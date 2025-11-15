@@ -32,6 +32,11 @@ export class WebsController {
     return this.websService.findOne(user.userId, id);
   }
 
+  @Get(':id/overview')
+  overview(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.getOverview(user.userId, id);
+  }
+
   @Post()
   create(@CurrentUser() user: AuthenticatedUserPayload, @Body() payload: CreateWebDto) {
     return this.websService.create(user.userId, payload);

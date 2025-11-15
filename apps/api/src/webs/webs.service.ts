@@ -152,4 +152,45 @@ export class WebsService {
     await this.prisma.webCredentials.delete({ where: { id: record.id } });
     return { deleted: true };
   }
+
+  async getOverview(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId },
+      include: {
+        analysis: true,
+        articles: {
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }
+      }
+    });
+
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    const analysis = web.analysis;
+
+    return {
+      web: {
+        id: web.id,
+        url: web.url,
+        status: web.status,
+        nickname: web.nickname,
+        createdAt: web.createdAt
+      },
+      analysis: {
+        lastScanAt: analysis?.lastScanAt ?? null,
+        hasScanResult: Boolean(analysis?.scanResult),
+        hasBusinessProfile: Boolean(analysis?.businessProfile),
+        hasSeoStrategy: Boolean(analysis?.seoStrategy)
+      },
+      articles: web.articles.map((article) => ({
+        id: article.id,
+        title: article.title,
+        status: article.status,
+        createdAt: article.createdAt
+      }))
+    };
+  }
 }

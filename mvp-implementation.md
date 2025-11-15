@@ -96,10 +96,10 @@ _Frontend (Next.js)_
 
 **Goal:** Provide minimal JSON API for the dashboard to show the state of a user’s websites/pipeline.
 
-- [ ] Add `GET /api/me`:
+- [x] Add `GET /api/me`:
   - Protected by JWT guard.
   - Returns `{ user: { id, email }, webs: [...] }` with each `Web` including `status`, `nickname`, `url`, `createdAt`.
-- [ ] Add `GET /api/webs/:id/overview`:
+- [x] Add `GET /api/webs/:id/overview`:
   - Protected by JWT guard.
   - Returns:
     ```jsonc

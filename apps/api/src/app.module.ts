@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { QueuesModule } from './queues/queues.module';
 import { WebsModule } from './webs/webs.module';
+import { MeModule } from './me/me.module';
 
 @Module({
   imports: [
@@ -42,7 +43,8 @@ import { WebsModule } from './webs/webs.module';
     QueuesModule,
     AuthModule,
     BillingModule,
-    WebsModule
+    WebsModule,
+    MeModule
   ],
   controllers: [AppController],
   providers: [AppService]
