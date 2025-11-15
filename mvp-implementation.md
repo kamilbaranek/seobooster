@@ -127,7 +127,7 @@ _Frontend (Next.js)_
 
 **Goal:** After payment, user can see at least one web and its pipeline status.
 
-- [ ] Implement `/dashboard/index.tsx`:
+- [x] Implement `/dashboard/index.tsx`:
   - On mount:
     - Calls `GET /api/me` to fetch current user and webs.
     - For active web (or first web) calls `GET /api/webs/:id/overview`.
@@ -139,15 +139,15 @@ _Frontend (Next.js)_
         - Analysis: `hasBusinessProfile`?
         - Strategy: `hasSeoStrategy`?
         - Draft article: existence `articles` with `status = DRAFT`.
-- [ ] For now, clicking na web v seznamu přepne vybraný `webId` a znovu načte overview.
+- [x] For now, clicking na web v seznamu přepne vybraný `webId` a znovu načte overview.
 
 ### P2.3 Basic Auth Handling in Frontend
 
-- [ ] Implement jednoduchý auth client (React hook nebo util):
+- [x] Implement jednoduchý auth client (React hook nebo util):
   - `login()` / `register()` ukládají JWT do `localStorage`.
   - `getToken()` vrací token.
   - Custom fetch wrapper automaticky přidá `Authorization: Bearer <token>`.
-- [ ] Implementovat guard pro bariéry:
+- [x] Implementovat guard pro bariéry:
   - Pokud není token, `/dashboard` a `/onboarding/payment` přesměrují na `/login` nebo `/onboarding`.
 
 > Později: přechod na httpOnly cookies, refresh tokeny, CSRF ochrana.

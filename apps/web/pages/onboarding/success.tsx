@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { apiFetch } from '../../lib/api-client';
+import { getToken } from '../../lib/auth-storage';
 
 interface WebDto {
   id: string;
@@ -20,6 +21,11 @@ const SuccessPage = () => {
   const [timeoutReached, setTimeoutReached] = useState(false);
 
   useEffect(() => {
+    if (!getToken()) {
+      router.replace('/login');
+      return;
+    }
+
     if (!webId) {
       return;
     }
@@ -125,4 +131,3 @@ const SuccessPage = () => {
 };
 
 export default SuccessPage;
-

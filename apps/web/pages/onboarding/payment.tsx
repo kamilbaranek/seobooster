@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { apiFetch } from '../../lib/api-client';
+import { getToken } from '../../lib/auth-storage';
 
 interface CheckoutResponse {
   checkoutUrl: string;
@@ -16,10 +17,15 @@ const PaymentPage = () => {
   const [origin, setOrigin] = useState<string>('');
 
   useEffect(() => {
+    if (!getToken()) {
+      router.replace('/onboarding');
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin);
     }
-  }, []);
+  }, [router]);
 
   const successUrl = useMemo(() => `${origin}/onboarding/success?webId=${webId ?? ''}`, [origin, webId]);
   const cancelUrl = useMemo(() => `${origin}/onboarding/cancel?webId=${webId ?? ''}`, [origin, webId]);
