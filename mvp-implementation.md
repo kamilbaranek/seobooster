@@ -64,28 +64,28 @@ The focus is:
 
 _Backend (NestJS – `BillingModule`)_
 
-- [ ] Confirm/adjust `BillingService.createCheckoutSession`:
+- [x] Confirm/adjust `BillingService.createCheckoutSession`:
   - Input: `userId` (from JWT), `CreateCheckoutSessionDto` `{ webId, successUrl, cancelUrl }`.
   - Adds Stripe `metadata` + `subscription_data.metadata` with `userId`, `webId`.
   - Returns `{ checkoutUrl }`.
-- [ ] Ensure Stripe webhook (`/api/billing/webhook`) correctly:
+- [x] Ensure Stripe webhook (`/api/billing/webhook`) correctly:
   - Maps subscription → `subscriptions` table (`Subscription` model).
   - Updates `web.subscriptionId` and sets `Web.status = ACTIVE` on successful checkout / subscription activation.
   - Enqueues `ScanWebsite` job via `JobQueueService.enqueueScanWebsite(webId)`.
 
 _Frontend (Next.js)_
 
-- [ ] Add `/onboarding/payment.tsx`:
+- [x] Add `/onboarding/payment.tsx`:
   - Reads `webId` from `router.query`.
   - Button “Pokračovat k platbě”:
     - Calls `POST /api/billing/checkout-session` with `webId`, `successUrl`, `cancelUrl`.
     - On success: `window.location.href = checkoutUrl`.
-- [ ] Add `/onboarding/success.tsx`:
+- [x] Add `/onboarding/success.tsx`:
   - Reads `webId` from query.
   - Polls API (new endpoint `GET /api/webs/:id/overview` – see P2.1) every 2–3 s:
     - If `Web.status === ACTIVE` → redirect `/dashboard`.
     - If timeout (např. 60 s) → zobrazit info, že zpracování běží déle, a nabídnout přechod na dashboard.
-- [ ] Add `/onboarding/cancel.tsx`:
+- [x] Add `/onboarding/cancel.tsx`:
   - Simple info page: payment cancelled, CTA zpět na `/onboarding/payment?webId=...`.
 
 ---
