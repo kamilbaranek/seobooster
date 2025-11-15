@@ -1,0 +1,39 @@
+{
+  "name": "@seobooster/api",
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node -r tsconfig-paths/register src/main.ts",
+    "start": "node dist/main.js",
+    "test": "echo \"No backend tests yet\"",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@seobooster/ai-types": "0.1.0",
+    "@nestjs/bullmq": "^11.0.4",
+    "@nestjs/common": "latest",
+    "@nestjs/config": "latest",
+    "@nestjs/core": "latest",
+    "@nestjs/jwt": "^11.0.1",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "latest",
+    "@prisma/client": "^6.19.0",
+    "@seobooster/shared-types": "0.1.0",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.63.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "ioredis": "^5.8.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "prisma": "^6.19.0",
+    "reflect-metadata": "latest",
+    "rxjs": "latest",
+    "undici": "latest",
+    "stripe": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/passport-jwt": "^4.0.1"
+  }
+}

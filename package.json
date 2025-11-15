@@ -1,0 +1,31 @@
+{
+  "name": "seobooster",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:api": "npm run dev --workspace @seobooster/api",
+    "dev:web": "npm run dev --workspace @seobooster/web",
+    "dev:worker": "npm run dev --workspace @seobooster/worker",
+    "build": "npm run build --workspace @seobooster/api && npm run build --workspace @seobooster/web && npm run build --workspace @seobooster/worker",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "start:api": "npm run start --workspace @seobooster/api",
+    "start:web": "npm run start --workspace @seobooster/web",
+    "test": "npm run test --workspace @seobooster/api && npm run test --workspace @seobooster/web",
+    "lint": "npm run lint --workspace @seobooster/api && npm run lint --workspace @seobooster/web"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "eslint": "latest",
+    "prettier": "latest",
+    "ts-node": "latest",
+    "tsconfig-paths": "latest",
+    "typescript": "latest"
+  }
+}
