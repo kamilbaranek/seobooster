@@ -40,12 +40,12 @@ The focus is:
 
 **Goal:** Capture website URL, email, and password and create user+web.
 
-- [ ] Add `/login` page:
+- [x] Add `/login` page:
   - Form: `email`, `password`.
   - Calls `POST /api/auth/login`.
   - On success: store JWT (MVP: `localStorage` + in‑memory, post‑MVP: httpOnly cookie).
   - Redirect to `/dashboard` if user already has an active web.
-- [ ] Add `/onboarding/index.tsx` (or `/onboarding/step-1.tsx`):
+- [x] Add `/onboarding/index.tsx` (or `/onboarding/step-1.tsx`):
   - Form fields: `websiteUrl`, `email`, `password`.
   - On submit:
     - `POST /api/auth/register` with `{ email, password, websiteUrl }`.
