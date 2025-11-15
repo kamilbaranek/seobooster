@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -47,6 +47,7 @@ const DashboardPage = () => {
   const [selectedWebId, setSelectedWebId] = useState<string | null>(null);
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,37 +71,28 @@ const DashboardPage = () => {
     fetchProfile();
   }, [router, selectedWebId]);
 
+  const loadOverview = useCallback(
+    async (webId: string) => {
+      setLoadingOverview(true);
+      setError(null);
+      try {
+        const data = await apiFetch<OverviewResponse>(`/webs/${webId}/overview`);
+        setOverview(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Nepodařilo se načíst web.');
+      } finally {
+        setLoadingOverview(false);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (!selectedWebId) {
       return;
     }
-
-    let cancelled = false;
-    const fetchOverview = async () => {
-      setLoadingOverview(true);
-      setError(null);
-      try {
-        const data = await apiFetch<OverviewResponse>(`/webs/${selectedWebId}/overview`);
-        if (!cancelled) {
-          setOverview(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Nepodařilo se načíst web.');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingOverview(false);
-        }
-      }
-    };
-
-    fetchOverview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedWebId]);
+    loadOverview(selectedWebId);
+  }, [loadOverview, selectedWebId]);
 
   const pipelineSteps = useMemo(() => {
     if (!overview) return [];
@@ -111,6 +103,22 @@ const DashboardPage = () => {
       { key: 'article', label: 'Draft článku', done: overview.articles.length > 0 }
     ];
   }, [overview]);
+
+  const handleGenerateArticle = async () => {
+    if (!selectedWebId) return;
+    setGenerateLoading(true);
+    setError(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}/generate-article`, {
+        method: 'POST'
+      });
+      await loadOverview(selectedWebId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit generování.');
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
 
   return (
     <>
@@ -151,9 +159,9 @@ const DashboardPage = () => {
               <p className="eyebrow">Dashboard</p>
               <h2>{overview?.web.nickname ?? overview?.web.url ?? 'Vyberte web'}</h2>
             </div>
-            <Link className="button primary" href="/onboarding/payment">
-              Vygenerovat další web
-            </Link>
+            <button className="button primary" onClick={handleGenerateArticle} disabled={!selectedWebId || generateLoading}>
+              {generateLoading ? 'Generuji…' : 'Vygenerovat článek'}
+            </button>
           </header>
 
           {error && <div className="notice error">{error}</div>}
@@ -253,6 +261,7 @@ const DashboardPage = () => {
           border-radius: 999px;
           text-align: center;
           font-weight: 600;
+          border: none;
         }
         .button.primary {
           background: linear-gradient(120deg, #0ea5e9, #8b5cf6);
@@ -350,4 +359,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-

@@ -158,11 +158,11 @@ _Frontend (Next.js)_
 
 **Goal:** Pro MVP stačí možnost ručně spustit generování článku pro web, aby bylo co ukázat v dashboardu.
 
-- [ ] API endpoint `POST /api/webs/:id/generate-article`:
+- [x] API endpoint `POST /api/webs/:id/generate-article`:
   - Protected (JWT).
   - Enqueues `GenerateArticle` job for daný `webId`.
   - Může volit cluster přes jednoduchý algoritmus (např. první cluster ze strategie) – později nahradíme schedulerem.
-- [ ] V dashboardu:
+- [x] V dashboardu:
   - Přidat tlačítko „Vygenerovat článek“ pro vybraný web.
   - Po kliknutí: zavolat endpoint, zobrazit loading, po krátké době aktualizovat overview (nový draft).
 

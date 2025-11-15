@@ -74,4 +74,9 @@ export class WebsController {
   deleteCredentials(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.deleteCredentials(user.userId, id);
   }
+
+  @Post(':id/generate-article')
+  generateArticle(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.triggerArticleGeneration(user.userId, id);
+  }
 }

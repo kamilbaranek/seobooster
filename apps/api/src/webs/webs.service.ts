@@ -193,4 +193,15 @@ export class WebsService {
       }))
     };
   }
+
+  async triggerArticleGeneration(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.jobQueueService.enqueueGenerateArticle(web.id);
+    return { queued: true };
+  }
 }
