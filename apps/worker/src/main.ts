@@ -25,9 +25,9 @@ import {
   ScanWebsiteJob
 } from '@seobooster/queue-types';
 import { createLogger } from './logger';
-import { aiProvider } from './services/ai-orchestrator';
+import { aiProvider, aiModelMap } from './services/ai-orchestrator';
 import type { AiTaskType, BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
-import { renderPromptTemplate } from '@seobooster/ai-prompts';
+import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
@@ -105,17 +105,59 @@ const createWorker = <T>(
     { connection: redisConnection }
   );
 
-const renderOverrides = (
+const renderPromptsForTask = (
+  task: AiTaskType,
   prompts: { systemPrompt: string | null; userPrompt: string | null } | null,
   variables: Record<string, unknown>
 ) => {
-  if (!prompts) {
-    return {};
-  }
+  const defaults = DEFAULT_PROMPTS[task];
+  const systemTemplate = prompts?.systemPrompt ?? defaults.systemPrompt;
+  const userTemplate = prompts?.userPrompt ?? defaults.userPrompt;
+
   return {
-    systemPrompt: prompts.systemPrompt ? renderPromptTemplate(prompts.systemPrompt, variables) : undefined,
-    userPrompt: prompts.userPrompt ? renderPromptTemplate(prompts.userPrompt, variables) : undefined
+    systemPrompt: renderPromptTemplate(systemTemplate, variables) ?? systemTemplate,
+    userPrompt: renderPromptTemplate(userTemplate, variables) ?? userTemplate
   };
+};
+
+type AiCallLogInput = {
+  webId?: string;
+  task: AiTaskType;
+  provider: string;
+  model: string;
+  variables: Record<string, unknown>;
+  systemPrompt: string;
+  userPrompt: string;
+  responseRaw?: unknown;
+  responseParsed?: unknown;
+  status: 'SUCCESS' | 'ERROR';
+  errorMessage?: string;
+};
+
+const recordAiCall = async (payload: AiCallLogInput) => {
+  if (!AI_DEBUG_LOG_PROMPTS) {
+    return;
+  }
+
+  try {
+    await prisma.aiCallLog.create({
+      data: {
+        webId: payload.webId,
+        task: payload.task,
+        provider: payload.provider,
+        model: payload.model,
+        variables: payload.variables as Prisma.InputJsonValue,
+        systemPrompt: payload.systemPrompt,
+        userPrompt: payload.userPrompt,
+        responseRaw: payload.responseRaw as Prisma.InputJsonValue,
+        responseParsed: payload.responseParsed as Prisma.InputJsonValue,
+        status: payload.status,
+        errorMessage: payload.errorMessage ?? null
+      }
+    });
+  } catch (error) {
+    logger.error({ error, task: payload.task, webId: payload.webId }, 'Failed to persist AI call log');
+  }
 };
 
 const bootstrap = async () => {
@@ -144,21 +186,53 @@ const bootstrap = async () => {
       where: { task: 'scan' }
     });
     const variables = { url: web.url };
-    const overrides = renderOverrides(prompts, variables);
+    const renderedPrompts = renderPromptsForTask('scan', prompts, variables);
+    const providerName = aiProvider.name;
+    const modelName = aiModelMap.scan;
 
     if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: web.id, variables, overrides }, 'AI debug: scan request');
+      logger.info({ webId: web.id, variables, renderedPrompts }, 'AI debug: scan request');
     }
 
-    const scanResult = (await aiProvider.scanWebsite(web.url, {
-      task: 'scan',
-      systemPrompt: overrides.systemPrompt,
-      userPrompt: overrides.userPrompt,
-      variables
-    })) as ScanResult;
+    let scanResult: ScanResult;
+    try {
+      scanResult = (await aiProvider.scanWebsite(web.url, {
+        task: 'scan',
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        variables
+      })) as ScanResult;
 
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: web.id, result: scanResult }, 'AI debug: scan response');
+      if (AI_DEBUG_LOG_PROMPTS) {
+        logger.info({ webId: web.id, result: scanResult }, 'AI debug: scan response');
+      }
+
+      await recordAiCall({
+        webId: web.id,
+        task: 'scan',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: scanResult,
+        responseParsed: scanResult,
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      await recordAiCall({
+        webId: web.id,
+        task: 'scan',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : undefined
+      });
+      throw error;
     }
 
     await prisma.webAnalysis.upsert({
@@ -192,18 +266,50 @@ const bootstrap = async () => {
       where: { task: 'analyze' }
     });
     const variables = { url: scan.url, scanResult: scan };
-    const overrides = renderOverrides(prompts, variables);
+    const renderedPrompts = renderPromptsForTask('analyze', prompts, variables);
+    const providerName = aiProvider.name;
+    const modelName = aiModelMap.analyze;
 
     if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: analyze request');
+      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: analyze request');
     }
 
-    const profile = (await aiProvider.analyzeBusiness(scan, {
-      task: 'analyze',
-      systemPrompt: overrides.systemPrompt,
-      userPrompt: overrides.userPrompt,
-      variables
-    })) as BusinessProfile;
+    let profile: BusinessProfile;
+    try {
+      profile = (await aiProvider.analyzeBusiness(scan, {
+        task: 'analyze',
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        variables
+      })) as BusinessProfile;
+
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'analyze',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: profile,
+        responseParsed: profile,
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'analyze',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : undefined
+      });
+      throw error;
+    }
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, result: profile }, 'AI debug: analyze response');
@@ -231,18 +337,50 @@ const bootstrap = async () => {
       where: { task: 'strategy' }
     });
     const variables = { businessProfile };
-    const overrides = renderOverrides(prompts, variables);
+    const renderedPrompts = renderPromptsForTask('strategy', prompts, variables);
+    const providerName = aiProvider.name;
+    const modelName = aiModelMap.strategy;
 
     if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: strategy request');
+      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
     }
 
-    const strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
-      task: 'strategy',
-      systemPrompt: overrides.systemPrompt,
-      userPrompt: overrides.userPrompt,
-      variables
-    })) as SeoStrategy;
+    let strategy: SeoStrategy;
+    try {
+      strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
+        task: 'strategy',
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        variables
+      })) as SeoStrategy;
+
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'strategy',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: strategy,
+        responseParsed: strategy,
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'strategy',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : undefined
+      });
+      throw error;
+    }
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, result: strategy }, 'AI debug: strategy response');
@@ -285,28 +423,60 @@ const bootstrap = async () => {
       where: { task: 'article' }
     });
     const variables = { strategy, cluster: targetCluster };
-    const overrides = renderOverrides(prompts, variables);
+    const renderedPrompts = renderPromptsForTask('article', prompts, variables);
+    const providerName = aiProvider.name;
+    const modelName = aiModelMap.article;
 
     if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: article request');
+      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: article request');
     }
 
-    const draft = await aiProvider.generateArticle(
-      strategy,
-      {
-        clusterName: targetCluster.name,
-        targetTone: strategy.targetTone
-      },
-      {
-        task: 'article',
-        systemPrompt: overrides.systemPrompt,
-        userPrompt: overrides.userPrompt,
-        variables
-      }
-    );
+    let draft;
+    try {
+      draft = await aiProvider.generateArticle(
+        strategy,
+        {
+          clusterName: targetCluster.name,
+          targetTone: strategy.targetTone
+        },
+        {
+          task: 'article',
+          systemPrompt: renderedPrompts.systemPrompt,
+          userPrompt: renderedPrompts.userPrompt,
+          variables
+        }
+      );
 
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, result: draft }, 'AI debug: article response');
+      if (AI_DEBUG_LOG_PROMPTS) {
+        logger.info({ webId: job.data.webId, result: draft }, 'AI debug: article response');
+      }
+
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'article',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: draft,
+        responseParsed: draft,
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      await recordAiCall({
+        webId: job.data.webId,
+        task: 'article',
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: renderedPrompts.systemPrompt,
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : undefined
+      });
+      throw error;
     }
 
     const article = await prisma.article.create({

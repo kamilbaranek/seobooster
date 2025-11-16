@@ -232,6 +232,175 @@ Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
 
 ---
 
+---
+
+## M6 – Per-request AI logy (AiCallLog + UI)
+
+-### M6.1 Datový model pro logy
+
+**Cíl:** Mít per-request historii AI volání tak, aby Superadmin viděl, co se opravdu poslalo na poskytovatele a jaká byla odpověď.
+
+- [x] Rozšiř `prisma/schema.prisma` o model `AiCallLog`, např.:
+  - `id: String @id @default(cuid())`
+  - `webId: String?` (relace na `Web`, pro přiřazení konkrétnímu webu – může být null pro globální testy).
+  - `task: String` (hodnoty z `AiTaskType` – `scan/analyze/strategy/article`).
+  - `provider: String` (např. `openrouter`, `openai`, `anthropic`).
+  - `model: String` (ID modelu použitého v requestu).
+  - `variables: Json` (snapshot proměnných použitých při templatingu).
+  - `systemPrompt: String` (finální system prompt, po dosazení proměnných).
+  - `userPrompt: String` (finální user prompt, po dosazení proměnných).
+  - `responseRaw: Json` (raw JSON odpovědi z provideru nebo parsovaný objekt před mapováním na `ScanResult/...`).
+  - `responseParsed: Json?` (volitelné: kopie parsed `ScanResult/BusinessProfile/...`).
+  - `status: String` (`SUCCESS` / `ERROR`).
+  - `errorMessage: String?`.
+  - `createdAt: DateTime @default(now())`.
+- [x] Spusť `npm run db:migrate` s popisným názvem migrace (`add_ai_call_log`). *(pozn.: kvůli omezením připojení k DB byla migrace vyhotovena manuálně jako SQL soubor a Prisma Client zregenerován)*
+- [x] `npm run build` + commit: `feat: add ai call log model`.
+
+### M6.2 Worker – ukládání logů
+
+**Cíl:** Každý AI krok uloží záznam do `AiCallLog`, ale jen pokud je zapnutý debug flag.
+
+- [x] V `apps/worker/src/main.ts` doplň helper pro zápis logu:
+  - Funkce např. `logAiCall({ webId, task, provider, model, variables, systemPrompt, userPrompt, responseRaw, responseParsed, status, errorMessage })`.
+  - Tato funkce:
+    - přečte `process.env.AI_DEBUG_LOG_PROMPTS`,
+    - pokud není `true`, nic neudělá (aby se logy daly vypnout),
+    - jinak zapíše záznam do `AiCallLog` přes Prisma.
+- [x] Pro každý worker krok:
+  - po vyrenderování promptu (před voláním modelu) připrav objekt s `variables`, `systemPrompt`, `userPrompt`, `provider` a `model` (přečti z konfigurace OpenRouter provideru).
+  - po obdržení odpovědi:
+    - do `responseRaw` ulož raw JSON (to, co vrátil OpenRouter).
+    - do `responseParsed` můžeš uložit `ScanResult` / `BusinessProfile` / `SeoStrategy` / `ArticleDraft` (serializované do JSON).
+    - do `status` zapiš `SUCCESS` nebo `ERROR`.
+  - Zavolej `logAiCall(...)`.
+- [x] `npm run build` + commit: `feat: persist ai call logs from worker`.
+
+### M6.3 Admin API – čtení logů
+
+**Cíl:** Superadmin uvidí historii volání filtrovateľně podle webu a tasku.
+
+- [x] Vytvoř nový controller `AdminAiLogsController` v `apps/api/src/admin/ai-logs`:
+  - Route prefix `@Controller('admin/ai-logs')`.
+  - Guardy: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles('SUPERADMIN')`.
+- [x] Endpoint `GET /api/admin/ai-logs`:
+  - Query parametry:
+    - `webId?: string`,
+    - `task?: string`,
+    - `provider?: string`,
+    - `limit?: number` (např. max 100).
+  - Vrátí pole logů se základními poli:
+    - `id`, `createdAt`, `webId`, `task`, `provider`, `model`, `status`.
+- [x] Endpoint `GET /api/admin/ai-logs/:id`:
+  - Vrátí detail jednoho logu včetně:
+    - `variables`, `systemPrompt`, `userPrompt`, `responseRaw`, `responseParsed`, `errorMessage`.
+- [x] Přidej modul `AdminAiLogsModule` a zaregistruj jej v `AppModule`.
+- [x] `npm run build --workspace @seobooster/api` + commit: `feat: add admin AI logs API`.
+
+### M6.4 Superadmin UI – historie v /admin/prompts
+
+**Cíl:** Přímo u každého tasku vidět poslední volání a možnost rozkliknout detail.
+
+- [x] V `apps/web/pages/admin/prompts.tsx`:
+  - Přidej pravý panel „Historie volání“ pod existující preview sekci:
+    - Použij endpoint `GET /api/admin/ai-logs?task=<selectedTask>&limit=20` po načtení tasku.
+    - Zobraz tabulku:
+      - sloupce: čas (`createdAt`), `webId` (zkrácený nebo URL), `provider`, `model`, `status`.
+      - řádek kliknutelný → uloží `selectedLogId`.
+  - Po kliknutí na řádek:
+    - Zavolej `GET /api/admin/ai-logs/:id`.
+    - Pod tabulkou zobraz tři `<pre>` bloky:
+      - „System prompt (used)“
+      - „User prompt (used)“
+      - „Variables + response“
+    - Pokud `status === 'ERROR'`, zobraz `errorMessage` červeně.
+- [x] `npm run build --workspace @seobooster/web` + commit: `feat: show per-request AI history in superadmin`.
+
+---
+
+## M7 – Výběr poskytovatele a modelu per task
+
+### M7.1 Rozšíření konfigurace v DB
+
+**Cíl:** Pro každý krok pipeline nastavit, přes kterého poskytovatele a konkrétní model poběží.
+
+- [ ] Rozšiř `AiPromptConfig` v `prisma/schema.prisma` o pole:
+  - `provider: String?` – např. `openrouter`, `openai`, `anthropic`.  
+    - Pokud null → použij default z globální konfigurace (`AI_PROVIDER`).
+  - `model: String?` – konkrétní model ID (např. `openrouter/deepseek-r1`, `anthropic/claude-3.5-sonnet`).  
+    - Pokud null → použij defaultní mapování z `AiModelMap` (env).
+- [ ] Migrační skript:
+  - Vytvoř migraci (např. `add_provider_model_to_ai_prompt_config`).
+  - `npm run db:migrate`.
+- [ ] `npm run build` + commit: `feat: extend AiPromptConfig with provider and model`.
+
+### M7.2 Backend – výběr provideru a modelu
+
+**Cíl:** Worker pro každou fázi pipeline použije provider/model podle konfigurace `AiPromptConfig`.
+
+- [ ] V `libs/ai-providers`:
+  - Zkontroluj, že existuje rozhraní, které umožňuje inicializovat různé providery (OpenRouter, OpenAI, Anthropic).  
+    - Pokud ne, připrav rozhraní `AiProviderFactory`, které na základě jména poskytovatele + modelu vrátí instanci `AiProvider`.
+- [ ] V workeru:
+  - Pro každý krok při načtení promptu `AiPromptConfig`:
+    - sestav strukturu `selectedProvider = prompt.provider ?? process.env.AI_PROVIDER ?? 'openrouter'`.
+    - `selectedModel = prompt.model ?? modelMap[task]` (kde `modelMap` je tvoje existující mapování z envu).
+  - Před voláním `aiProvider.*`:
+    - buď:
+      - použij existující `aiProvider`, ale rozšiř ho tak, aby respektoval `selectedProvider` / `selectedModel`, nebo
+      - použij fabriku: `const provider = aiProviderFactory(selectedProvider, selectedModel)`.
+- [ ] Doplň tyto informace i do `AiCallLog` (`provider`, `model`), aby historie odpovídala realitě.
+- [ ] `npm run build --workspace @seobooster/worker` + commit: `feat: select AI provider and model per task`.
+
+### M7.3 Admin API – čtení / ukládání provideru a modelu
+
+**Cíl:** Superadmin UI umí nastavit provider + model pro každý task.
+
+- [ ] V `AdminPromptsController`:
+  - Rozšiř návratové DTO o `provider` a `model`.
+  - U `PUT /api/admin/prompts/:task` povol v payloadu i `provider` a `model`.
+  - U `GET /api/admin/prompts` přidej tyto hodnoty do seznamu (aby UI vědělo, zda je tam custom nastavení).
+- [ ] DTO `UpdatePromptDto` rozšiř o volitelné:
+  - `provider?: string;`
+  - `model?: string;`
+- [ ] `npm run build --workspace @seobooster/api` + commit: `feat: expose provider and model in admin prompts API`.
+
+### M7.4 Superadmin UI – přepínač poskytovatele a modelu
+
+**Cíl:** Na stránce `/admin/prompts` u každého tasku vidět a měnit provider + model.
+
+- [ ] V `apps/web/pages/admin/prompts.tsx`:
+  - Rozšiř `PromptDto` o `provider?: string` a `model?: string`.
+  - Nad textareas přidej sekci „AI provider & model“:
+    - Select pro `provider` s hodnotami:
+      - `default` (použít globální nastavení / env),
+      - `openrouter`,
+      - `openai`,
+      - `anthropic` (zatím může být disabled, pokud není implementováno).
+    - Select pro `model`:
+      - Naplněný staticky podle provideru (**MVP**):
+        - OpenRouter: několik doporučených modelů.
+        - OpenAI / Anthropic: placeholder seznam pro budoucí implementaci.
+      - Později lze napojit na API, které vrací dostupné modely dynamicky.
+  - Při `PUT /api/admin/prompts/:task` posílej i `provider` + `model`.
+- [ ] V UI jasně zobraz:
+  - Pokud je `provider/model` `null` → „inherit from global settings“.
+  - Pokud je nastaveno → „custom provider/model for this task“.
+- [ ] `npm run build --workspace @seobooster/web` + commit: `feat: allow configuring provider and model per task`.
+
+### M7.5 Dokumentace & bezpečnost
+
+- [ ] Aktualizuj `README.md`:
+  - Uveď, že Superadmin může per-krok nastavovat:
+    - provider (`openrouter` / další),
+    - model ID.
+  - Připomeň, že API klíče pro OpenAI/Anthropic musí být nastavené v env a nesmí se zobrazovat v UI.
+- [ ] Do `superadmin.md` přidej krátkou poznámku:
+  - jaký je doporučený default provider/model pro jednotlivé kroky (např. lehčí model pro scan, robustnější pro strategy/article).
+- [ ] `npm run build` + commit: `docs: document per-task provider and model selection`.
+
+---
+
 ## Poznámka na závěr
 
 Při implementaci se drž těchto zásad:

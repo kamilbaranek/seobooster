@@ -85,6 +85,7 @@ model Web {
   credentials     WebCredentials?
   analysis        WebAnalysis?
   articles        Article[]
+  aiCallLogs      AiCallLog[]
 }
 
 model WebCredentials {
@@ -141,4 +142,21 @@ model AiPromptConfig {
   userPrompt   String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model AiCallLog {
+  id             String   @id @default(cuid())
+  web            Web?     @relation(fields: [webId], references: [id])
+  webId          String?
+  task           String
+  provider       String
+  model          String
+  variables      Json?
+  systemPrompt   String
+  userPrompt     String
+  responseRaw    Json?
+  responseParsed Json?
+  status         String
+  errorMessage   String?
+  createdAt      DateTime @default(now())
 }

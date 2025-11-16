@@ -28,6 +28,25 @@ interface PreviewResponse {
   variables: Record<string, unknown>;
 }
 
+interface AiLogListItem {
+  id: string;
+  createdAt: string;
+  webId?: string | null;
+  task: TaskKey;
+  provider: string;
+  model: string;
+  status: string;
+}
+
+interface AiLogDetail extends AiLogListItem {
+  variables?: Record<string, unknown> | null;
+  systemPrompt: string;
+  userPrompt: string;
+  responseRaw?: unknown;
+  responseParsed?: unknown;
+  errorMessage?: string | null;
+}
+
 const TASKS: Array<{ key: TaskKey; title: string; description: string }> = [
   {
     key: 'scan',
@@ -80,6 +99,21 @@ const AdminPromptsPage = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
+  const [logEntries, setLogEntries] = useState<AiLogListItem[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [logDetail, setLogDetail] = useState<AiLogDetail | null>(null);
+  const [logDetailLoading, setLogDetailLoading] = useState(false);
+  const [logDetailError, setLogDetailError] = useState<string | null>(null);
+  const formatDateTime = (value: string) => new Date(value).toLocaleString();
+  const renderJson = (value: unknown) => {
+    try {
+      return JSON.stringify(value ?? null, null, 2);
+    } catch {
+      return 'Nelze serializovat obsah.';
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -154,6 +188,39 @@ const AdminPromptsPage = () => {
     []
   );
 
+  const loadLogs = useCallback(
+    async (task: TaskKey) => {
+      setLogsLoading(true);
+      setLogsError(null);
+      setSelectedLogId(null);
+      setLogDetail(null);
+      try {
+        const data = await apiFetch<AiLogListItem[]>(`/admin/ai-logs?task=${task}&limit=20`);
+        setLogEntries(data);
+      } catch (err) {
+        setLogsError(err instanceof Error ? err.message : 'Nepodařilo se načíst logy.');
+        setLogEntries([]);
+      } finally {
+        setLogsLoading(false);
+      }
+    },
+    []
+  );
+
+  const loadLogDetail = useCallback(async (logId: string) => {
+    setLogDetailLoading(true);
+    setLogDetailError(null);
+    try {
+      const detail = await apiFetch<AiLogDetail>(`/admin/ai-logs/${logId}`);
+      setLogDetail(detail);
+    } catch (err) {
+      setLogDetailError(err instanceof Error ? err.message : 'Nelze načíst detail záznamu.');
+      setLogDetail(null);
+    } finally {
+      setLogDetailLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isSuperadmin) {
       return;
@@ -166,7 +233,8 @@ const AdminPromptsPage = () => {
       return;
     }
     loadPromptDetail(selectedTask);
-  }, [isSuperadmin, selectedTask, loadPromptDetail]);
+    loadLogs(selectedTask);
+  }, [isSuperadmin, selectedTask, loadPromptDetail, loadLogs]);
 
   const handleSave = async () => {
     if (!selectedTask) return;
@@ -225,6 +293,11 @@ const AdminPromptsPage = () => {
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  const handleSelectLog = (logId: string) => {
+    setSelectedLogId(logId);
+    loadLogDetail(logId);
   };
 
   const selectedMeta = TASKS.find((task) => task.key === selectedTask);
@@ -358,6 +431,89 @@ const AdminPromptsPage = () => {
                       </div>
                     </section>
                   )}
+
+                  <section className="history">
+                    <div className="history-head">
+                      <h3>Historie volání</h3>
+                      {logsLoading && <small>Načítám…</small>}
+                    </div>
+                    {logsError && <p className="error">{logsError}</p>}
+                    {!logsLoading && logEntries.length === 0 && <p className="muted">Zatím žádné záznamy.</p>}
+                    {logEntries.length > 0 && (
+                      <div className="logs-table-wrapper">
+                        <table className="logs-table">
+                          <thead>
+                            <tr>
+                              <th>Čas</th>
+                              <th>Web</th>
+                              <th>Provider</th>
+                              <th>Model</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {logEntries.map((log) => (
+                              <tr
+                                key={log.id}
+                                className={selectedLogId === log.id ? 'active' : ''}
+                                onClick={() => handleSelectLog(log.id)}
+                              >
+                                <td>{formatDateTime(log.createdAt)}</td>
+                                <td>{log.webId ?? '—'}</td>
+                                <td>{log.provider}</td>
+                                <td>{log.model}</td>
+                                <td>
+                                  <span className={`status-pill ${log.status.toLowerCase()}`}>
+                                    {log.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedLogId && logDetailLoading && <p className="muted">Načítám detail…</p>}
+                    {logDetailError && <p className="error">{logDetailError}</p>}
+                    {logDetail && (
+                      <div className="log-detail">
+                        <div className="log-meta">
+                          <p>
+                            <strong>Čas:</strong> {formatDateTime(logDetail.createdAt)}
+                          </p>
+                          <p>
+                            <strong>Web:</strong> {logDetail.webId ?? 'N/A'}
+                          </p>
+                          <p>
+                            <strong>Provider:</strong> {logDetail.provider} / {logDetail.model}
+                          </p>
+                          <p>
+                            <strong>Status:</strong> {logDetail.status}
+                          </p>
+                        </div>
+                        {logDetail.errorMessage && <p className="error">{logDetail.errorMessage}</p>}
+                        <div className="preview-grid">
+                          <div>
+                            <h4>System prompt (used)</h4>
+                            <pre>{logDetail.systemPrompt}</pre>
+                          </div>
+                          <div>
+                            <h4>User prompt (used)</h4>
+                            <pre>{logDetail.userPrompt}</pre>
+                          </div>
+                          <div>
+                            <h4>Variables</h4>
+                            <pre>{renderJson(logDetail.variables)}</pre>
+                          </div>
+                          <div>
+                            <h4>Raw response</h4>
+                            <pre>{renderJson(logDetail.responseRaw)}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
                 </>
               )}
             </section>
@@ -569,6 +725,62 @@ const AdminPromptsPage = () => {
           border-radius: 0.6rem;
           border: 1px solid rgba(255, 255, 255, 0.08);
           min-height: 120px;
+        }
+        .history {
+          margin-top: 2rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding-top: 1.5rem;
+        }
+        .history-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+        }
+        .logs-table-wrapper {
+          overflow-x: auto;
+          margin-top: 0.5rem;
+        }
+        .logs-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .logs-table th,
+        .logs-table td {
+          text-align: left;
+          padding: 0.4rem 0.6rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          font-size: 0.85rem;
+        }
+        .logs-table tr {
+          cursor: pointer;
+        }
+        .logs-table tr:hover,
+        .logs-table tr.active {
+          background: rgba(125, 211, 252, 0.08);
+        }
+        .status-pill {
+          display: inline-block;
+          padding: 0.1rem 0.6rem;
+          border-radius: 999px;
+          font-size: 0.75rem;
+          text-transform: uppercase;
+        }
+        .status-pill.success {
+          background: rgba(34, 197, 94, 0.15);
+          color: #4ade80;
+        }
+        .status-pill.error {
+          background: rgba(248, 113, 113, 0.15);
+          color: #f87171;
+        }
+        .log-detail {
+          margin-top: 1.5rem;
+        }
+        .log-meta {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.5rem;
+          margin-bottom: 1rem;
         }
         @media (max-width: 960px) {
           .prompts-grid {

@@ -12,6 +12,7 @@ import { WebsModule } from './webs/webs.module';
 import { MeModule } from './me/me.module';
 import { AdminPromptsModule } from './admin/prompts/admin-prompts.module';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
 
 @Module({
   imports: [
@@ -46,7 +47,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
     BillingModule,
     WebsModule,
     MeModule,
-    AdminPromptsModule
+    AdminPromptsModule,
+    AdminAiLogsModule
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard]
