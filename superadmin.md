@@ -118,20 +118,10 @@ Cíl: REST API, přes které superadmin uvidí a změní prompty.
 
 ### M2.2 Detail + upsert + delete
 
-1. V `admin-prompts.controller.ts`:
-   - `GET /api/admin/prompts/:task`:
-     - Vezmi `task` z `@Param('task')` (ověř, že je jedním z `'scan'|'analyze'|'strategy'|'article'`, můžeš si udělat helper).
-     - Najdi `AiPromptConfig` podle `task`.
-     - Pokud není, vrať prázdný objekt s implicitním `task` a prázdnými stringy.
-   - `PUT /api/admin/prompts/:task`:
-     - DTO `UpdatePromptDto` (pole `systemPrompt`, `userPrompt`, oba `@IsString()`).
-     - `upsert` do `aiPromptConfig`.
-   - `DELETE /api/admin/prompts/:task`:
-     - Smaž záznam podle `task`.
-     - Pokud neexistuje, vrať 204 (nebo klidně 200 s `{ deleted: false }`).
-
-2. `npm run build --workspace @seobooster/api`  
-   - Commit: `git commit -m "feat: add admin prompt detail and upsert endpoints"`  
+- [x] `GET /api/admin/prompts/:task` vrací detail (nebo prázdné stringy, pokud neexistuje).
+- [x] `PUT /api/admin/prompts/:task` používá `UpdatePromptDto` a `upsert` v DB.
+- [x] `DELETE /api/admin/prompts/:task` odstraní záznam (nebo mlčky succeedne, pokud neexistuje).
+- [x] `npm run build --workspace @seobooster/api` + commit `feat: add admin prompt detail and upsert endpoints`.
 
 ---
 
@@ -139,16 +129,16 @@ Cíl: REST API, přes které superadmin uvidí a změní prompty.
 
 ### M3.1 Routing & ochrana
 
-1. V `apps/web/pages/admin/prompts.tsx` vytvoř novou stránku:
-   - Při mountu:
-     - Zkontroluj token (`getToken()`), pokud chybí → redirect `/login`.
-     - Zavolej `GET /api/me`.
-     - Pokud `user.role !== 'SUPERADMIN'` → redirect `/dashboard`.
+- [x] V `apps/web/pages/admin/prompts.tsx` vytvoř novou stránku:
+  - Při mountu:
+    - Zkontroluj token (`getToken()`), pokud chybí → redirect `/login`.
+    - Zavolej `GET /api/me`.
+    - Pokud `user.role !== 'SUPERADMIN'` → redirect `/dashboard`.
 
-2. Stránka může používat stejný základní layout jako dashboard (nebo jednoduchý panel).
+- [x] Stránka může používat stejný základní layout jako dashboard (nebo jednoduchý panel).
 
-3. `npm run build --workspace @seobooster/web`  
-   - Commit: `git commit -m "feat: add superadmin prompts page skeleton"`  
+- [x] `npm run build --workspace @seobooster/web`  
+  - Commit: `git commit -m "feat: add superadmin prompts page skeleton"`  
 
 ### M3.2 UI – seznam a editor
 
