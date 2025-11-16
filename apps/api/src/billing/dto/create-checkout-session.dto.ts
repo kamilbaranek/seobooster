@@ -4,10 +4,9 @@ export class CreateCheckoutSessionDto {
   @IsString()
   webId!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   successUrl!: string;
 
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   cancelUrl!: string;
 }
-
