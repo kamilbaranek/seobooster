@@ -142,25 +142,25 @@ Cíl: REST API, přes které superadmin uvidí a změní prompty.
 
 ### M3.2 UI – seznam a editor
 
-1. Na `/admin/prompts`:
-   - Nech stránku načíst `GET /api/admin/prompts`.
-   - Vykresli seznam tasků v tabulce nebo seznamu:
-     - Např. „Scan (scan)“, „Analyze (analyze)“, atd.
-     - U každého tasku zobraz, zda má vlastní config (`custom`), nebo používá default (`default`).
+- [x] Na `/admin/prompts`:
+  - Nech stránku načíst `GET /api/admin/prompts`.
+  - Vykresli seznam tasků v tabulce nebo seznamu:
+    - Např. „Scan (scan)“, „Analyze (analyze)“, atd.
+    - U každého tasku zobraz, zda má vlastní config (`custom`), nebo používá default (`default`).
 
-2. Přidej možnost kliknout na task:
-   - Po kliknutí:
-     - Zavolej `GET /api/admin/prompts/:task`.
-     - Naplň formulář:
-       - Textarea pro `systemPrompt`.
-       - Textarea pro `userPrompt`.
-   - Přidej tlačítka:
-     - „Uložit“ → `PUT /api/admin/prompts/:task`.
-     - „Reset na default“ → `DELETE /api/admin/prompts/:task`.
-   - Po úspěchu zobraz krátkou zprávu („Uloženo“) a/nebo reloadni seznam.
+- [x] Přidej možnost kliknout na task:
+  - Po kliknutí:
+    - Zavolej `GET /api/admin/prompts/:task`.
+    - Naplň formulář:
+      - Textarea pro `systemPrompt`.
+      - Textarea pro `userPrompt`.
+  - Přidej tlačítka:
+    - „Uložit“ → `PUT /api/admin/prompts/:task`.
+    - „Reset na default“ → `DELETE /api/admin/prompts/:task`.
+  - Po úspěchu zobraz krátkou zprávu („Uloženo“) a/nebo reloadni seznam.
 
-3. `npm run build --workspace @seobooster/web`  
-   - Commit: `git commit -m "feat: implement superadmin prompts UI"`  
+- [x] `npm run build --workspace @seobooster/web`  
+  - Commit: `git commit -m "feat: implement superadmin prompts UI"`  
 
 ---
 
