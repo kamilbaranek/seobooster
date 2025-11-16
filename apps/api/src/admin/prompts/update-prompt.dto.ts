@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class UpdatePromptDto {
   @IsString()
@@ -6,5 +6,12 @@ export class UpdatePromptDto {
 
   @IsString()
   userPrompt!: string;
-}
 
+  @IsOptional()
+  @IsString()
+  provider?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+}

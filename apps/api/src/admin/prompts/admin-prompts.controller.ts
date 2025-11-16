@@ -68,9 +68,21 @@ export class AdminPromptsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  list() {
-    return this.prisma.aiPromptConfig.findMany({
+  async list() {
+    const prompts = await this.prisma.aiPromptConfig.findMany({
       orderBy: { task: 'asc' }
+    });
+    return prompts.map((prompt) => {
+      const defaults = DEFAULT_PROMPTS[prompt.task as PromptTask];
+      const isCustom =
+        prompt.systemPrompt !== defaults.systemPrompt ||
+        prompt.userPrompt !== defaults.userPrompt ||
+        Boolean(prompt.provider) ||
+        Boolean(prompt.model);
+      return {
+        ...prompt,
+        isCustom
+      };
     });
   }
 
@@ -84,7 +96,9 @@ export class AdminPromptsController {
     return {
       task,
       systemPrompt: defaults.systemPrompt,
-      userPrompt: defaults.userPrompt
+      userPrompt: defaults.userPrompt,
+      provider: null,
+      model: null
     };
   }
 
@@ -117,12 +131,16 @@ export class AdminPromptsController {
       where: { task },
       update: {
         systemPrompt: payload.systemPrompt,
-        userPrompt: payload.userPrompt
+        userPrompt: payload.userPrompt,
+        provider: payload.provider ?? null,
+        model: payload.model ?? null
       },
       create: {
         task,
         systemPrompt: payload.systemPrompt,
-        userPrompt: payload.userPrompt
+        userPrompt: payload.userPrompt,
+        provider: payload.provider ?? null,
+        model: payload.model ?? null
       }
     });
   }

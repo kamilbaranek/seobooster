@@ -8,6 +8,7 @@ import { OpenRouterProvider } from './providers/openrouter.provider';
 
 export interface ProviderFactoryOptions {
   modelOverrides?: Partial<AiModelMap>;
+  providerOverride?: ProviderName;
 }
 
 const buildModelMap = (overrides?: Partial<AiModelMap>): AiModelMap => ({
@@ -21,7 +22,7 @@ export const buildAiProviderFromEnv = (
   options?: ProviderFactoryOptions
 ): { provider: AiProvider; modelMap: AiModelMap } => {
   const modelMap = buildModelMap(options?.modelOverrides);
-  const providerName = (process.env.AI_PROVIDER as ProviderName) ?? 'openrouter';
+  const providerName = options?.providerOverride ?? ((process.env.AI_PROVIDER as ProviderName) ?? 'openrouter');
 
   if (providerName === 'openrouter') {
     return {
@@ -50,4 +51,3 @@ export const buildAiProviderFromEnv = (
     )
   };
 };
-

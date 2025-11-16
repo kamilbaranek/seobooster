@@ -26,8 +26,9 @@ import {
 } from '@seobooster/queue-types';
 import { createLogger } from './logger';
 import { aiProvider, aiModelMap } from './services/ai-orchestrator';
-import type { AiTaskType, BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import type { AiTaskType, BusinessProfile, ProviderName, ScanResult, SeoStrategy } from '@seobooster/ai-types';
 import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
+import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
@@ -105,9 +106,16 @@ const createWorker = <T>(
     { connection: redisConnection }
   );
 
+type PromptConfig = {
+  systemPrompt: string | null;
+  userPrompt: string | null;
+  provider?: string | null;
+  model?: string | null;
+} | null;
+
 const renderPromptsForTask = (
   task: AiTaskType,
-  prompts: { systemPrompt: string | null; userPrompt: string | null } | null,
+  prompts: PromptConfig,
   variables: Record<string, unknown>
 ) => {
   const defaults = DEFAULT_PROMPTS[task];
@@ -187,8 +195,10 @@ const bootstrap = async () => {
     });
     const variables = { url: web.url };
     const renderedPrompts = renderPromptsForTask('scan', prompts, variables);
-    const providerName = aiProvider.name;
-    const modelName = aiModelMap.scan;
+    const providerSelection = resolveProviderForTask('scan', prompts);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: web.id, variables, renderedPrompts }, 'AI debug: scan request');
@@ -196,7 +206,7 @@ const bootstrap = async () => {
 
     let scanResult: ScanResult;
     try {
-      scanResult = (await aiProvider.scanWebsite(web.url, {
+      scanResult = (await providerForCall.scanWebsite(web.url, {
         task: 'scan',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
@@ -267,8 +277,10 @@ const bootstrap = async () => {
     });
     const variables = { url: scan.url, scanResult: scan };
     const renderedPrompts = renderPromptsForTask('analyze', prompts, variables);
-    const providerName = aiProvider.name;
-    const modelName = aiModelMap.analyze;
+    const providerSelection = resolveProviderForTask('analyze', prompts);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: analyze request');
@@ -276,7 +288,7 @@ const bootstrap = async () => {
 
     let profile: BusinessProfile;
     try {
-      profile = (await aiProvider.analyzeBusiness(scan, {
+      profile = (await providerForCall.analyzeBusiness(scan, {
         task: 'analyze',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
@@ -338,8 +350,10 @@ const bootstrap = async () => {
     });
     const variables = { businessProfile };
     const renderedPrompts = renderPromptsForTask('strategy', prompts, variables);
-    const providerName = aiProvider.name;
-    const modelName = aiModelMap.strategy;
+    const providerSelection = resolveProviderForTask('strategy', prompts);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
@@ -347,7 +361,7 @@ const bootstrap = async () => {
 
     let strategy: SeoStrategy;
     try {
-      strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
+      strategy = (await providerForCall.buildSeoStrategy(businessProfile, {
         task: 'strategy',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
@@ -424,8 +438,10 @@ const bootstrap = async () => {
     });
     const variables = { strategy, cluster: targetCluster };
     const renderedPrompts = renderPromptsForTask('article', prompts, variables);
-    const providerName = aiProvider.name;
-    const modelName = aiModelMap.article;
+    const providerSelection = resolveProviderForTask('article', prompts);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: article request');
@@ -433,7 +449,7 @@ const bootstrap = async () => {
 
     let draft;
     try {
-      draft = await aiProvider.generateArticle(
+      draft = await providerForCall.generateArticle(
         strategy,
         {
           clusterName: targetCluster.name,
@@ -504,3 +520,22 @@ bootstrap().catch(async (err) => {
   await stop();
   process.exit(1);
 });
+const resolveProviderForTask = (
+  task: AiTaskType,
+  prompts: PromptConfig
+) => {
+  const providerOverride = prompts?.provider as ProviderName | undefined;
+  const modelOverride = prompts?.model ?? undefined;
+
+  if (!providerOverride && !modelOverride) {
+    return { provider: aiProvider, model: aiModelMap[task] };
+  }
+
+  const overrides = modelOverride ? { [task]: modelOverride } : undefined;
+  const { provider, modelMap } = buildAiProviderFromEnv({
+    providerOverride,
+    modelOverrides: overrides
+  });
+
+  return { provider, model: modelMap[task] };
+};

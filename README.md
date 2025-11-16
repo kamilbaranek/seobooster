@@ -75,3 +75,4 @@ See `development_plan.md` and `implementation_plan.md` for the full product and 
 5. V dev prostředí otevři `/admin/prompts`:
    - Vidíš všechny pipeline kroky + status (default/custom).
    - Můžeš editovat `systemPrompt` / `userPrompt`, resetovat na výchozí hodnoty a zobrazit náhled s reálnými daty z DB.
+   - Navíc lze pro každý krok zvolit poskytovatele (OpenRouter / OpenAI / Anthropic) a konkrétní model, případně zůstat u globálního nastavení.

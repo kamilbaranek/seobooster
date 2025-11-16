@@ -324,24 +324,24 @@ Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
 
 **Cíl:** Pro každý krok pipeline nastavit, přes kterého poskytovatele a konkrétní model poběží.
 
-- [ ] Rozšiř `AiPromptConfig` v `prisma/schema.prisma` o pole:
+- [x] Rozšiř `AiPromptConfig` v `prisma/schema.prisma` o pole:
   - `provider: String?` – např. `openrouter`, `openai`, `anthropic`.  
     - Pokud null → použij default z globální konfigurace (`AI_PROVIDER`).
   - `model: String?` – konkrétní model ID (např. `openrouter/deepseek-r1`, `anthropic/claude-3.5-sonnet`).  
     - Pokud null → použij defaultní mapování z `AiModelMap` (env).
-- [ ] Migrační skript:
+- [x] Migrační skript:
   - Vytvoř migraci (např. `add_provider_model_to_ai_prompt_config`).
   - `npm run db:migrate`.
-- [ ] `npm run build` + commit: `feat: extend AiPromptConfig with provider and model`.
+- [x] `npm run build` + commit: `feat: extend AiPromptConfig with provider and model`.
 
 ### M7.2 Backend – výběr provideru a modelu
 
 **Cíl:** Worker pro každou fázi pipeline použije provider/model podle konfigurace `AiPromptConfig`.
 
-- [ ] V `libs/ai-providers`:
+- [x] V `libs/ai-providers`:
   - Zkontroluj, že existuje rozhraní, které umožňuje inicializovat různé providery (OpenRouter, OpenAI, Anthropic).  
     - Pokud ne, připrav rozhraní `AiProviderFactory`, které na základě jména poskytovatele + modelu vrátí instanci `AiProvider`.
-- [ ] V workeru:
+- [x] V workeru:
   - Pro každý krok při načtení promptu `AiPromptConfig`:
     - sestav strukturu `selectedProvider = prompt.provider ?? process.env.AI_PROVIDER ?? 'openrouter'`.
     - `selectedModel = prompt.model ?? modelMap[task]` (kde `modelMap` je tvoje existující mapování z envu).
@@ -349,27 +349,27 @@ Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
     - buď:
       - použij existující `aiProvider`, ale rozšiř ho tak, aby respektoval `selectedProvider` / `selectedModel`, nebo
       - použij fabriku: `const provider = aiProviderFactory(selectedProvider, selectedModel)`.
-- [ ] Doplň tyto informace i do `AiCallLog` (`provider`, `model`), aby historie odpovídala realitě.
-- [ ] `npm run build --workspace @seobooster/worker` + commit: `feat: select AI provider and model per task`.
+- [x] Doplň tyto informace i do `AiCallLog` (`provider`, `model`), aby historie odpovídala realitě.
+- [x] `npm run build --workspace @seobooster/worker` + commit: `feat: select AI provider and model per task`.
 
 ### M7.3 Admin API – čtení / ukládání provideru a modelu
 
 **Cíl:** Superadmin UI umí nastavit provider + model pro každý task.
 
-- [ ] V `AdminPromptsController`:
+- [x] V `AdminPromptsController`:
   - Rozšiř návratové DTO o `provider` a `model`.
   - U `PUT /api/admin/prompts/:task` povol v payloadu i `provider` a `model`.
   - U `GET /api/admin/prompts` přidej tyto hodnoty do seznamu (aby UI vědělo, zda je tam custom nastavení).
-- [ ] DTO `UpdatePromptDto` rozšiř o volitelné:
+- [x] DTO `UpdatePromptDto` rozšiř o volitelné:
   - `provider?: string;`
   - `model?: string;`
-- [ ] `npm run build --workspace @seobooster/api` + commit: `feat: expose provider and model in admin prompts API`.
+- [x] `npm run build --workspace @seobooster/api` + commit: `feat: expose provider and model in admin prompts API`.
 
 ### M7.4 Superadmin UI – přepínač poskytovatele a modelu
 
 **Cíl:** Na stránce `/admin/prompts` u každého tasku vidět a měnit provider + model.
 
-- [ ] V `apps/web/pages/admin/prompts.tsx`:
+- [x] V `apps/web/pages/admin/prompts.tsx`:
   - Rozšiř `PromptDto` o `provider?: string` a `model?: string`.
   - Nad textareas přidej sekci „AI provider & model“:
     - Select pro `provider` s hodnotami:
@@ -383,21 +383,21 @@ Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
         - OpenAI / Anthropic: placeholder seznam pro budoucí implementaci.
       - Později lze napojit na API, které vrací dostupné modely dynamicky.
   - Při `PUT /api/admin/prompts/:task` posílej i `provider` + `model`.
-- [ ] V UI jasně zobraz:
+- [x] V UI jasně zobraz:
   - Pokud je `provider/model` `null` → „inherit from global settings“.
   - Pokud je nastaveno → „custom provider/model for this task“.
-- [ ] `npm run build --workspace @seobooster/web` + commit: `feat: allow configuring provider and model per task`.
+- [x] `npm run build --workspace @seobooster/web` + commit: `feat: allow configuring provider and model per task`.
 
 ### M7.5 Dokumentace & bezpečnost
 
-- [ ] Aktualizuj `README.md`:
+- [x] Aktualizuj `README.md`:
   - Uveď, že Superadmin může per-krok nastavovat:
     - provider (`openrouter` / další),
     - model ID.
   - Připomeň, že API klíče pro OpenAI/Anthropic musí být nastavené v env a nesmí se zobrazovat v UI.
-- [ ] Do `superadmin.md` přidej krátkou poznámku:
+- [x] Do `superadmin.md` přidej krátkou poznámku:
   - jaký je doporučený default provider/model pro jednotlivé kroky (např. lehčí model pro scan, robustnější pro strategy/article).
-- [ ] `npm run build` + commit: `docs: document per-task provider and model selection`.
+- [x] `npm run build` + commit: `docs: document per-task provider and model selection`.
 
 ---
 

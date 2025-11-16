@@ -20,6 +20,9 @@ interface PromptDto {
   systemPrompt: string;
   userPrompt: string;
   updatedAt?: string;
+  provider?: string | null;
+  model?: string | null;
+  isCustom?: boolean;
 }
 
 interface PreviewResponse {
@@ -83,6 +86,29 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
   ]
 };
 
+const PROVIDER_OPTIONS = [
+  { value: 'default', label: 'Výchozí (globální nastavení)' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' }
+];
+
+const MODEL_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
+  openrouter: [
+    { value: 'openrouter/auto', label: 'openrouter/auto' },
+    { value: 'perplexity/sonar-pro-search', label: 'perplexity/sonar-pro-search' },
+    { value: 'anthropic/claude-3.7-sonnet', label: 'anthropic/claude-3.7-sonnet' }
+  ],
+  openai: [
+    { value: 'openai/gpt-4o-mini', label: 'gpt-4o-mini' },
+    { value: 'openai/gpt-4.1-mini', label: 'gpt-4.1-mini' }
+  ],
+  anthropic: [
+    { value: 'anthropic/claude-3.7-sonnet', label: 'claude-3.7-sonnet' },
+    { value: 'anthropic/claude-3.5-sonnet', label: 'claude-3.5-sonnet' }
+  ]
+};
+
 const AdminPromptsPage = () => {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -96,6 +122,8 @@ const AdminPromptsPage = () => {
   const [promptList, setPromptList] = useState<PromptDto[]>([]);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
+  const [providerChoice, setProviderChoice] = useState('default');
+  const [modelChoice, setModelChoice] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
@@ -179,6 +207,8 @@ const AdminPromptsPage = () => {
         const detail = await apiFetch<PromptDto>(`/admin/prompts/${task}`);
         setSystemPrompt(detail.systemPrompt ?? '');
         setUserPrompt(detail.userPrompt ?? '');
+        setProviderChoice(detail.provider ?? 'default');
+        setModelChoice(detail.model ?? '');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Nepodařilo se načíst detail promptu.');
       } finally {
@@ -236,6 +266,19 @@ const AdminPromptsPage = () => {
     loadLogs(selectedTask);
   }, [isSuperadmin, selectedTask, loadPromptDetail, loadLogs]);
 
+  useEffect(() => {
+    setModelChoice((current) => {
+      if (providerChoice === 'default') {
+        return '';
+      }
+      const models = MODEL_OPTIONS[providerChoice] ?? [];
+      if (current && !models.some((option) => option.value === current)) {
+        return '';
+      }
+      return current;
+    });
+  }, [providerChoice]);
+
   const handleSave = async () => {
     if (!selectedTask) return;
     setSaving(true);
@@ -246,7 +289,9 @@ const AdminPromptsPage = () => {
         method: 'PUT',
         body: JSON.stringify({
           systemPrompt,
-          userPrompt
+          userPrompt,
+          provider: providerChoice === 'default' ? null : providerChoice,
+          model: modelChoice || null
         })
       });
       setSuccessMessage('Prompty uloženy.');
@@ -270,6 +315,8 @@ const AdminPromptsPage = () => {
       setSuccessMessage('Prompty vráceny na výchozí hodnoty.');
       await loadPrompts();
       await loadPromptDetail(selectedTask);
+      setProviderChoice('default');
+      setModelChoice('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nepodařilo se resetovat prompt.');
     } finally {
@@ -335,7 +382,7 @@ const AdminPromptsPage = () => {
               <ul>
                 {TASKS.map((task) => {
                   const isActive = selectedTask === task.key;
-                  const isCustom = Boolean(promptMap[task.key]);
+                  const isCustom = promptMap[task.key]?.isCustom ?? false;
                   return (
                     <li key={task.key}>
                       <button className={`task ${isActive ? 'active' : ''}`} onClick={() => setSelectedTask(task.key)}>
@@ -363,6 +410,40 @@ const AdminPromptsPage = () => {
                     {formattedUpdatedAt && <small>Naposledy upraveno: {formattedUpdatedAt}</small>}
                   </div>
                   <p className="muted">{selectedMeta?.description}</p>
+
+                  <div className="provider-row">
+                    <label className="stacked">
+                      <span>AI poskytovatel</span>
+                      <select
+                        value={providerChoice}
+                        onChange={(event) => setProviderChoice(event.target.value)}
+                      >
+                        {PROVIDER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="stacked">
+                      <span>Model</span>
+                      <select
+                        value={modelChoice}
+                        onChange={(event) => setModelChoice(event.target.value)}
+                        disabled={providerChoice === 'default' || !(MODEL_OPTIONS[providerChoice] ?? []).length}
+                      >
+                        <option value="">Dědit z výchozího nastavení</option>
+                        {(MODEL_OPTIONS[providerChoice] ?? []).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {providerChoice === 'default' && (
+                    <p className="muted">Pokud nepotřebuješ vlastní provider/model, nech „Výchozí“. Čerpá se z env proměnných AI_PROVIDER a AI_MODEL_*.</p>
+                  )}
 
                   <label>
                     <span>System prompt</span>
@@ -648,6 +729,23 @@ const AdminPromptsPage = () => {
           flex-direction: column;
           gap: 0.4rem;
           margin-top: 1.5rem;
+        }
+        .provider-row {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1rem;
+          margin-top: 1.5rem;
+        }
+        .stacked span {
+          font-size: 0.85rem;
+          color: #cbd5f5;
+        }
+        select {
+          border-radius: 0.6rem;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: rgba(5, 6, 11, 0.6);
+          color: #f1f5ff;
+          padding: 0.75rem;
         }
         textarea {
           width: 100%;

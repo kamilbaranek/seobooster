@@ -140,6 +140,8 @@ model AiPromptConfig {
   task         String   @unique
   systemPrompt String
   userPrompt   String
+  provider     String?
+  model        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
