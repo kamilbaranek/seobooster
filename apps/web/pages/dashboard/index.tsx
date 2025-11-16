@@ -65,6 +65,7 @@ const DashboardPage = () => {
   const [debugData, setDebugData] = useState<PipelineDebugResponse | null>(null);
 
   const debugMode = process.env.NEXT_PUBLIC_DEBUG_PIPELINE === 'true';
+  const isSuperadmin = profile?.user.role === 'SUPERADMIN';
 
   useEffect(() => {
     if (!getToken()) {
@@ -182,6 +183,11 @@ const DashboardPage = () => {
           <Link className="button ghost" href="/onboarding/add-site">
             Přidat další web
           </Link>
+          {isSuperadmin && (
+            <Link className="button ghost" href="/admin/prompts">
+              Superadmin: prompty
+            </Link>
+          )}
         </aside>
 
         <main className="content">

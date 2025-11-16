@@ -83,18 +83,9 @@ Cíl: Umět si vytvořit prvního superadmina bez ručního psaní SQL.
 
 Cíl: Na dashboardu vědět, že přihlášený uživatel je superadmin.
 
-1. `GET /api/me` už vrací `user.role`. Ověř to v `apps/api/src/me/me.controller.ts`.
-2. V `apps/web/pages/dashboard/index.tsx`:
-   - Typ `MeResponse.user` už má `role?: string;`.
-   - Přidej `const isSuperadmin = profile?.user.role === 'SUPERADMIN';`.
-   - V layoutu sidebaru přidej (jen když `isSuperadmin`) link typu:
-     ```tsx
-     {isSuperadmin && (
-       <Link className="button ghost" href="/admin/prompts">
-         Superadmin: prompty
-       </Link>
-     )}
-     ```
+- [x] `GET /api/me` vrací `user.role` (v `apps/api/src/me/me.controller.ts`).
+
+- [x] Dashboard ukazuje superadmin link: v `apps/web/pages/dashboard/index.tsx` definuj `const isSuperadmin = profile?.user.role === 'SUPERADMIN';` a pokud je true, zobraz v sidebaru odkaz na `/admin/prompts`.
 
 3. `npm run build --workspace @seobooster/web`  
    - Commit: `git commit -m "feat: expose superadmin role in dashboard"`  
