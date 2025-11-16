@@ -41,6 +41,18 @@ interface OverviewResponse {
   }>;
 }
 
+interface PipelineDebugResponse {
+  scanResult: unknown;
+  businessProfile: unknown;
+  seoStrategy: unknown;
+  latestArticle: {
+    id: string;
+    title: string;
+    status: string;
+    createdAt: string;
+  } | null;
+}
+
 const DashboardPage = () => {
   const router = useRouter();
   const [profile, setProfile] = useState<MeResponse | null>(null);
@@ -49,6 +61,9 @@ const DashboardPage = () => {
   const [loadingOverview, setLoadingOverview] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugData, setDebugData] = useState<PipelineDebugResponse | null>(null);
+
+  const debugMode = process.env.NEXT_PUBLIC_DEBUG_PIPELINE === 'true';
 
   useEffect(() => {
     if (!getToken()) {
@@ -78,13 +93,17 @@ const DashboardPage = () => {
       try {
         const data = await apiFetch<OverviewResponse>(`/webs/${webId}/overview`);
         setOverview(data);
+        if (debugMode) {
+          const debug = await apiFetch<PipelineDebugResponse>(`/webs/${webId}/pipeline-debug`);
+          setDebugData(debug);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Nepodařilo se načíst web.');
       } finally {
         setLoadingOverview(false);
       }
     },
-    []
+    [debugMode]
   );
 
   useEffect(() => {
@@ -117,6 +136,17 @@ const DashboardPage = () => {
       setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit generování.');
     } finally {
       setGenerateLoading(false);
+    }
+  };
+
+  const triggerDebugStep = async (path: string) => {
+    if (!selectedWebId) return;
+    setError(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}/${path}`, { method: 'POST' });
+      await loadOverview(selectedWebId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nepodařilo se znovu spustit krok pipeline.');
     }
   };
 
@@ -202,6 +232,53 @@ const DashboardPage = () => {
                   </ul>
                 )}
               </section>
+
+              {debugMode && debugData && (
+                <section className="panel debug">
+                  <h3>Pipeline debug (local only)</h3>
+                  <div className="debug-actions">
+                    <button
+                      type="button"
+                      className="button ghost"
+                      onClick={() => triggerDebugStep('debug/scan')}
+                    >
+                      Znovu spustit scan
+                    </button>
+                    <button
+                      type="button"
+                      className="button ghost"
+                      onClick={() => triggerDebugStep('debug/analyze')}
+                    >
+                      Znovu spustit analýzu
+                    </button>
+                    <button
+                      type="button"
+                      className="button ghost"
+                      onClick={() => triggerDebugStep('debug/strategy')}
+                    >
+                      Znovu vygenerovat strategii
+                    </button>
+                  </div>
+                  <div className="debug-grid">
+                    <div>
+                      <h4>Scan result</h4>
+                      <pre>{JSON.stringify(debugData.scanResult, null, 2)}</pre>
+                    </div>
+                    <div>
+                      <h4>Business profile</h4>
+                      <pre>{JSON.stringify(debugData.businessProfile, null, 2)}</pre>
+                    </div>
+                    <div>
+                      <h4>SEO strategy</h4>
+                      <pre>{JSON.stringify(debugData.seoStrategy, null, 2)}</pre>
+                    </div>
+                    <div>
+                      <h4>Latest article</h4>
+                      <pre>{JSON.stringify(debugData.latestArticle, null, 2)}</pre>
+                    </div>
+                  </div>
+                </section>
+              )}
             </>
           )}
         </main>
@@ -294,6 +371,25 @@ const DashboardPage = () => {
           border-radius: 1.2rem;
           padding: 2rem;
           border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .panel.debug pre {
+          max-height: 200px;
+          overflow: auto;
+          background: #020617;
+          border-radius: 0.6rem;
+          padding: 0.75rem 1rem;
+          font-size: 0.75rem;
+        }
+        .debug-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+        }
+        .debug-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1rem;
         }
         .pipeline {
           display: grid;

@@ -204,4 +204,61 @@ export class WebsService {
     await this.jobQueueService.enqueueGenerateArticle(web.id);
     return { queued: true };
   }
+
+  async triggerScan(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.jobQueueService.enqueueScanWebsite(web.id);
+    return { queued: true };
+  }
+
+  async triggerAnalysis(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.jobQueueService.enqueueAnalyzeBusiness(web.id);
+    return { queued: true };
+  }
+
+  async triggerStrategy(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.jobQueueService.enqueueCreateSeoStrategy(web.id);
+    return { queued: true };
+  }
+
+  async getPipelineDebug(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId },
+      include: {
+        analysis: true,
+        articles: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    return {
+      scanResult: web.analysis?.scanResult ?? null,
+      businessProfile: web.analysis?.businessProfile ?? null,
+      seoStrategy: web.analysis?.seoStrategy ?? null,
+      latestArticle: web.articles[0] ?? null
+    };
+  }
 }

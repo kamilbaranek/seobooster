@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -78,5 +79,37 @@ export class WebsController {
   @Post(':id/generate-article')
   generateArticle(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.triggerArticleGeneration(user.userId, id);
+  }
+
+  @Post(':id/debug/scan')
+  debugScan(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    return this.websService.triggerScan(user.userId, id);
+  }
+
+  @Post(':id/debug/analyze')
+  debugAnalyze(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    return this.websService.triggerAnalysis(user.userId, id);
+  }
+
+  @Post(':id/debug/strategy')
+  debugStrategy(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    return this.websService.triggerStrategy(user.userId, id);
+  }
+
+  @Get(':id/pipeline-debug')
+  getPipelineDebug(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    return this.websService.getPipelineDebug(user.userId, id);
   }
 }
