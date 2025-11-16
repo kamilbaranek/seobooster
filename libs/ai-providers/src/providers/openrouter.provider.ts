@@ -106,14 +106,33 @@ export class OpenRouterProvider implements AiProvider {
 
       this.lastMessageContent = content;
 
+      const tryParseJson = (text: string): JsonResponse<T> | T => {
+        return JSON.parse(text) as JsonResponse<T> | T;
+      };
+
       let parsed: JsonResponse<T> | T;
       try {
-        parsed = JSON.parse(content);
+        parsed = tryParseJson(content);
       } catch (parseError) {
-        if (forceJsonResponse) {
-          throw parseError;
+        // Některé modely (zejména když JSON mode není plně podporovaný)
+        // vrací JSON zabalený v ```json ... ``` nebo podobném code fence.
+        const fenceMatch = content.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/);
+        if (fenceMatch && fenceMatch[1]) {
+          const inner = fenceMatch[1].trim();
+          try {
+            parsed = tryParseJson(inner);
+          } catch (innerError) {
+            if (forceJsonResponse) {
+              throw innerError;
+            }
+            return fallback;
+          }
+        } else {
+          if (forceJsonResponse) {
+            throw parseError;
+          }
+          return fallback;
         }
-        return fallback;
       }
       if (typeof parsed === 'object' && parsed !== null && 'data' in parsed && 'success' in parsed) {
         const structured = parsed as JsonResponse<T>;
