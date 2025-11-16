@@ -69,3 +69,7 @@ See `development_plan.md` and `implementation_plan.md` for the full product and 
    npm run seed:superadmin
    ```
 3. Přihlas se na `/login` s těmito údaji – v dashboardu uvidíš odkaz „Superadmin: prompty“, kde můžeš spravovat AI prompty pro jednotlivé fáze pipeline.
+4. Detailní plán a workflow je popsán v `superadmin.md` (UI, preview, templated variables).
+5. V dev prostředí otevři `/admin/prompts`:
+   - Vidíš všechny pipeline kroky + status (default/custom).
+   - Můžeš editovat `systemPrompt` / `userPrompt`, resetovat na výchozí hodnoty a zobrazit náhled s reálnými daty z DB.

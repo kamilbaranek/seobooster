@@ -9,6 +9,8 @@ The focus is:
 - Minimal but real integration with Supabase Postgres, Upstash Redis, Stripe, and OpenRouter.
 - Everything else (email, WordPress publish, admin, etc.) is treated as post‑MVP.
 
+> Superadmin prompt management (role, UI, preview, defaults) is coordinated in `superadmin.md`. Pokud řešíš prompty nebo admin nástroje, řiď se tímto dokumentem.
+
 ---
 
 ## 0. Target MVP Flow

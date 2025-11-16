@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 import * as bcrypt from 'bcryptjs';
 import { PrismaClient, UserRole } from '@prisma/client';
+import { DEFAULT_PROMPTS, AI_TASKS } from '@seobooster/ai-prompts';
 
 const projectRoot = resolve(__dirname, '..');
 ['.env', '.env.local'].forEach((file, index) => {
@@ -51,7 +52,27 @@ const seedSuperadmin = async () => {
   }
 };
 
+const seedPromptDefaults = async () => {
+  for (const task of AI_TASKS) {
+    const existing = await prisma.aiPromptConfig.findUnique({ where: { task } });
+    if (existing) {
+      continue;
+    }
+    const defaults = DEFAULT_PROMPTS[task];
+    await prisma.aiPromptConfig.create({
+      data: {
+        task,
+        systemPrompt: defaults.systemPrompt,
+        userPrompt: defaults.userPrompt
+      }
+    });
+    // eslint-disable-next-line no-console
+    console.log(`Seeded default prompts for task ${task}.`);
+  }
+};
+
 seedSuperadmin()
+  .then(seedPromptDefaults)
   .catch((error) => {
     // eslint-disable-next-line no-console
     console.error(error);
@@ -60,4 +81,3 @@ seedSuperadmin()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

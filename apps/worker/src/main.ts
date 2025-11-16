@@ -27,6 +27,7 @@ import {
 import { createLogger } from './logger';
 import { aiProvider } from './services/ai-orchestrator';
 import type { AiTaskType, BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import { renderPromptTemplate } from '@seobooster/ai-prompts';
 
 const logger = createLogger('worker');
 
@@ -103,6 +104,19 @@ const createWorker = <T>(
     { connection: redisConnection }
   );
 
+const renderOverrides = (
+  prompts: { systemPrompt: string | null; userPrompt: string | null } | null,
+  variables: Record<string, unknown>
+) => {
+  if (!prompts) {
+    return {};
+  }
+  return {
+    systemPrompt: prompts.systemPrompt ? renderPromptTemplate(prompts.systemPrompt, variables) : undefined,
+    userPrompt: prompts.userPrompt ? renderPromptTemplate(prompts.userPrompt, variables) : undefined
+  };
+};
+
 const bootstrap = async () => {
   if (!process.env.DATABASE_URL) {
     logger.warn('DATABASE_URL is not set. Worker operations may fail.');
@@ -128,12 +142,14 @@ const bootstrap = async () => {
     const prompts = await prisma.aiPromptConfig.findUnique({
       where: { task: 'scan' }
     });
+    const variables = { url: web.url };
+    const overrides = renderOverrides(prompts, variables);
 
     const scanResult = (await aiProvider.scanWebsite(web.url, {
       task: 'scan',
-      systemPrompt: prompts?.systemPrompt,
-      userPrompt: prompts?.userPrompt,
-      variables: { url: web.url }
+      systemPrompt: overrides.systemPrompt,
+      userPrompt: overrides.userPrompt,
+      variables
     })) as ScanResult;
 
     await prisma.webAnalysis.upsert({
@@ -166,12 +182,14 @@ const bootstrap = async () => {
     const prompts = await prisma.aiPromptConfig.findUnique({
       where: { task: 'analyze' }
     });
+    const variables = { url: scan.url, scanResult: scan };
+    const overrides = renderOverrides(prompts, variables);
 
     const profile = (await aiProvider.analyzeBusiness(scan, {
       task: 'analyze',
-      systemPrompt: prompts?.systemPrompt,
-      userPrompt: prompts?.userPrompt,
-      variables: { url: scan.url, scanResult: scan }
+      systemPrompt: overrides.systemPrompt,
+      userPrompt: overrides.userPrompt,
+      variables
     })) as BusinessProfile;
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
@@ -195,12 +213,14 @@ const bootstrap = async () => {
     const prompts = await prisma.aiPromptConfig.findUnique({
       where: { task: 'strategy' }
     });
+    const variables = { businessProfile };
+    const overrides = renderOverrides(prompts, variables);
 
     const strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
       task: 'strategy',
-      systemPrompt: prompts?.systemPrompt,
-      userPrompt: prompts?.userPrompt,
-      variables: { businessProfile }
+      systemPrompt: overrides.systemPrompt,
+      userPrompt: overrides.userPrompt,
+      variables
     })) as SeoStrategy;
 
     await prisma.webAnalysis.update({
@@ -239,6 +259,8 @@ const bootstrap = async () => {
     const prompts = await prisma.aiPromptConfig.findUnique({
       where: { task: 'article' }
     });
+    const variables = { strategy, cluster: targetCluster };
+    const overrides = renderOverrides(prompts, variables);
 
     const draft = await aiProvider.generateArticle(
       strategy,
@@ -248,9 +270,9 @@ const bootstrap = async () => {
       },
       {
         task: 'article',
-        systemPrompt: prompts?.systemPrompt,
-        userPrompt: prompts?.userPrompt,
-        variables: { strategy, cluster: targetCluster }
+        systemPrompt: overrides.systemPrompt,
+        userPrompt: overrides.userPrompt,
+        variables
       }
     );
 

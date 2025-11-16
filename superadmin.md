@@ -212,24 +212,23 @@ Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
 
 ### M5.1 Seed default promptů
 
-1. Rozšiř seed skript (nebo vytvoř nový) tak, aby:
-   - pro každé `task` v `AiTaskType`:
-     - pokud v `AiPromptConfig` není záznam, vloží defaultní prompty (kopie toho, co je v `OpenRouterProvider`).
+- [x] Rozšiř seed skript (nebo vytvoř nový) tak, aby:
+  - pro každé `task` v `AiTaskType`:
+    - pokud v `AiPromptConfig` není záznam, vloží defaultní prompty (kopie toho, co je v `OpenRouterProvider`).
 
-2. `npm run db:generate` / případně jen `npm run seed:superadmin` pokud script používáš jen pro prompty.
-3. `npm run build`, commit:  
-   `git commit -m "chore: seed default AI prompts"`  
+- [x] `npm run build`, commit:  
+  `git commit -m "feat: seed default prompts and apply templating"`  
 
 ### M5.2 Dokumentace
 
-1. Aktualizuj `README.md`:
-   - Krátká sekce „Superadmin & AI prompts“.
-   - Jak se přihlásit jako superadmin.
-   - Kde hledat admin UI (`/admin/prompts`).
+- [x] Aktualizuj `README.md`:
+  - Krátká sekce „Superadmin & AI prompts“.
+  - Jak se přihlásit jako superadmin.
+  - Kde hledat admin UI (`/admin/prompts`).
 
-2. Pokud používáme `mvp-implementation.md`, přidej reference na tento soubor `superadmin.md`.
-3. `npm run build` (rychlá kontrola), commit:  
-   `git commit -m "docs: document superadmin prompt management"`  
+- [x] Pokud používáme `mvp-implementation.md`, přidej reference na tento soubor `superadmin.md`.
+- [x] `npm run build` (rychlá kontrola), commit:  
+  `git commit -m "docs: document superadmin prompt management"`  
 
 ---
 

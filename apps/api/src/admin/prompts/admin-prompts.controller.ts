@@ -9,12 +9,8 @@ import {
   Put,
   UseGuards
 } from '@nestjs/common';
-import {
-  ArticleDraft,
-  BusinessProfile,
-  ScanResult,
-  SeoStrategy
-} from '@seobooster/ai-types';
+import { BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -29,30 +25,6 @@ export enum PromptTask {
   Strategy = 'strategy',
   Article = 'article'
 }
-
-const DEFAULT_PROMPTS: Record<PromptTask, { systemPrompt: string; userPrompt: string }> = {
-  [PromptTask.Scan]: {
-    systemPrompt:
-      'You extract structured metadata about websites. Always return JSON object { success: boolean, data: ScanResult }.',
-    userPrompt:
-      'Analyze the website {{url}} and provide title, short description, keywords array, and detected technologies.'
-  },
-  [PromptTask.Analyze]: {
-    systemPrompt:
-      'You convert website scan data into a business profile. Return JSON { success, data } where data is BusinessProfile.',
-    userPrompt: 'Scan Result: {{scanResult}}\nCreate a concise business profile.'
-  },
-  [PromptTask.Strategy]: {
-    systemPrompt: 'You design SEO strategies with pillars and topic clusters. Respond with JSON { success, data }.',
-    userPrompt:
-      'Business profile: {{businessProfile}}\nGenerate an initial SEO strategy with at least one pillar and cluster keywords.'
-  },
-  [PromptTask.Article]: {
-    systemPrompt: 'You write high quality SEO articles. Always return JSON { success, data } with ArticleDraft fields.',
-    userPrompt:
-      'SEO Strategy: {{strategy}}\nSelected cluster: {{cluster}}\nTone: Professional\nProduce a detailed outline, markdown body, keywords, and CTA.'
-  }
-};
 
 const FALLBACK_SCAN_RESULT: ScanResult = {
   url: 'https://example.com',
@@ -121,14 +93,17 @@ export class AdminPromptsController {
     @Body() payload: PreviewPromptDto
   ) {
     const overrides = await this.prisma.aiPromptConfig.findUnique({ where: { task } });
-    const prompts = DEFAULT_PROMPTS[task];
+    const defaults = DEFAULT_PROMPTS[task];
 
     const variables = await this.resolvePreviewVariables(task, payload);
 
+    const templateSystem = overrides?.systemPrompt ?? defaults.systemPrompt;
+    const templateUser = overrides?.userPrompt ?? defaults.userPrompt;
+
     return {
       variables,
-      systemPrompt: overrides?.systemPrompt ?? prompts.systemPrompt,
-      userPrompt: overrides?.userPrompt ?? prompts.userPrompt
+      systemPrompt: renderPromptTemplate(templateSystem, variables) ?? templateSystem,
+      userPrompt: renderPromptTemplate(templateUser, variables) ?? templateUser
     };
   }
 

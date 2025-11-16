@@ -22,6 +22,9 @@
       ],
       "@seobooster/ai-providers": [
         "libs/ai-providers/src"
+      ],
+      "@seobooster/ai-prompts": [
+        "libs/ai-prompts/src"
       ]
     }
   }
