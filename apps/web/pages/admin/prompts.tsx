@@ -22,6 +22,12 @@ interface PromptDto {
   updatedAt?: string;
 }
 
+interface PreviewResponse {
+  systemPrompt: string;
+  userPrompt: string;
+  variables: Record<string, unknown>;
+}
+
 const TASKS: Array<{ key: TaskKey; title: string; description: string }> = [
   {
     key: 'scan',
@@ -71,6 +77,9 @@ const AdminPromptsPage = () => {
   const [promptList, setPromptList] = useState<PromptDto[]>([]);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -163,6 +172,7 @@ const AdminPromptsPage = () => {
     if (!selectedTask) return;
     setSaving(true);
     setError(null);
+    setPreviewError(null);
     try {
       await apiFetch(`/admin/prompts/${selectedTask}`, {
         method: 'PUT',
@@ -184,6 +194,7 @@ const AdminPromptsPage = () => {
     if (!selectedTask) return;
     setSaving(true);
     setError(null);
+    setPreviewError(null);
     try {
       await apiFetch(`/admin/prompts/${selectedTask}`, {
         method: 'DELETE'
@@ -195,6 +206,24 @@ const AdminPromptsPage = () => {
       setError(err instanceof Error ? err.message : 'Nepodařilo se resetovat prompt.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!selectedTask) return;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewData(null);
+    try {
+      const preview = await apiFetch<PreviewResponse>(`/admin/prompts/${selectedTask}/preview`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      setPreviewData(preview);
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Nelze načíst náhled.');
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -289,6 +318,9 @@ const AdminPromptsPage = () => {
                     <button className="button ghost" onClick={handleReset} disabled={!canReset || saving}>
                       Reset na default
                     </button>
+                    <button className="button ghost" onClick={handlePreview} disabled={previewLoading}>
+                      {previewLoading ? 'Generuji náhled…' : 'Zobrazit náhled'}
+                    </button>
                   </div>
 
                   {successMessage && <p className="success">{successMessage}</p>}
@@ -305,6 +337,27 @@ const AdminPromptsPage = () => {
                       ))}
                     </ul>
                   </section>
+
+                  {previewError && <p className="error">{previewError}</p>}
+                  {previewData && (
+                    <section className="preview">
+                      <h3>Náhled výsledného requestu</h3>
+                      <div className="preview-grid">
+                        <div>
+                          <h4>System prompt</h4>
+                          <pre>{previewData.systemPrompt}</pre>
+                        </div>
+                        <div>
+                          <h4>User prompt</h4>
+                          <pre>{previewData.userPrompt}</pre>
+                        </div>
+                        <div>
+                          <h4>Variables</h4>
+                          <pre>{JSON.stringify(previewData.variables, null, 2)}</pre>
+                        </div>
+                      </div>
+                    </section>
+                  )}
                 </>
               )}
             </section>
@@ -497,6 +550,25 @@ const AdminPromptsPage = () => {
         }
         .variables span {
           color: #cbd5f5;
+        }
+        .preview {
+          margin-top: 2rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding-top: 1.5rem;
+        }
+        .preview-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1rem;
+        }
+        .preview pre {
+          white-space: pre-wrap;
+          word-break: break-word;
+          background: rgba(0, 0, 0, 0.3);
+          padding: 1rem;
+          border-radius: 0.6rem;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          min-height: 120px;
         }
         @media (max-width: 960px) {
           .prompts-grid {

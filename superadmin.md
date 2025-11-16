@@ -187,31 +187,24 @@ Zatím je to jen textová dokumentace – nepotřebuješ měnit backend.
 
 Cíl: Superadmin vidí, co se do promptu pošle, aniž by volal reálný model.
 
-1. V `AdminPromptsController` přidej endpoint:
-   - `POST /api/admin/prompts/:task/preview`
-   - Na základě tasku:
-     - načti jeden „vzorek“ dat z DB:
-       - `scan`: stačí URL z payloadu (`{ url: string }`) nebo první web.
-       - `analyze`: `scanResult` z `web_analysis` pro nějaký web.
-       - `strategy`: `businessProfile`.
-       - `article`: `seoStrategy` + první cluster.
-   - Z DB vytáhni (nebo fallback do defaultu) `systemPrompt` a `userPrompt`.
-   - Vrať:
-     ```jsonc
-     {
-       "variables": { ... },
-       "systemPrompt": "....",
-       "userPrompt": "...."
-     }
-     ```
-   - Žádné volání OpenRouteru – jen složení dat.
+- [x] V `AdminPromptsController` přidej endpoint:
+  - `POST /api/admin/prompts/:task/preview`
+  - Na základě tasku:
+    - načti jeden „vzorek“ dat z DB:
+      - `scan`: stačí URL z payloadu (`{ url: string }`) nebo první web.
+      - `analyze`: `scanResult` z `web_analysis` pro nějaký web.
+      - `strategy`: `businessProfile`.
+      - `article`: `seoStrategy` + první cluster.
+  - Z DB vytáhni (nebo fallback do defaultu) `systemPrompt` a `userPrompt`.
+  - Vrať JSON s `variables`, `systemPrompt`, `userPrompt`.
+  - Žádné volání OpenRouteru – jen složení dat.
 
-2. V UI přidej tlačítko „Zobrazit náhled“:
-   - Zavolej preview endpoint.
-   - Výsledek zobraz ve `<pre>` blocích.
+- [x] V UI přidej tlačítko „Zobrazit náhled“:
+  - Zavolej preview endpoint.
+  - Výsledek zobraz ve `<pre>` blocích.
 
-3. `npm run build`  
-   - Commit: `git commit -m "feat: add prompt preview without AI call"`  
+- [x] `npm run build`  
+  - Commit: `git commit -m "feat: add prompt preview without AI call"`  
 
 ---
 
