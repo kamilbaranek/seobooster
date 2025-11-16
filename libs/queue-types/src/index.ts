@@ -12,6 +12,7 @@ export type ScanWebsiteJob = {
 export type AnalyzeBusinessJob = {
   webId: string;
   debug?: boolean;
+  rawScanOutput?: string | null;
 };
 
 export type CreateSeoStrategyJob = {

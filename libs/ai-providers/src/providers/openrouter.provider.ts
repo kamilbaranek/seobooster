@@ -26,11 +26,16 @@ type JsonResponse<T> = {
 export class OpenRouterProvider implements AiProvider {
   name: AiProvider['name'] = 'openrouter';
   private lastRawResponse: unknown;
+  private lastMessageContent?: string;
 
   constructor(private readonly config: OpenRouterProviderConfig) {}
 
   getLastRawResponse() {
     return this.lastRawResponse;
+  }
+
+  getLastMessageContent() {
+    return this.lastMessageContent;
   }
 
   private async requestJson<T>(
@@ -43,6 +48,7 @@ export class OpenRouterProvider implements AiProvider {
     const apiKey = this.config.apiKey;
     const model = this.config.modelMap[task] ?? this.config.model;
     this.lastRawResponse = undefined;
+    this.lastMessageContent = undefined;
 
     if (!apiKey) {
       this.lastRawResponse = { error: 'missing_api_key' };
@@ -98,7 +104,17 @@ export class OpenRouterProvider implements AiProvider {
         throw new Error('OpenRouter response missing content');
       }
 
-      const parsed: JsonResponse<T> | T = JSON.parse(content);
+      this.lastMessageContent = content;
+
+      let parsed: JsonResponse<T> | T;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseError) {
+        if (forceJsonResponse) {
+          throw parseError;
+        }
+        return fallback;
+      }
       if (typeof parsed === 'object' && parsed !== null && 'data' in parsed && 'success' in parsed) {
         const structured = parsed as JsonResponse<T>;
         return structured.success ? structured.data : fallback;

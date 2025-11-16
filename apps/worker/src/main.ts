@@ -228,6 +228,7 @@ const bootstrap = async () => {
     const isDebug = Boolean(job.data.debug);
 
     let scanResult: ScanResult;
+    let rawScanText: string | undefined;
     try {
       scanResult = (await providerForCall.scanWebsite(web.url, {
         task: 'scan',
@@ -242,6 +243,11 @@ const bootstrap = async () => {
       }
 
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
+      rawScanText =
+        typeof (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent ===
+        'function'
+          ? (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent?.()
+          : undefined;
       await recordAiCall({
         webId: web.id,
         task: 'scan',
@@ -250,7 +256,7 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? scanResult,
+        responseRaw: rawResponse ?? rawScanText ?? scanResult,
         responseParsed: scanResult,
         status: 'SUCCESS'
       });
@@ -285,7 +291,10 @@ const bootstrap = async () => {
     });
 
     if (!isDebug) {
-      await analyzeQueue.add('AnalyzeBusiness', { webId: web.id });
+      await analyzeQueue.add('AnalyzeBusiness', {
+        webId: web.id,
+        rawScanOutput: rawScanText ?? null
+      });
     }
   });
 
@@ -304,7 +313,10 @@ const bootstrap = async () => {
       where: { task: 'analyze' }
     });
     const variables = { url: scan.url, scanResult: scan };
-    const renderedPrompts = renderPromptsForTask('analyze', prompts, variables);
+    const renderedPrompts = renderPromptsForTask('analyze', prompts, {
+      ...variables,
+      rawScanOutput: job.data.rawScanOutput ?? null
+    });
     const providerSelection = resolveProviderForTask('analyze', prompts);
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
@@ -323,7 +335,10 @@ const bootstrap = async () => {
         task: 'analyze',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        variables,
+        variables: {
+          ...variables,
+          rawScanOutput: job.data.rawScanOutput ?? null
+        },
         forceJsonResponse
       })) as BusinessProfile;
 
