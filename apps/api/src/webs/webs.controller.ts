@@ -83,7 +83,8 @@ export class WebsController {
 
   @Post(':id/debug/scan')
   debugScan(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
-    if (process.env.NODE_ENV === 'production') {
+    const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';
+    if (!debugEnabled) {
       throw new NotFoundException();
     }
     return this.websService.triggerScan(user.userId, id);
@@ -91,7 +92,8 @@ export class WebsController {
 
   @Post(':id/debug/analyze')
   debugAnalyze(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
-    if (process.env.NODE_ENV === 'production') {
+    const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';
+    if (!debugEnabled) {
       throw new NotFoundException();
     }
     return this.websService.triggerAnalysis(user.userId, id);
@@ -99,7 +101,8 @@ export class WebsController {
 
   @Post(':id/debug/strategy')
   debugStrategy(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
-    if (process.env.NODE_ENV === 'production') {
+    const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';
+    if (!debugEnabled) {
       throw new NotFoundException();
     }
     return this.websService.triggerStrategy(user.userId, id);
@@ -107,7 +110,8 @@ export class WebsController {
 
   @Get(':id/pipeline-debug')
   getPipelineDebug(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
-    if (process.env.NODE_ENV === 'production') {
+    const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';
+    if (!debugEnabled) {
       throw new NotFoundException();
     }
     return this.websService.getPipelineDebug(user.userId, id);

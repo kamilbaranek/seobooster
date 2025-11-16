@@ -53,6 +53,8 @@ Backend expects these environment variables (for local dev, put them in a non‑
 - `WEB_APP_URL` – allowed origin for CORS (defaults to `http://localhost:3000`, set to production frontend URL in prod).
 - `NEXT_PUBLIC_API_BASE_URL` – Frontend volá API přes tuto adresu (pro lokální vývoj `http://localhost:3333/api`).
 - `NEXT_PUBLIC_DEBUG_PIPELINE` – Nastav na `true`, pokud chceš v dashboardu vidět debug panel se stavem jednotlivých fází.
+- `AI_DEBUG_PIPELINE` – pokud nastavíš na `true`, zpřístupní se `/webs/:id/pipeline-debug` a debug endpointy i mimo lokální prostředí.
+- `AI_DEBUG_LOG_PROMPTS` – pokud nastavíš na `true`, worker bude logovat do konzole finální `systemPrompt`/`userPrompt`, `variables` a výsledky pro každý AI krok.
 
 See `development_plan.md` and `implementation_plan.md` for the full product and implementation specification.
 - `npm run start:worker` – run the compiled worker (after `npm run build --workspace @seobooster/worker`).

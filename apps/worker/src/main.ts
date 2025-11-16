@@ -30,6 +30,7 @@ import type { AiTaskType, BusinessProfile, ScanResult, SeoStrategy } from '@seob
 import { renderPromptTemplate } from '@seobooster/ai-prompts';
 
 const logger = createLogger('worker');
+const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
 
 const redisConnection = {
   host: process.env.REDIS_HOST ?? '127.0.0.1',
@@ -145,12 +146,20 @@ const bootstrap = async () => {
     const variables = { url: web.url };
     const overrides = renderOverrides(prompts, variables);
 
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: web.id, variables, overrides }, 'AI debug: scan request');
+    }
+
     const scanResult = (await aiProvider.scanWebsite(web.url, {
       task: 'scan',
       systemPrompt: overrides.systemPrompt,
       userPrompt: overrides.userPrompt,
       variables
     })) as ScanResult;
+
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: web.id, result: scanResult }, 'AI debug: scan response');
+    }
 
     await prisma.webAnalysis.upsert({
       where: { webId: web.id },
@@ -185,12 +194,20 @@ const bootstrap = async () => {
     const variables = { url: scan.url, scanResult: scan };
     const overrides = renderOverrides(prompts, variables);
 
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: analyze request');
+    }
+
     const profile = (await aiProvider.analyzeBusiness(scan, {
       task: 'analyze',
       systemPrompt: overrides.systemPrompt,
       userPrompt: overrides.userPrompt,
       variables
     })) as BusinessProfile;
+
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, result: profile }, 'AI debug: analyze response');
+    }
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
       data: { businessProfile: profile as unknown as Prisma.InputJsonValue }
@@ -216,12 +233,20 @@ const bootstrap = async () => {
     const variables = { businessProfile };
     const overrides = renderOverrides(prompts, variables);
 
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: strategy request');
+    }
+
     const strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
       task: 'strategy',
       systemPrompt: overrides.systemPrompt,
       userPrompt: overrides.userPrompt,
       variables
     })) as SeoStrategy;
+
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, result: strategy }, 'AI debug: strategy response');
+    }
 
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
@@ -262,6 +287,10 @@ const bootstrap = async () => {
     const variables = { strategy, cluster: targetCluster };
     const overrides = renderOverrides(prompts, variables);
 
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, variables, overrides }, 'AI debug: article request');
+    }
+
     const draft = await aiProvider.generateArticle(
       strategy,
       {
@@ -275,6 +304,10 @@ const bootstrap = async () => {
         variables
       }
     );
+
+    if (AI_DEBUG_LOG_PROMPTS) {
+      logger.info({ webId: job.data.webId, result: draft }, 'AI debug: article response');
+    }
 
     const article = await prisma.article.create({
       data: {
