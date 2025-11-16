@@ -68,6 +68,7 @@ export interface AiProvider {
     options: GenerateArticleOptions,
     overrides?: PromptOverrides<'article'>
   ): Promise<ArticleDraft>;
+  getLastRawResponse?(): unknown;
 }
 
 export interface GenerateArticleOptions {

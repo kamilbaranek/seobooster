@@ -25,8 +25,13 @@ type JsonResponse<T> = {
 
 export class OpenRouterProvider implements AiProvider {
   name: AiProvider['name'] = 'openrouter';
+  private lastRawResponse: unknown;
 
   constructor(private readonly config: OpenRouterProviderConfig) {}
+
+  getLastRawResponse() {
+    return this.lastRawResponse;
+  }
 
   private async requestJson<T>(
     task: AiTaskType,
@@ -36,8 +41,10 @@ export class OpenRouterProvider implements AiProvider {
   ): Promise<T> {
     const apiKey = this.config.apiKey;
     const model = this.config.modelMap[task] ?? this.config.model;
+    this.lastRawResponse = undefined;
 
     if (!apiKey) {
+      this.lastRawResponse = { error: 'missing_api_key' };
       return fallback;
     }
 
@@ -60,13 +67,30 @@ export class OpenRouterProvider implements AiProvider {
         })
       });
 
-      const completion = (await response.json()) as {
+      const responseText = await response.text();
+      let completion: unknown;
+      try {
+        completion = JSON.parse(responseText);
+      } catch {
+        completion = responseText;
+      }
+      this.lastRawResponse = completion;
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter responded ${response.status}: ${responseText}`);
+      }
+
+      if (typeof completion !== 'object' || completion === null) {
+        throw new Error('OpenRouter returned unexpected payload');
+      }
+
+      const completionTyped = completion as {
         choices?: Array<{ message?: { content?: string } }>;
       };
 
-      const content = completion.choices?.[0]?.message?.content;
+      const content = completionTyped.choices?.[0]?.message?.content;
       if (!content) {
-        return fallback;
+        throw new Error('OpenRouter response missing content');
       }
 
       const parsed: JsonResponse<T> | T = JSON.parse(content);
@@ -77,7 +101,6 @@ export class OpenRouterProvider implements AiProvider {
 
       return parsed as T;
     } catch (error) {
-      // In debug we want to notice provider errors; for now bubble up so callers can log them.
       throw error;
     }
   }

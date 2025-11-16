@@ -239,6 +239,7 @@ const bootstrap = async () => {
         logger.info({ webId: web.id, result: scanResult }, 'AI debug: scan response');
       }
 
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: web.id,
         task: 'scan',
@@ -247,11 +248,12 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: scanResult,
+        responseRaw: rawResponse ?? scanResult,
         responseParsed: scanResult,
         status: 'SUCCESS'
       });
     } catch (error) {
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: web.id,
         task: 'scan',
@@ -260,7 +262,7 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
         status: 'ERROR',
         errorMessage: error instanceof Error ? error.message : undefined
       });
@@ -321,6 +323,7 @@ const bootstrap = async () => {
         variables
       })) as BusinessProfile;
 
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'analyze',
@@ -329,11 +332,12 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: profile,
+        responseRaw: rawResponse ?? profile,
         responseParsed: profile,
         status: 'SUCCESS'
       });
     } catch (error) {
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'analyze',
@@ -342,7 +346,7 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
         status: 'ERROR',
         errorMessage: error instanceof Error ? error.message : undefined
       });
@@ -398,6 +402,7 @@ const bootstrap = async () => {
         variables
       })) as SeoStrategy;
 
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'strategy',
@@ -406,11 +411,12 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: strategy,
+        responseRaw: rawResponse ?? strategy,
         responseParsed: strategy,
         status: 'SUCCESS'
       });
     } catch (error) {
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'strategy',
@@ -419,7 +425,7 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
         status: 'ERROR',
         errorMessage: error instanceof Error ? error.message : undefined
       });
@@ -499,6 +505,7 @@ const bootstrap = async () => {
         logger.info({ webId: job.data.webId, result: draft }, 'AI debug: article response');
       }
 
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'article',
@@ -507,11 +514,12 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: draft,
+        responseRaw: rawResponse ?? draft,
         responseParsed: draft,
         status: 'SUCCESS'
       });
     } catch (error) {
+      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
         webId: job.data.webId,
         task: 'article',
@@ -520,7 +528,7 @@ const bootstrap = async () => {
         variables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: error instanceof Error ? { message: error.message } : { error: 'Unknown error' },
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
         status: 'ERROR',
         errorMessage: error instanceof Error ? error.message : undefined
       });
