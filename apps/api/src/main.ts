@@ -7,6 +7,11 @@ import { ResponseEnvelopeInterceptor } from './common/interceptors/response-enve
 
 const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
+  const webOrigin = process.env.WEB_APP_URL ?? 'http://localhost:3000';
+  app.enableCors({
+    origin: webOrigin,
+    credentials: false
+  });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
