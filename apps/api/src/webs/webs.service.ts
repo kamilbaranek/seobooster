@@ -258,7 +258,8 @@ export class WebsService {
       scanResult: web.analysis?.scanResult ?? null,
       businessProfile: web.analysis?.businessProfile ?? null,
       seoStrategy: web.analysis?.seoStrategy ?? null,
-      latestArticle: web.articles[0] ?? null
+      latestArticle: web.articles[0] ?? null,
+      rawScanOutput: (web.analysis?.scanResult as any)?.rawScanOutput ?? null
     };
   }
 }
