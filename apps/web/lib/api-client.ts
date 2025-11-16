@@ -32,7 +32,13 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     return {} as T;
   }
 
-  return (await response.json()) as T;
+  const payload = await response.json();
+
+  if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
+    return (payload.data ?? {}) as T;
+  }
+
+  return payload as T;
 }
 
 async function safeJson(response: Response) {
@@ -42,4 +48,3 @@ async function safeJson(response: Response) {
     return null;
   }
 }
-
