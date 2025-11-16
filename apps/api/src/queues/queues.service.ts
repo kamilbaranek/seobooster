@@ -26,12 +26,16 @@ export class JobQueueService {
     return this.scanWebsiteQueue.add('ScanWebsiteDebug', { webId, debug: true });
   }
 
-  enqueueAnalyzeBusiness(webId: string) {
-    return this.analyzeBusinessQueue.add('AnalyzeBusiness', { webId });
+  enqueueAnalyzeBusiness(webId: string, rawScanOutput?: string | null) {
+    return this.analyzeBusinessQueue.add('AnalyzeBusiness', { webId, rawScanOutput: rawScanOutput ?? null });
   }
 
-  enqueueAnalyzeBusinessDebug(webId: string) {
-    return this.analyzeBusinessQueue.add('AnalyzeBusinessDebug', { webId, debug: true });
+  enqueueAnalyzeBusinessDebug(webId: string, rawScanOutput?: string | null) {
+    return this.analyzeBusinessQueue.add('AnalyzeBusinessDebug', {
+      webId,
+      debug: true,
+      rawScanOutput: rawScanOutput ?? null
+    });
   }
 
   enqueueCreateSeoStrategy(webId: string) {

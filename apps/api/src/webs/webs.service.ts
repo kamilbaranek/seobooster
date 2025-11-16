@@ -223,7 +223,32 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.jobQueueService.enqueueAnalyzeBusinessDebug(web.id);
+    const lastScanLog = await this.prisma.aiCallLog.findFirst({
+      where: {
+        webId: id,
+        task: 'scan'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let rawScanOutput: string | null = null;
+    if (lastScanLog) {
+      const variables = lastScanLog.variables as unknown as { rawScanOutput?: unknown } | null;
+      if (variables && typeof variables === 'object' && 'rawScanOutput' in variables) {
+        const value = (variables as any).rawScanOutput;
+        rawScanOutput = typeof value === 'string' ? value : JSON.stringify(value);
+      } else if (lastScanLog.responseRaw) {
+        const raw = lastScanLog.responseRaw as any;
+        if (typeof raw === 'string') {
+          rawScanOutput = raw;
+        } else if (raw && Array.isArray(raw.choices)) {
+          const content = raw.choices[0]?.message?.content;
+          rawScanOutput = typeof content === 'string' ? content : null;
+        }
+      }
+    }
+
+    await this.jobQueueService.enqueueAnalyzeBusinessDebug(web.id, rawScanOutput);
     return { queued: true };
   }
 
