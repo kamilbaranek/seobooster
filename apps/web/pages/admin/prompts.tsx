@@ -921,10 +921,14 @@ const AdminPromptsPage = () => {
           padding: 1rem;
           border-radius: 0.6rem;
           border: 1px solid rgba(255, 255, 255, 0.08);
-          min-height: 120px;
+          min-height: 80px;
+          max-height: 260px;
+          overflow: auto;
         }
         .message-content {
           margin-top: 1.5rem;
+          max-height: 260px;
+          overflow: auto;
         }
         .history {
           margin-top: 2rem;
@@ -975,6 +979,8 @@ const AdminPromptsPage = () => {
         }
         .log-detail {
           margin-top: 1.5rem;
+          max-height: 420px;
+          overflow: auto;
         }
         .log-meta {
           display: grid;
