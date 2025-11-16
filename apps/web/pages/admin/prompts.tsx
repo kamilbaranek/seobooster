@@ -78,7 +78,12 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
   scan: [{ name: '{{url}}', description: 'URL webu, který se má skenovat.' }],
   analyze: [
     { name: '{{url}}', description: 'URL aktuálního webu.' },
-    { name: '{{scanResult}}', description: 'JSON výstup předchozího scanu.' }
+    { name: '{{scanResult}}', description: 'JSON výstup předchozího scanu.' },
+    {
+      name: '{{rawScanOutput}}',
+      description:
+        'Raw text / message content z kroku Scan (použij, když je JSON response vypnutý nebo model vrací text).'
+    }
   ],
   strategy: [{ name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' }],
   article: [
