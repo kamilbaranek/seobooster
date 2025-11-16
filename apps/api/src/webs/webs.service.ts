@@ -254,12 +254,37 @@ export class WebsService {
       throw new NotFoundException('Website not found');
     }
 
+    const lastScanLog = await this.prisma.aiCallLog.findFirst({
+      where: {
+        webId: id,
+        task: 'scan'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let rawScanOutput: string | null = null;
+    if (lastScanLog) {
+      const variables = lastScanLog.variables as unknown as { rawScanOutput?: unknown } | null;
+      if (variables && typeof variables === 'object' && 'rawScanOutput' in variables) {
+        const value = (variables as any).rawScanOutput;
+        rawScanOutput = typeof value === 'string' ? value : JSON.stringify(value);
+      } else if (lastScanLog.responseRaw) {
+        const raw = lastScanLog.responseRaw as any;
+        if (typeof raw === 'string') {
+          rawScanOutput = raw;
+        } else if (raw && Array.isArray(raw.choices)) {
+          const content = raw.choices[0]?.message?.content;
+          rawScanOutput = typeof content === 'string' ? content : null;
+        }
+      }
+    }
+
     return {
       scanResult: web.analysis?.scanResult ?? null,
       businessProfile: web.analysis?.businessProfile ?? null,
       seoStrategy: web.analysis?.seoStrategy ?? null,
       latestArticle: web.articles[0] ?? null,
-      rawScanOutput: (web.analysis?.scanResult as any)?.rawScanOutput ?? null
+      rawScanOutput
     };
   }
 }

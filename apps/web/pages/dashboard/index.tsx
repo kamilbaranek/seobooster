@@ -52,6 +52,7 @@ interface PipelineDebugResponse {
     status: string;
     createdAt: string;
   } | null;
+  rawScanOutput?: string | null;
 }
 
 const DashboardPage = () => {
@@ -283,6 +284,12 @@ const DashboardPage = () => {
                       <h4>Latest article</h4>
                       <pre>{JSON.stringify(debugData.latestArticle, null, 2)}</pre>
                     </div>
+                    {debugData.rawScanOutput && (
+                      <div>
+                        <h4>Raw scan output (model content)</h4>
+                        <pre>{debugData.rawScanOutput}</pre>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}

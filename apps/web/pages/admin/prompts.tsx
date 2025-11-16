@@ -145,6 +145,25 @@ const AdminPromptsPage = () => {
     }
   };
 
+  const extractMessageContent = (log: AiLogDetail | null) => {
+    if (!log) return null;
+
+    const vars = log.variables as any;
+    if (vars && typeof vars === 'object' && 'rawScanOutput' in vars && vars.rawScanOutput) {
+      const raw = vars.rawScanOutput;
+      return typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+    }
+
+    const raw = log.responseRaw as any;
+    if (!raw) return null;
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw.choices)) {
+      const content = raw.choices[0]?.message?.content;
+      if (typeof content === 'string') return content;
+    }
+    return null;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -506,6 +525,12 @@ const AdminPromptsPage = () => {
                   </section>
 
                   {previewError && <p className="error">{previewError}</p>}
+                  {!forceJsonResponse && (
+                    <p className="muted">
+                      JSON režim je vypnutý – model může vracet čistý text. Pro další krok používej
+                      proměnnou <code>rawScanOutput</code> nebo message content z historie.
+                    </p>
+                  )}
                   {previewData && (
                     <section className="preview">
                       <h3>Náhled výsledného requestu</h3>
@@ -605,6 +630,12 @@ const AdminPromptsPage = () => {
                             <pre>{renderJson(logDetail.responseRaw)}</pre>
                           </div>
                         </div>
+                        {extractMessageContent(logDetail) && (
+                          <div className="message-content">
+                            <h4>Message content (model output)</h4>
+                            <pre>{extractMessageContent(logDetail)}</pre>
+                          </div>
+                        )}
                       </div>
                     )}
                   </section>
@@ -847,6 +878,9 @@ const AdminPromptsPage = () => {
           border-radius: 0.6rem;
           border: 1px solid rgba(255, 255, 255, 0.08);
           min-height: 120px;
+        }
+        .message-content {
+          margin-top: 1.5rem;
         }
         .history {
           margin-top: 2rem;
