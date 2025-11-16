@@ -148,7 +148,7 @@ const DashboardPage = () => {
               <p className="muted">Zatím žádné připojené weby.</p>
             )}
           </div>
-          <Link className="button ghost" href="/onboarding">
+          <Link className="button ghost" href="/onboarding/add-site">
             Přidat další web
           </Link>
         </aside>

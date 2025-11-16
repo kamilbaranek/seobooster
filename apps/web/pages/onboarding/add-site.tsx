@@ -3,28 +3,24 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { apiFetch } from '../../lib/api-client';
-import { saveToken, getToken } from '../../lib/auth-storage';
+import { getToken } from '../../lib/auth-storage';
 
-interface AuthResponse {
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    webs: Array<{ id: string; url: string; status: string }>;
-  };
+interface WebResponse {
+  id: string;
+  url: string;
+  status: string;
 }
 
-const OnboardingStepOne = () => {
+const AddSitePage = () => {
   const router = useRouter();
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (getToken()) {
-      router.replace('/onboarding/add-site');
+    if (!getToken()) {
+      router.replace('/login');
     }
   }, [router]);
 
@@ -34,17 +30,17 @@ const OnboardingStepOne = () => {
     setLoading(true);
 
     try {
-      const data = await apiFetch<AuthResponse>('/auth/register', {
+      const web = await apiFetch<WebResponse>('/webs', {
         method: 'POST',
-        body: JSON.stringify({ email, password, websiteUrl }),
-        skipAuth: true
+        body: JSON.stringify({
+          url: websiteUrl,
+          nickname: nickname || undefined
+        })
       });
 
-      saveToken(data.accessToken);
-      const webId = data.user.webs[0]?.id;
-      router.push(`/onboarding/payment?webId=${webId ?? ''}`);
+      router.push(`/onboarding/payment?webId=${web.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registrace se nezdařila.');
+      setError(err instanceof Error ? err.message : 'Nepodařilo se přidat web.');
     } finally {
       setLoading(false);
     }
@@ -53,19 +49,19 @@ const OnboardingStepOne = () => {
   return (
     <>
       <Head>
-        <title>SEO Booster – Onboarding</title>
+        <title>SEO Booster – Přidat web</title>
       </Head>
       <main className="auth">
         <form className="panel" onSubmit={handleSubmit}>
-          <p className="eyebrow">Začněte během 2 minut</p>
-          <h1>Zadejte web a kontaktní údaje</h1>
-          <p>Po registraci vás přesměrujeme na platební bránu Stripe.</p>
+          <p className="eyebrow">Přidat další web</p>
+          <h1>Připojte další doménu k vašemu účtu</h1>
+          <p>Pro každý web vytvoříme samostatnou SEO strategii i plán generování článků.</p>
 
           <label>
-            URL vašeho webu
+            URL nového webu
             <input
               type="url"
-              placeholder="https://mojekrasnastranka.cz"
+              placeholder="https://dalsiweb.cz"
               value={websiteUrl}
               onChange={(event) => setWebsiteUrl(event.target.value)}
               required
@@ -73,29 +69,23 @@ const OnboardingStepOne = () => {
           </label>
 
           <label>
-            E-mail
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          </label>
-
-          <label>
-            Heslo
+            Interní název (volitelné)
             <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              minLength={8}
-              required
+              type="text"
+              placeholder="Např. Firemní blog"
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
             />
           </label>
 
           {error && <p className="error">{error}</p>}
 
           <button type="submit" className="button primary" disabled={loading}>
-            {loading ? 'Zakládám účet…' : 'Pokračovat k platbě'}
+            {loading ? 'Připravuji platební krok…' : 'Pokračovat k platbě'}
           </button>
 
           <p className="footnote">
-            Už máte účet? <Link href="/login">Přihlaste se zde.</Link>
+            Zpět na <Link href="/dashboard">dashboard</Link>.
           </p>
         </form>
       </main>
@@ -181,4 +171,5 @@ const OnboardingStepOne = () => {
   );
 };
 
-export default OnboardingStepOne;
+export default AddSitePage;
+
