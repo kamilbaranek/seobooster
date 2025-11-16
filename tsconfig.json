@@ -1,8 +1,12 @@
 {
+  "extends": "./tsconfig.base.json",
   "files": [],
   "references": [
     {
       "path": "./libs/shared-types"
+    },
+    {
+      "path": "./libs/ai-prompts"
     },
     {
       "path": "./apps/api"
@@ -12,4 +16,3 @@
     }
   ]
 }
-
