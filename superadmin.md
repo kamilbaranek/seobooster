@@ -67,38 +67,17 @@ Cíl: Mít možnost označit endpointy, které smí volat jen Superadmin.
 
 Cíl: Umět si vytvořit prvního superadmina bez ručního psaní SQL.
 
-1. V rootu projektu přidej skript (např. `scripts/seed-superadmin.ts`):
-   - Načti `.env` (stejně jako v `main.ts`).
-   - Použij `PrismaClient` z `@prisma/client`.
-   - Vem `SUPERADMIN_EMAIL` a `SUPERADMIN_PASSWORD` z `process.env`.
-   - Najdi uživatele s daným emailem:
-     - pokud existuje → updatni jeho `role` na `SUPERADMIN`,
-     - pokud neexistuje → vytvoř nového:
-       - spočítej `passwordHash` pomocí `bcrypt` (stejně jako v `AuthService.register`),
-       - nastav `role: SUPERADMIN`.
+- [x] **Seed skript**  
+  V rootu přidej `scripts/seed-superadmin.ts`, který načte `.env`, použije `PrismaClient` + `bcrypt`, a vytvoří nebo aktualizuje uživatele s emailem z `SUPERADMIN_EMAIL` na roli `SUPERADMIN`.
 
-2. V `package.json` přidej script:
-   ```json
-   "scripts": {
-     "...": "...",
-     "seed:superadmin": "ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts"
-   }
-   ```
+- [x] **NPM script**  
+  Do `package.json` přidej příkaz `seed:superadmin` spouštějící `ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts`.
 
-3. Aktualizuj `README.md`:
-   - Přidej sekci „Superadmin setup“.
-   - Popiš, že je potřeba nastavit:
-     ```env
-     SUPERADMIN_EMAIL=...
-     SUPERADMIN_PASSWORD=...
-     ```
-   - A že seed se spustí příkazem:
-     ```bash
-     npm run seed:superadmin
-     ```
+- [x] **README sekce**  
+  Popsáno, jak nastavit `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` a spustit seed.
 
-4. `npm run build`  
-   - Commit: `git commit -m "feat: add superadmin seed script"`  
+- [x] **Build + commit**  
+  `npm run build` → commit `feat: add superadmin seed script`.
 
 ### M1.3 Frontend – rozpoznání superadmina
 

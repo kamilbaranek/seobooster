@@ -51,6 +51,21 @@ Backend expects these environment variables (for local dev, put them in a non‑
 - `AI_MODEL_SCAN` / `AI_MODEL_ANALYZE` / `AI_MODEL_STRATEGY` / `AI_MODEL_ARTICLE` – model identifiers (via OpenRouter) used per orchestrator phase.
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `PERPLEXITY_API_KEY` – reserved for future providers.
 - `WEB_APP_URL` – allowed origin for CORS (defaults to `http://localhost:3000`, set to production frontend URL in prod).
+- `NEXT_PUBLIC_API_BASE_URL` – Frontend volá API přes tuto adresu (pro lokální vývoj `http://localhost:3333/api`).
+- `NEXT_PUBLIC_DEBUG_PIPELINE` – Nastav na `true`, pokud chceš v dashboardu vidět debug panel se stavem jednotlivých fází.
 
 See `development_plan.md` and `implementation_plan.md` for the full product and implementation specification.
 - `npm run start:worker` – run the compiled worker (after `npm run build --workspace @seobooster/worker`).
+
+## Superadmin Setup
+
+1. Do `.env.local` přidej:
+   ```env
+   SUPERADMIN_EMAIL=admin@example.com
+   SUPERADMIN_PASSWORD=nějaké-heslo
+   ```
+2. Spusť seed skript:
+   ```bash
+   npm run seed:superadmin
+   ```
+3. Přihlas se na `/login` s těmito údaji – v dashboardu uvidíš odkaz „Superadmin: prompty“, kde můžeš spravovat AI prompty pro jednotlivé fáze pipeline.
