@@ -95,11 +95,7 @@ const PROVIDER_OPTIONS = [
 ];
 
 const MODEL_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
-  openrouter: [
-    { value: 'openrouter/auto', label: 'openrouter/auto' },
-    { value: 'perplexity/sonar-pro-search', label: 'perplexity/sonar-pro-search' },
-    { value: 'anthropic/claude-3.7-sonnet', label: 'anthropic/claude-3.7-sonnet' }
-  ],
+  openrouter: [],
   openai: [
     { value: 'openai/gpt-4o-mini', label: 'gpt-4o-mini' },
     { value: 'openai/gpt-4.1-mini', label: 'gpt-4.1-mini' }
@@ -126,6 +122,9 @@ const AdminPromptsPage = () => {
   const [providerChoice, setProviderChoice] = useState('default');
   const [modelChoice, setModelChoice] = useState('');
   const [forceJsonResponse, setForceJsonResponse] = useState(true);
+  const [openrouterModels, setOpenrouterModels] = useState<Array<{ value: string; label: string }>>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
@@ -163,6 +162,21 @@ const AdminPromptsPage = () => {
     }
     return null;
   };
+
+  const loadOpenrouterModels = useCallback(async () => {
+    if (openrouterModels.length > 0 || modelsLoading) return;
+    setModelsLoading(true);
+    setModelsError(null);
+    try {
+      const data = await apiFetch<Array<{ id: string; name: string }>>('/admin/models/openrouter');
+      const options = data.map((model) => ({ value: model.id, label: model.name || model.id }));
+      setOpenrouterModels(options);
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : 'Nelze načíst modely z OpenRouteru.');
+    } finally {
+      setModelsLoading(false);
+    }
+  }, [modelsLoading, openrouterModels.length]);
 
   useEffect(() => {
     let isMounted = true;
@@ -286,20 +300,24 @@ const AdminPromptsPage = () => {
     }
     loadPromptDetail(selectedTask);
     loadLogs(selectedTask);
-  }, [isSuperadmin, selectedTask, loadPromptDetail, loadLogs]);
+    if (providerChoice === 'openrouter') {
+      loadOpenrouterModels();
+    }
+  }, [isSuperadmin, selectedTask, providerChoice, loadPromptDetail, loadLogs, loadOpenrouterModels]);
 
   useEffect(() => {
     setModelChoice((current) => {
       if (providerChoice === 'default') {
         return '';
       }
-      const models = MODEL_OPTIONS[providerChoice] ?? [];
+      const models =
+        providerChoice === 'openrouter' ? openrouterModels : MODEL_OPTIONS[providerChoice] ?? [];
       if (current && !models.some((option) => option.value === current)) {
         return '';
       }
       return current;
     });
-  }, [providerChoice]);
+  }, [providerChoice, openrouterModels]);
 
   const handleSave = async () => {
     if (!selectedTask) return;
@@ -454,16 +472,42 @@ const AdminPromptsPage = () => {
                       <select
                         value={modelChoice}
                         onChange={(event) => setModelChoice(event.target.value)}
-                        disabled={providerChoice === 'default' || !(MODEL_OPTIONS[providerChoice] ?? []).length}
+                        disabled={
+                          providerChoice === 'default' ||
+                          (providerChoice === 'openrouter'
+                            ? openrouterModels.length === 0 && !modelsLoading
+                            : !(MODEL_OPTIONS[providerChoice] ?? []).length)
+                        }
                       >
                         <option value="">Dědit z výchozího nastavení</option>
-                        {(MODEL_OPTIONS[providerChoice] ?? []).map((option) => (
+                        {(providerChoice === 'openrouter'
+                          ? openrouterModels
+                          : MODEL_OPTIONS[providerChoice] ?? []
+                        ).map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
                         ))}
+                        {modelChoice &&
+                          !(providerChoice === 'openrouter'
+                            ? openrouterModels
+                            : MODEL_OPTIONS[providerChoice] ?? []
+                          ).some((option) => option.value === modelChoice) && (
+                            <option value={modelChoice}>{modelChoice}</option>
+                          )}
                       </select>
                     </label>
+                    {providerChoice === 'openrouter' && (
+                      <small className="muted">
+                        {modelsLoading
+                          ? 'Načítám modely z OpenRouteru…'
+                          : modelsError
+                          ? `Chyba při načítání modelů: ${modelsError}`
+                          : openrouterModels.length
+                          ? `${openrouterModels.length} dostupných modelů.`
+                          : 'Žádné modely nenalezeny nebo klíč není správně nastaven.'}
+                      </small>
+                    )}
                   </div>
                   <label className="toggle-row">
                     <input
