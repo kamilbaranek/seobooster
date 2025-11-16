@@ -23,10 +23,10 @@ export class MeController {
     return {
       user: {
         id: me?.id ?? user.userId,
-        email: me?.email ?? user.email
+        email: me?.email ?? user.email,
+        role: me?.role ?? user.role
       },
       webs: me?.webs ?? []
     };
   }
 }
-

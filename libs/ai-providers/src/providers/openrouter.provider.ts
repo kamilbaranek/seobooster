@@ -8,7 +8,8 @@ import {
   GenerateArticleOptions,
   ScanResult,
   SeoStrategy,
-  AiTaskType
+  AiTaskType,
+  PromptOverrides
 } from '@seobooster/ai-types';
 
 interface OpenRouterProviderConfig extends AiProviderConfig {
@@ -84,7 +85,7 @@ export class OpenRouterProvider implements AiProvider {
     }
   }
 
-  async scanWebsite(url: string): Promise<ScanResult> {
+  async scanWebsite(url: string, overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
     const fallback: ScanResult = {
       url,
       title: `Scan of ${url}`,
@@ -93,15 +94,25 @@ export class OpenRouterProvider implements AiProvider {
       detectedTechnologies: []
     };
 
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You extract structured metadata about websites. Always return JSON object { success: boolean, data: ScanResult }.';
+    const userPrompt =
+      overrides?.userPrompt ??
+      `Analyze the website ${url} and provide title, short description, keywords array, and detected technologies.`;
+
     return this.requestJson<ScanResult>(
       'scan',
-      'You extract structured metadata about websites. Always return JSON object { success: boolean, data: ScanResult }.',
-      `Analyze the website ${url} and provide title, short description, keywords array, and detected technologies.`,
+      systemPrompt,
+      userPrompt,
       fallback
     );
   }
 
-  async analyzeBusiness(scan: ScanResult): Promise<BusinessProfile> {
+  async analyzeBusiness(
+    scan: ScanResult,
+    overrides?: PromptOverrides<'analyze'>
+  ): Promise<BusinessProfile> {
     const fallback: BusinessProfile = {
       name: scan.title || scan.url,
       tagline: '',
@@ -110,29 +121,52 @@ export class OpenRouterProvider implements AiProvider {
       differentiators: []
     };
 
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You convert website scan data into a business profile. Return JSON { success, data } where data is BusinessProfile.';
+    const userPrompt =
+      overrides?.userPrompt ??
+      `Scan Result: ${JSON.stringify(scan)}\nCreate a concise business profile.`;
+
     return this.requestJson<BusinessProfile>(
       'analyze',
-      'You convert website scan data into a business profile. Return JSON { success, data } where data is BusinessProfile.',
-      `Scan Result: ${JSON.stringify(scan)}\nCreate a concise business profile.`,
+      systemPrompt,
+      userPrompt,
       fallback
     );
   }
 
-  async buildSeoStrategy(profile: BusinessProfile): Promise<SeoStrategy> {
+  async buildSeoStrategy(
+    profile: BusinessProfile,
+    overrides?: PromptOverrides<'strategy'>
+  ): Promise<SeoStrategy> {
     const fallback: SeoStrategy = {
       pillars: [],
       targetTone: profile.tagline ? 'Brand voice' : undefined
     };
 
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You design SEO strategies with pillars and topic clusters. Respond with JSON { success, data }.';
+    const userPrompt =
+      overrides?.userPrompt ??
+      `Business profile: ${JSON.stringify(
+        profile
+      )}\nGenerate an initial SEO strategy with at least one pillar and cluster keywords.`;
+
     return this.requestJson<SeoStrategy>(
       'strategy',
-      'You design SEO strategies with pillars and topic clusters. Respond with JSON { success, data }.',
-      `Business profile: ${JSON.stringify(profile)}\nGenerate an initial SEO strategy with at least one pillar and cluster keywords.`,
+      systemPrompt,
+      userPrompt,
       fallback
     );
   }
 
-  async generateArticle(strategy: SeoStrategy, options: GenerateArticleOptions): Promise<ArticleDraft> {
+  async generateArticle(
+    strategy: SeoStrategy,
+    options: GenerateArticleOptions,
+    overrides?: PromptOverrides<'article'>
+  ): Promise<ArticleDraft> {
     const fallback: ArticleDraft = {
       title: `Article for ${options.clusterName}`,
       outline: [],
@@ -141,14 +175,23 @@ export class OpenRouterProvider implements AiProvider {
       callToAction: undefined
     };
 
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You write high quality SEO articles. Always return JSON { success, data } with ArticleDraft fields.';
+    const tone = options.targetTone ?? strategy.targetTone ?? 'Professional';
+    const userPrompt =
+      overrides?.userPrompt ??
+      `SEO Strategy: ${JSON.stringify(strategy)}\nSelected cluster: ${
+        options.clusterName
+      }\nTone: ${tone}\nProduce a detailed outline, markdown body, keywords, and CTA.`;
+
+    const variables = overrides?.variables ?? {};
+
     return this.requestJson<ArticleDraft>(
       'article',
-      'You write high quality SEO articles. Always return JSON { success, data } with ArticleDraft fields.',
-      `SEO Strategy: ${JSON.stringify(strategy)}\nSelected cluster: ${options.clusterName}\nTone: ${
-        options.targetTone ?? strategy.targetTone ?? 'Professional'
-      }\nProduce a detailed outline, markdown body, keywords, and CTA.`,
+      systemPrompt,
+      userPrompt,
       fallback
     );
   }
 }
-

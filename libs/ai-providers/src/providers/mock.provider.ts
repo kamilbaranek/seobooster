@@ -5,6 +5,7 @@ import {
   ArticleDraft,
   BusinessProfile,
   GenerateArticleOptions,
+  PromptOverrides,
   ScanResult,
   SeoStrategy
 } from '@seobooster/ai-types';
@@ -17,7 +18,7 @@ export class MockAiProvider implements AiProvider {
     private readonly models: AiModelMap
   ) {}
 
-  async scanWebsite(url: string): Promise<ScanResult> {
+  async scanWebsite(url: string, _overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
     return {
       url,
       title: `Scanned ${url}`,
@@ -27,7 +28,7 @@ export class MockAiProvider implements AiProvider {
     };
   }
 
-  async analyzeBusiness(scan: ScanResult): Promise<BusinessProfile> {
+  async analyzeBusiness(scan: ScanResult, _overrides?: PromptOverrides<'analyze'>): Promise<BusinessProfile> {
     return {
       name: new URL(scan.url).hostname,
       tagline: 'AI-powered marketing',
@@ -37,7 +38,7 @@ export class MockAiProvider implements AiProvider {
     };
   }
 
-  async buildSeoStrategy(profile: BusinessProfile): Promise<SeoStrategy> {
+  async buildSeoStrategy(profile: BusinessProfile, _overrides?: PromptOverrides<'strategy'>): Promise<SeoStrategy> {
     return {
       pillars: [
         {
@@ -52,7 +53,11 @@ export class MockAiProvider implements AiProvider {
     };
   }
 
-  async generateArticle(strategy: SeoStrategy, options: GenerateArticleOptions): Promise<ArticleDraft> {
+  async generateArticle(
+    strategy: SeoStrategy,
+    options: GenerateArticleOptions,
+    _overrides?: PromptOverrides<'article'>
+  ): Promise<ArticleDraft> {
     const clusters = strategy.pillars.flatMap((pillar) => pillar.clusters);
     const cluster =
       clusters.find((c) => c.name === options.clusterName) ?? clusters[0] ?? { name: 'SEO automation', keywords: [] };
@@ -66,4 +71,3 @@ export class MockAiProvider implements AiProvider {
     };
   }
 }
-

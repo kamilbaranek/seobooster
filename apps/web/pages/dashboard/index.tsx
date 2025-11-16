@@ -9,6 +9,7 @@ interface MeResponse {
   user: {
     id: string;
     email: string;
+    role?: string;
   };
   webs: Array<{
     id: string;

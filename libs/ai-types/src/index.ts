@@ -51,13 +51,33 @@ export interface ArticleDraft {
 
 export interface AiProvider {
   name: ProviderName;
-  scanWebsite(url: string): Promise<ScanResult>;
-  analyzeBusiness(scan: ScanResult): Promise<BusinessProfile>;
-  buildSeoStrategy(profile: BusinessProfile): Promise<SeoStrategy>;
-  generateArticle(strategy: SeoStrategy, options: GenerateArticleOptions): Promise<ArticleDraft>;
+  scanWebsite(
+    url: string,
+    overrides?: PromptOverrides<'scan'>
+  ): Promise<ScanResult>;
+  analyzeBusiness(
+    scan: ScanResult,
+    overrides?: PromptOverrides<'analyze'>
+  ): Promise<BusinessProfile>;
+  buildSeoStrategy(
+    profile: BusinessProfile,
+    overrides?: PromptOverrides<'strategy'>
+  ): Promise<SeoStrategy>;
+  generateArticle(
+    strategy: SeoStrategy,
+    options: GenerateArticleOptions,
+    overrides?: PromptOverrides<'article'>
+  ): Promise<ArticleDraft>;
 }
 
 export interface GenerateArticleOptions {
   clusterName: string;
   targetTone?: string;
 }
+
+export type PromptOverrides<TTask extends AiTaskType> = {
+  systemPrompt?: string;
+  userPrompt?: string;
+  variables?: Record<string, unknown>;
+  task?: TTask;
+};

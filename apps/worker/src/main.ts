@@ -26,7 +26,7 @@ import {
 } from '@seobooster/queue-types';
 import { createLogger } from './logger';
 import { aiProvider } from './services/ai-orchestrator';
-import type { BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import type { AiTaskType, BusinessProfile, ScanResult, SeoStrategy } from '@seobooster/ai-types';
 
 const logger = createLogger('worker');
 
@@ -125,7 +125,16 @@ const bootstrap = async () => {
       return;
     }
 
-    const scanResult = (await aiProvider.scanWebsite(web.url)) as ScanResult;
+    const prompts = await prisma.aiPromptConfig.findUnique({
+      where: { task: 'scan' }
+    });
+
+    const scanResult = (await aiProvider.scanWebsite(web.url, {
+      task: 'scan',
+      systemPrompt: prompts?.systemPrompt,
+      userPrompt: prompts?.userPrompt,
+      variables: { url: web.url }
+    })) as ScanResult;
 
     await prisma.webAnalysis.upsert({
       where: { webId: web.id },
@@ -152,9 +161,18 @@ const bootstrap = async () => {
       return;
     }
 
-    const profile = (await aiProvider.analyzeBusiness(
-      analysis.scanResult as unknown as ScanResult
-    )) as BusinessProfile;
+    const scan = analysis.scanResult as unknown as ScanResult;
+
+    const prompts = await prisma.aiPromptConfig.findUnique({
+      where: { task: 'analyze' }
+    });
+
+    const profile = (await aiProvider.analyzeBusiness(scan, {
+      task: 'analyze',
+      systemPrompt: prompts?.systemPrompt,
+      userPrompt: prompts?.userPrompt,
+      variables: { url: scan.url, scanResult: scan }
+    })) as BusinessProfile;
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
       data: { businessProfile: profile as unknown as Prisma.InputJsonValue }
@@ -172,9 +190,18 @@ const bootstrap = async () => {
       return;
     }
 
-    const strategy = (await aiProvider.buildSeoStrategy(
-      analysis.businessProfile as unknown as BusinessProfile
-    )) as SeoStrategy;
+    const businessProfile = analysis.businessProfile as unknown as BusinessProfile;
+
+    const prompts = await prisma.aiPromptConfig.findUnique({
+      where: { task: 'strategy' }
+    });
+
+    const strategy = (await aiProvider.buildSeoStrategy(businessProfile, {
+      task: 'strategy',
+      systemPrompt: prompts?.systemPrompt,
+      userPrompt: prompts?.userPrompt,
+      variables: { businessProfile }
+    })) as SeoStrategy;
 
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
@@ -209,10 +236,23 @@ const bootstrap = async () => {
       return;
     }
 
-    const draft = await aiProvider.generateArticle(strategy, {
-      clusterName: targetCluster.name,
-      targetTone: strategy.targetTone
+    const prompts = await prisma.aiPromptConfig.findUnique({
+      where: { task: 'article' }
     });
+
+    const draft = await aiProvider.generateArticle(
+      strategy,
+      {
+        clusterName: targetCluster.name,
+        targetTone: strategy.targetTone
+      },
+      {
+        task: 'article',
+        systemPrompt: prompts?.systemPrompt,
+        userPrompt: prompts?.userPrompt,
+        variables: { strategy, cluster: targetCluster }
+      }
+    );
 
     const article = await prisma.article.create({
       data: {
