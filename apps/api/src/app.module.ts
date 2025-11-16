@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 import type { RedisOptions } from 'ioredis';
@@ -10,12 +11,12 @@ import { BillingModule } from './billing/billing.module';
 import { QueuesModule } from './queues/queues.module';
 import { WebsModule } from './webs/webs.module';
 import { MeModule } from './me/me.module';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env.local', '.env']
+      isGlobal: true
     }),
     PrismaModule,
     BullModule.forRootAsync({
@@ -47,6 +48,12 @@ import { MeModule } from './me/me.module';
     MeModule
   ],
   controllers: [AppController],
-  providers: [AppService]
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard
+    }
+  ]
 })
 export class AppModule {}
