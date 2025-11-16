@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePromptDto {
   @IsString()
@@ -14,4 +14,8 @@ export class UpdatePromptDto {
   @IsOptional()
   @IsString()
   model?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  forceJsonResponse?: boolean;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "AiPromptConfig" ADD COLUMN IF NOT EXISTS "forceJsonResponse" BOOLEAN NOT NULL DEFAULT true;

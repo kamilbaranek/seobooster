@@ -219,6 +219,7 @@ const bootstrap = async () => {
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
+    const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: web.id, variables, renderedPrompts }, 'AI debug: scan request');
@@ -232,7 +233,8 @@ const bootstrap = async () => {
         task: 'scan',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        variables
+        variables,
+        forceJsonResponse
       })) as ScanResult;
 
       if (AI_DEBUG_LOG_PROMPTS) {
@@ -307,6 +309,7 @@ const bootstrap = async () => {
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
+    const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: analyze request');
@@ -320,7 +323,8 @@ const bootstrap = async () => {
         task: 'analyze',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        variables
+        variables,
+        forceJsonResponse
       })) as BusinessProfile;
 
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
@@ -386,6 +390,7 @@ const bootstrap = async () => {
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
+    const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
@@ -399,7 +404,8 @@ const bootstrap = async () => {
         task: 'strategy',
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
-        variables
+        variables,
+        forceJsonResponse
       })) as SeoStrategy;
 
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
@@ -480,6 +486,7 @@ const bootstrap = async () => {
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
+    const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: article request');
@@ -497,7 +504,8 @@ const bootstrap = async () => {
           task: 'article',
           systemPrompt: renderedPrompts.systemPrompt,
           userPrompt: renderedPrompts.userPrompt,
-          variables
+          variables,
+          forceJsonResponse
         }
       );
 

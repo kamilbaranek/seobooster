@@ -23,6 +23,7 @@ interface PromptDto {
   provider?: string | null;
   model?: string | null;
   isCustom?: boolean;
+  forceJsonResponse?: boolean | null;
 }
 
 interface PreviewResponse {
@@ -124,6 +125,7 @@ const AdminPromptsPage = () => {
   const [userPrompt, setUserPrompt] = useState('');
   const [providerChoice, setProviderChoice] = useState('default');
   const [modelChoice, setModelChoice] = useState('');
+  const [forceJsonResponse, setForceJsonResponse] = useState(true);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
@@ -209,6 +211,7 @@ const AdminPromptsPage = () => {
         setUserPrompt(detail.userPrompt ?? '');
         setProviderChoice(detail.provider ?? 'default');
         setModelChoice(detail.model ?? '');
+        setForceJsonResponse(detail.forceJsonResponse ?? true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Nepodařilo se načíst detail promptu.');
       } finally {
@@ -291,7 +294,8 @@ const AdminPromptsPage = () => {
           systemPrompt,
           userPrompt,
           provider: providerChoice === 'default' ? null : providerChoice,
-          model: modelChoice || null
+          model: modelChoice || null,
+          forceJsonResponse
         })
       });
       setSuccessMessage('Prompty uloženy.');
@@ -317,6 +321,7 @@ const AdminPromptsPage = () => {
       await loadPromptDetail(selectedTask);
       setProviderChoice('default');
       setModelChoice('');
+      setForceJsonResponse(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nepodařilo se resetovat prompt.');
     } finally {
@@ -441,6 +446,14 @@ const AdminPromptsPage = () => {
                       </select>
                     </label>
                   </div>
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={forceJsonResponse}
+                      onChange={(event) => setForceJsonResponse(event.target.checked)}
+                    />
+                    <span>Vynutit JSON response (doporučeno, vypni pro modely, které JSON režim nepodporují)</span>
+                  </label>
                   {providerChoice === 'default' && (
                     <p className="muted">Pokud nepotřebuješ vlastní provider/model, nech „Výchozí“. Čerpá se z env proměnných AI_PROVIDER a AI_MODEL_*.</p>
                   )}
@@ -739,6 +752,17 @@ const AdminPromptsPage = () => {
         .stacked span {
           font-size: 0.85rem;
           color: #cbd5f5;
+        }
+        .toggle-row {
+          margin-top: 0.8rem;
+          display: flex;
+          gap: 0.6rem;
+          align-items: center;
+          font-size: 0.9rem;
+        }
+        .toggle-row input[type='checkbox'] {
+          width: 18px;
+          height: 18px;
         }
         select {
           border-radius: 0.6rem;

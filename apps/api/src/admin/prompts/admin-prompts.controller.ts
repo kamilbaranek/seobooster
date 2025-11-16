@@ -78,7 +78,8 @@ export class AdminPromptsController {
         prompt.systemPrompt !== defaults.systemPrompt ||
         prompt.userPrompt !== defaults.userPrompt ||
         Boolean(prompt.provider) ||
-        Boolean(prompt.model);
+        Boolean(prompt.model) ||
+        prompt.forceJsonResponse === false;
       return {
         ...prompt,
         isCustom
@@ -98,7 +99,8 @@ export class AdminPromptsController {
       systemPrompt: defaults.systemPrompt,
       userPrompt: defaults.userPrompt,
       provider: null,
-      model: null
+      model: null,
+      forceJsonResponse: true
     };
   }
 
@@ -133,14 +135,16 @@ export class AdminPromptsController {
         systemPrompt: payload.systemPrompt,
         userPrompt: payload.userPrompt,
         provider: payload.provider ?? null,
-        model: payload.model ?? null
+        model: payload.model ?? null,
+        forceJsonResponse: payload.forceJsonResponse ?? true
       },
       create: {
         task,
         systemPrompt: payload.systemPrompt,
         userPrompt: payload.userPrompt,
         provider: payload.provider ?? null,
-        model: payload.model ?? null
+        model: payload.model ?? null,
+        forceJsonResponse: payload.forceJsonResponse ?? true
       }
     });
   }

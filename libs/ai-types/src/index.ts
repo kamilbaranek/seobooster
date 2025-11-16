@@ -81,4 +81,5 @@ export type PromptOverrides<TTask extends AiTaskType> = {
   userPrompt?: string;
   variables?: Record<string, unknown>;
   task?: TTask;
+  forceJsonResponse?: boolean;
 };

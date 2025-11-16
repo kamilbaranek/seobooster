@@ -37,6 +37,7 @@ export class OpenRouterProvider implements AiProvider {
     task: AiTaskType,
     systemPrompt: string,
     userPrompt: string,
+    forceJsonResponse: boolean,
     fallback: T
   ): Promise<T> {
     const apiKey = this.config.apiKey;
@@ -49,6 +50,17 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     try {
+      const body: Record<string, unknown> = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      };
+      if (forceJsonResponse) {
+        body.response_format = { type: 'json_object' };
+      }
+
       const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -57,14 +69,7 @@ export class OpenRouterProvider implements AiProvider {
           'HTTP-Referer': this.config.siteUrl,
           'X-Title': this.config.appName
         },
-        body: JSON.stringify({
-          model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ]
-        })
+        body: JSON.stringify(body)
       });
 
       const responseText = await response.text();
@@ -121,12 +126,8 @@ export class OpenRouterProvider implements AiProvider {
       overrides?.userPrompt ??
       `Analyze the website ${url} and provide title, short description, keywords array, and detected technologies.`;
 
-    return this.requestJson<ScanResult>(
-      'scan',
-      systemPrompt,
-      userPrompt,
-      fallback
-    );
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+    return this.requestJson<ScanResult>('scan', systemPrompt, userPrompt, forceJsonResponse, fallback);
   }
 
   async analyzeBusiness(
@@ -148,12 +149,8 @@ export class OpenRouterProvider implements AiProvider {
       overrides?.userPrompt ??
       `Scan Result: ${JSON.stringify(scan)}\nCreate a concise business profile.`;
 
-    return this.requestJson<BusinessProfile>(
-      'analyze',
-      systemPrompt,
-      userPrompt,
-      fallback
-    );
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+    return this.requestJson<BusinessProfile>('analyze', systemPrompt, userPrompt, forceJsonResponse, fallback);
   }
 
   async buildSeoStrategy(
@@ -174,12 +171,8 @@ export class OpenRouterProvider implements AiProvider {
         profile
       )}\nGenerate an initial SEO strategy with at least one pillar and cluster keywords.`;
 
-    return this.requestJson<SeoStrategy>(
-      'strategy',
-      systemPrompt,
-      userPrompt,
-      fallback
-    );
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+    return this.requestJson<SeoStrategy>('strategy', systemPrompt, userPrompt, forceJsonResponse, fallback);
   }
 
   async generateArticle(
@@ -207,11 +200,7 @@ export class OpenRouterProvider implements AiProvider {
 
     const variables = overrides?.variables ?? {};
 
-    return this.requestJson<ArticleDraft>(
-      'article',
-      systemPrompt,
-      userPrompt,
-      fallback
-    );
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+    return this.requestJson<ArticleDraft>('article', systemPrompt, userPrompt, forceJsonResponse, fallback);
   }
 }
