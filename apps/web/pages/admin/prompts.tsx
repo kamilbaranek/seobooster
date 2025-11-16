@@ -305,10 +305,16 @@ const AdminPromptsPage = () => {
     }
     loadPromptDetail(selectedTask);
     loadLogs(selectedTask);
+  }, [isSuperadmin, selectedTask, loadPromptDetail, loadLogs]);
+
+  useEffect(() => {
+    if (!isSuperadmin) {
+      return;
+    }
     if (providerChoice === 'openrouter') {
       loadOpenrouterModels();
     }
-  }, [isSuperadmin, selectedTask, providerChoice, loadPromptDetail, loadLogs, loadOpenrouterModels]);
+  }, [isSuperadmin, providerChoice, loadOpenrouterModels]);
 
   useEffect(() => {
     setModelChoice((current) => {
