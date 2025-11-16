@@ -80,10 +80,11 @@ export class AdminPromptsController {
     if (prompt) {
       return prompt;
     }
+    const defaults = DEFAULT_PROMPTS[task];
     return {
       task,
-      systemPrompt: '',
-      userPrompt: ''
+      systemPrompt: defaults.systemPrompt,
+      userPrompt: defaults.userPrompt
     };
   }
 
