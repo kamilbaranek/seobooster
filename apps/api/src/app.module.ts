@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 import type { RedisOptions } from 'ioredis';
@@ -11,6 +10,7 @@ import { BillingModule } from './billing/billing.module';
 import { QueuesModule } from './queues/queues.module';
 import { WebsModule } from './webs/webs.module';
 import { MeModule } from './me/me.module';
+import { AdminPromptsModule } from './admin/prompts/admin-prompts.module';
 import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
@@ -45,15 +45,10 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AuthModule,
     BillingModule,
     WebsModule,
-    MeModule
+    MeModule,
+    AdminPromptsModule
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard
-    }
-  ]
+  providers: [AppService, RolesGuard]
 })
 export class AppModule {}
