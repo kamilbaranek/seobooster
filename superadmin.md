@@ -168,20 +168,20 @@ Cíl: REST API, přes které superadmin uvidí a změní prompty.
 
 ### M4.1 Dokumentace proměnných v UI
 
-1. Na stránce `/admin/prompts` pod formulářem zobraz blok „Dostupné proměnné“:
-   - Pro `scan`:
-     - `{{url}}`
-   - Pro `analyze`:
-     - `{{url}}`, `{{scanResult}}`
-   - Pro `strategy`:
-     - `{{businessProfile}}`
-   - Pro `article`:
-     - `{{strategy}}`, `{{cluster}}`
+- [x] Na stránce `/admin/prompts` pod formulářem zobraz blok „Dostupné proměnné“:
+  - Pro `scan`:
+    - `{{url}}`
+  - Pro `analyze`:
+    - `{{url}}`, `{{scanResult}}`
+  - Pro `strategy`:
+    - `{{businessProfile}}`
+  - Pro `article`:
+    - `{{strategy}}`, `{{cluster}}`
 
 Zatím je to jen textová dokumentace – nepotřebuješ měnit backend.
 
-2. `npm run build --workspace @seobooster/web`  
-   - Commit: `git commit -m "docs: show available AI variables per task in UI"`  
+- [x] `npm run build --workspace @seobooster/web`  
+  - Commit: `git commit -m "docs: show available AI variables per task in UI"`  
 
 ### M4.2 Preview endpoint (bez volání modelu)
 

@@ -45,6 +45,19 @@ const TASKS: Array<{ key: TaskKey; title: string; description: string }> = [
   }
 ];
 
+const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }>> = {
+  scan: [{ name: '{{url}}', description: 'URL webu, který se má skenovat.' }],
+  analyze: [
+    { name: '{{url}}', description: 'URL aktuálního webu.' },
+    { name: '{{scanResult}}', description: 'JSON výstup předchozího scanu.' }
+  ],
+  strategy: [{ name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' }],
+  article: [
+    { name: '{{strategy}}', description: 'JSON SEO strategie s pilíři a clustry.' },
+    { name: '{{cluster}}', description: 'Konkrétní cluster/příležitost vybraný pro článek.' }
+  ]
+};
+
 const AdminPromptsPage = () => {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -280,6 +293,18 @@ const AdminPromptsPage = () => {
 
                   {successMessage && <p className="success">{successMessage}</p>}
                   {!canReset && <p className="muted">Momentálně se používají výchozí prompty z kódu.</p>}
+
+                  <section className="variables">
+                    <h3>Dostupné proměnné</h3>
+                    <ul>
+                      {VARIABLE_DOCS[selectedTask].map((variable) => (
+                        <li key={variable.name}>
+                          <code>{variable.name}</code>
+                          <span>{variable.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 </>
               )}
             </section>
@@ -445,6 +470,33 @@ const AdminPromptsPage = () => {
           display: flex;
           gap: 1rem;
           margin-top: 1.5rem;
+        }
+        .variables {
+          margin-top: 2rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding-top: 1.5rem;
+        }
+        .variables ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+        .variables li {
+          display: flex;
+          gap: 1rem;
+          align-items: baseline;
+        }
+        .variables code {
+          background: rgba(15, 23, 42, 0.9);
+          padding: 0.2rem 0.5rem;
+          border-radius: 0.4rem;
+          font-family: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, monospace;
+        }
+        .variables span {
+          color: #cbd5f5;
         }
         @media (max-width: 960px) {
           .prompts-grid {
