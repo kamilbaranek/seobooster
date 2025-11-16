@@ -6,14 +6,17 @@ export const PUBLISH_ARTICLE_QUEUE = 'publish-article' as const;
 
 export type ScanWebsiteJob = {
   webId: string;
+  debug?: boolean;
 };
 
 export type AnalyzeBusinessJob = {
   webId: string;
+  debug?: boolean;
 };
 
 export type CreateSeoStrategyJob = {
   webId: string;
+  debug?: boolean;
 };
 
 export type GenerateArticleJob = {
@@ -24,4 +27,3 @@ export type GenerateArticleJob = {
 export type PublishArticleJob = {
   articleId: string;
 };
-

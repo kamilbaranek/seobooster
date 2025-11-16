@@ -1,5 +1,4 @@
--- CreateTable
-CREATE TABLE "AiCallLog" (
+CREATE TABLE IF NOT EXISTS "AiCallLog" (
     "id" TEXT NOT NULL,
     "webId" TEXT,
     "task" TEXT NOT NULL,
@@ -17,4 +16,11 @@ CREATE TABLE "AiCallLog" (
 );
 
 -- AddForeignKey
-ALTER TABLE "AiCallLog" ADD CONSTRAINT "AiCallLog_webId_fkey" FOREIGN KEY ("webId") REFERENCES "Web"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'AiCallLog_webId_fkey'
+  ) THEN
+    ALTER TABLE "AiCallLog" ADD CONSTRAINT "AiCallLog_webId_fkey" FOREIGN KEY ("webId") REFERENCES "Web"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END$$;

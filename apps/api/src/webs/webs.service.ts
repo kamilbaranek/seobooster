@@ -212,7 +212,7 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.jobQueueService.enqueueScanWebsite(web.id);
+    await this.jobQueueService.enqueueScanWebsiteDebug(web.id);
     return { queued: true };
   }
 
@@ -223,7 +223,7 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.jobQueueService.enqueueAnalyzeBusiness(web.id);
+    await this.jobQueueService.enqueueAnalyzeBusinessDebug(web.id);
     return { queued: true };
   }
 
@@ -234,7 +234,7 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.jobQueueService.enqueueCreateSeoStrategy(web.id);
+    await this.jobQueueService.enqueueCreateSeoStrategyDebug(web.id);
     return { queued: true };
   }
 

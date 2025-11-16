@@ -168,6 +168,26 @@ const recordAiCall = async (payload: AiCallLogInput) => {
   }
 };
 
+const resolveProviderForTask = (
+  task: AiTaskType,
+  prompts: PromptConfig
+) => {
+  const providerOverride = prompts?.provider as ProviderName | undefined;
+  const modelOverride = prompts?.model ?? undefined;
+
+  if (!providerOverride && !modelOverride) {
+    return { provider: aiProvider, model: aiModelMap[task] };
+  }
+
+  const overrides = modelOverride ? { [task]: modelOverride } : undefined;
+  const { provider, modelMap } = buildAiProviderFromEnv({
+    providerOverride,
+    modelOverrides: overrides
+  });
+
+  return { provider, model: modelMap[task] };
+};
+
 const bootstrap = async () => {
   if (!process.env.DATABASE_URL) {
     logger.warn('DATABASE_URL is not set. Worker operations may fail.');
@@ -203,6 +223,8 @@ const bootstrap = async () => {
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: web.id, variables, renderedPrompts }, 'AI debug: scan request');
     }
+
+    const isDebug = Boolean(job.data.debug);
 
     let scanResult: ScanResult;
     try {
@@ -258,7 +280,9 @@ const bootstrap = async () => {
       }
     });
 
-    await analyzeQueue.add('AnalyzeBusiness', { webId: web.id });
+    if (!isDebug) {
+      await analyzeQueue.add('AnalyzeBusiness', { webId: web.id });
+    }
   });
 
   createWorker<AnalyzeBusinessJob>(ANALYZE_BUSINESS_QUEUE, async (job) => {
@@ -285,6 +309,8 @@ const bootstrap = async () => {
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: analyze request');
     }
+
+    const isDebug = Boolean(job.data.debug);
 
     let profile: BusinessProfile;
     try {
@@ -331,7 +357,9 @@ const bootstrap = async () => {
       data: { businessProfile: profile as unknown as Prisma.InputJsonValue }
     });
 
-    await strategyQueue.add('CreateSeoStrategy', { webId: job.data.webId });
+    if (!isDebug) {
+      await strategyQueue.add('CreateSeoStrategy', { webId: job.data.webId });
+    }
   });
 
   createWorker<CreateSeoStrategyJob>(CREATE_SEO_STRATEGY_QUEUE, async (job) => {
@@ -358,6 +386,8 @@ const bootstrap = async () => {
     if (AI_DEBUG_LOG_PROMPTS) {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
     }
+
+    const isDebug = Boolean(job.data.debug);
 
     let strategy: SeoStrategy;
     try {
@@ -405,7 +435,9 @@ const bootstrap = async () => {
       data: { seoStrategy: strategy as unknown as Prisma.InputJsonValue }
     });
 
-    await generateQueue.add('GenerateArticle', { webId: job.data.webId });
+    if (!isDebug) {
+      await generateQueue.add('GenerateArticle', { webId: job.data.webId });
+    }
   });
 
   createWorker<GenerateArticleJob>(GENERATE_ARTICLE_QUEUE, async (job) => {
@@ -520,22 +552,3 @@ bootstrap().catch(async (err) => {
   await stop();
   process.exit(1);
 });
-const resolveProviderForTask = (
-  task: AiTaskType,
-  prompts: PromptConfig
-) => {
-  const providerOverride = prompts?.provider as ProviderName | undefined;
-  const modelOverride = prompts?.model ?? undefined;
-
-  if (!providerOverride && !modelOverride) {
-    return { provider: aiProvider, model: aiModelMap[task] };
-  }
-
-  const overrides = modelOverride ? { [task]: modelOverride } : undefined;
-  const { provider, modelMap } = buildAiProviderFromEnv({
-    providerOverride,
-    modelOverrides: overrides
-  });
-
-  return { provider, model: modelMap[task] };
-};

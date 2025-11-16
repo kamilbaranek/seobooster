@@ -22,12 +22,24 @@ export class JobQueueService {
     return this.scanWebsiteQueue.add('ScanWebsite', { webId });
   }
 
+  enqueueScanWebsiteDebug(webId: string) {
+    return this.scanWebsiteQueue.add('ScanWebsiteDebug', { webId, debug: true });
+  }
+
   enqueueAnalyzeBusiness(webId: string) {
     return this.analyzeBusinessQueue.add('AnalyzeBusiness', { webId });
   }
 
+  enqueueAnalyzeBusinessDebug(webId: string) {
+    return this.analyzeBusinessQueue.add('AnalyzeBusinessDebug', { webId, debug: true });
+  }
+
   enqueueCreateSeoStrategy(webId: string) {
     return this.createSeoStrategyQueue.add('CreateSeoStrategy', { webId });
+  }
+
+  enqueueCreateSeoStrategyDebug(webId: string) {
+    return this.createSeoStrategyQueue.add('CreateSeoStrategyDebug', { webId, debug: true });
   }
 
   enqueueGenerateArticle(webId: string) {

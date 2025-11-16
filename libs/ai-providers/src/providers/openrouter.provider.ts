@@ -60,10 +60,6 @@ export class OpenRouterProvider implements AiProvider {
         })
       });
 
-      if (!response.ok) {
-        return fallback;
-      }
-
       const completion = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
@@ -81,7 +77,8 @@ export class OpenRouterProvider implements AiProvider {
 
       return parsed as T;
     } catch (error) {
-      return fallback;
+      // In debug we want to notice provider errors; for now bubble up so callers can log them.
+      throw error;
     }
   }
 
