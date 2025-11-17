@@ -9,7 +9,9 @@
   "references": [
     {
       "path": "../../libs/queue-types"
+    },
+    {
+      "path": "../../libs/storage"
     }
   ]
 }
-

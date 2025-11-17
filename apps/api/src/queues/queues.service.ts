@@ -4,18 +4,22 @@ import { Queue } from 'bullmq';
 import {
   ANALYZE_BUSINESS_QUEUE,
   CREATE_SEO_STRATEGY_QUEUE,
+  FETCH_FAVICON_QUEUE,
   GENERATE_ARTICLE_QUEUE,
+  GENERATE_SCREENSHOT_QUEUE,
   PUBLISH_ARTICLE_QUEUE,
   SCAN_WEBSITE_QUEUE
 } from '@seobooster/queue-types';
 @Injectable()
 export class JobQueueService {
   constructor(
-    @InjectQueue('scan-website') private readonly scanWebsiteQueue: Queue,
-    @InjectQueue('analyze-business') private readonly analyzeBusinessQueue: Queue,
-    @InjectQueue('create-seo-strategy') private readonly createSeoStrategyQueue: Queue,
-    @InjectQueue('generate-article') private readonly generateArticleQueue: Queue,
-    @InjectQueue('publish-article') private readonly publishArticleQueue: Queue
+    @InjectQueue(SCAN_WEBSITE_QUEUE) private readonly scanWebsiteQueue: Queue,
+    @InjectQueue(ANALYZE_BUSINESS_QUEUE) private readonly analyzeBusinessQueue: Queue,
+    @InjectQueue(CREATE_SEO_STRATEGY_QUEUE) private readonly createSeoStrategyQueue: Queue,
+    @InjectQueue(GENERATE_ARTICLE_QUEUE) private readonly generateArticleQueue: Queue,
+    @InjectQueue(PUBLISH_ARTICLE_QUEUE) private readonly publishArticleQueue: Queue,
+    @InjectQueue(FETCH_FAVICON_QUEUE) private readonly fetchFaviconQueue: Queue,
+    @InjectQueue(GENERATE_SCREENSHOT_QUEUE) private readonly generateScreenshotQueue: Queue
   ) {}
 
   enqueueScanWebsite(webId: string) {
@@ -46,11 +50,39 @@ export class JobQueueService {
     return this.createSeoStrategyQueue.add('CreateSeoStrategyDebug', { webId, debug: true });
   }
 
-  enqueueGenerateArticle(webId: string) {
-    return this.generateArticleQueue.add('GenerateArticle', { webId });
+  enqueueGenerateArticle(webId: string, plannedArticleId: string) {
+    return this.generateArticleQueue.add('GenerateArticle', { webId, plannedArticleId });
   }
 
   enqueuePublishArticle(articleId: string) {
     return this.publishArticleQueue.add('PublishArticle', { articleId });
+  }
+
+  enqueueFetchFavicon(webId: string, trigger: string) {
+    return this.fetchFaviconQueue.add(
+      'FetchFavicon',
+      { webId, trigger },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 60000
+        }
+      }
+    );
+  }
+
+  enqueueGenerateScreenshot(webId: string, trigger: string, fullPage = false) {
+    return this.generateScreenshotQueue.add(
+      'GenerateHomepageScreenshot',
+      { webId, trigger, fullPage },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 120000
+        }
+      }
+    );
   }
 }

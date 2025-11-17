@@ -29,16 +29,25 @@ export interface BusinessProfile {
 }
 
 export interface SeoStrategy {
-  pillars: Array<{
+  business: {
     name: string;
-    description?: string;
-    clusters: Array<{
-      name: string;
+    description: string;
+    target_audience: string;
+  };
+  topic_clusters: Array<{
+    pillar_page: string;
+    pillar_keywords: string[];
+    cluster_intent: string;
+    funnel_stage: string;
+    supporting_articles: Array<{
+      title: string;
       keywords: string[];
-      cadenceDays: number;
+      intent: string;
+      funnel_stage: string;
+      meta_description: string;
     }>;
   }>;
-  targetTone?: string;
+  total_clusters: number;
 }
 
 export interface ArticleDraft {

@@ -1,9 +1,23 @@
 import 'reflect-metadata';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+import express from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
+
+const projectRoot = resolve(__dirname, '../../..');
+process.env.PROJECT_ROOT = projectRoot;
+
+['.env', '.env.local'].forEach((envFile, index) => {
+  const fullPath = resolve(projectRoot, envFile);
+  if (existsSync(fullPath)) {
+    loadEnv({ path: fullPath, override: index > 0 });
+  }
+});
 
 const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
@@ -12,6 +26,11 @@ const bootstrap = async () => {
     origin: webOrigin,
     credentials: false
   });
+  const assetPath = resolve(
+    projectRoot,
+    process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
+  );
+  app.use('/assets', express.static(assetPath, { index: false, maxAge: '1d' }));
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

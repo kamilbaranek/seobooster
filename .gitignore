@@ -8,3 +8,5 @@ apps/web/.next/
 apps/api/dist/
 apps/web/node_modules/
 apps/api/node_modules/
+/storage/
+**/tsconfig.tsbuildinfo

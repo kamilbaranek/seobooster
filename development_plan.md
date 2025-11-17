@@ -78,6 +78,8 @@ Redis Queue ─────► Workers ─────► AI Providers
                                WordPress Sites
 ```
 
+Implementation details for favicon handling and homepage screenshots (rendering service, workers, storage abstraction) are described in `screenshots.md`.
+
 ---
 
 ## 5. User Flow
@@ -246,4 +248,3 @@ Tokens for secure publishing links.
 ---
 
 ## End of Document
-

@@ -43,7 +43,7 @@ const SuccessPage = () => {
           router.replace('/dashboard');
           return;
         }
-      } catch (error) {
+      } catch (_error) {
         // keep silent, retry
       }
 

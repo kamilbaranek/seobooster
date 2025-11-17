@@ -23,6 +23,60 @@ type JsonResponse<T> = {
   data: T;
 };
 
+const STRATEGY_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    business: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        target_audience: { type: 'string' }
+      },
+      required: ['name', 'description', 'target_audience'],
+      additionalProperties: false
+    },
+    topic_clusters: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pillar_page: { type: 'string' },
+          pillar_keywords: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          cluster_intent: { type: 'string' },
+          funnel_stage: { type: 'string' },
+          supporting_articles: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                keywords: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                intent: { type: 'string' },
+                funnel_stage: { type: 'string' },
+                meta_description: { type: 'string' }
+              },
+              required: ['title', 'keywords'],
+              additionalProperties: false
+            }
+          }
+        },
+        required: ['pillar_page', 'pillar_keywords', 'supporting_articles'],
+        additionalProperties: false
+      }
+    },
+    total_clusters: { type: 'integer' }
+  },
+  required: ['business', 'topic_clusters'],
+  additionalProperties: false
+} as const;
+
 export class OpenRouterProvider implements AiProvider {
   name: AiProvider['name'] = 'openrouter';
   private lastRawResponse: unknown;
@@ -55,94 +109,102 @@ export class OpenRouterProvider implements AiProvider {
       return fallback;
     }
 
-    try {
-      const body: Record<string, unknown> = {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ]
-      };
-      if (forceJsonResponse) {
+    const body: Record<string, unknown> = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    };
+
+    if (forceJsonResponse) {
+      if (task === 'strategy') {
+        body.response_format = {
+          type: 'json_schema',
+          json_schema: {
+            name: 'seo_strategy',
+            strict: true,
+            schema: STRATEGY_JSON_SCHEMA
+          }
+        };
+      } else {
         body.response_format = { type: 'json_object' };
       }
+    }
 
-      const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': this.config.siteUrl,
-          'X-Title': this.config.appName
-        },
-        body: JSON.stringify(body)
-      });
+    const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': this.config.siteUrl,
+        'X-Title': this.config.appName
+      },
+      body: JSON.stringify(body)
+    });
 
-      const responseText = await response.text();
-      let completion: unknown;
-      try {
-        completion = JSON.parse(responseText);
-      } catch {
-        completion = responseText;
-      }
-      this.lastRawResponse = completion;
+    const responseText = await response.text();
+    let completion: unknown;
+    try {
+      completion = JSON.parse(responseText);
+    } catch {
+      completion = responseText;
+    }
+    this.lastRawResponse = completion;
 
-      if (!response.ok) {
-        throw new Error(`OpenRouter responded ${response.status}: ${responseText}`);
-      }
+    if (!response.ok) {
+      throw new Error(`OpenRouter responded ${response.status}: ${responseText}`);
+    }
 
-      if (typeof completion !== 'object' || completion === null) {
-        throw new Error('OpenRouter returned unexpected payload');
-      }
+    if (typeof completion !== 'object' || completion === null) {
+      throw new Error('OpenRouter returned unexpected payload');
+    }
 
-      const completionTyped = completion as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
+    const completionTyped = completion as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
 
-      const content = completionTyped.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new Error('OpenRouter response missing content');
-      }
+    const content = completionTyped.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('OpenRouter response missing content');
+    }
 
-      this.lastMessageContent = content;
+    this.lastMessageContent = content;
 
-      const tryParseJson = (text: string): JsonResponse<T> | T => {
-        return JSON.parse(text) as JsonResponse<T> | T;
-      };
+    const tryParseJson = (text: string): JsonResponse<T> | T => {
+      return JSON.parse(text) as JsonResponse<T> | T;
+    };
 
-      let parsed: JsonResponse<T> | T;
-      try {
-        parsed = tryParseJson(content);
-      } catch (parseError) {
-        // Některé modely (zejména když JSON mode není plně podporovaný)
-        // vrací JSON zabalený v ```json ... ``` nebo podobném code fence.
-        const fenceMatch = content.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/);
-        if (fenceMatch && fenceMatch[1]) {
-          const inner = fenceMatch[1].trim();
-          try {
-            parsed = tryParseJson(inner);
-          } catch (innerError) {
-            if (forceJsonResponse) {
-              throw innerError;
-            }
-            return fallback;
-          }
-        } else {
+    let parsed: JsonResponse<T> | T;
+    try {
+      parsed = tryParseJson(content);
+    } catch (parseError) {
+      // Některé modely (zejména když JSON mode není plně podporovaný)
+      // vrací JSON zabalený v ```json ... ``` nebo podobném code fence.
+      const fenceMatch = content.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/);
+      if (fenceMatch && fenceMatch[1]) {
+        const inner = fenceMatch[1].trim();
+        try {
+          parsed = tryParseJson(inner);
+        } catch (innerError) {
           if (forceJsonResponse) {
-            throw parseError;
+            throw innerError;
           }
           return fallback;
         }
+      } else {
+        if (forceJsonResponse) {
+          throw parseError;
+        }
+        return fallback;
       }
-      if (typeof parsed === 'object' && parsed !== null && 'data' in parsed && 'success' in parsed) {
-        const structured = parsed as JsonResponse<T>;
-        return structured.success ? structured.data : fallback;
-      }
-
-      return parsed as T;
-    } catch (error) {
-      throw error;
     }
+    if (typeof parsed === 'object' && parsed !== null && 'data' in parsed && 'success' in parsed) {
+      const structured = parsed as JsonResponse<T>;
+      return structured.success ? structured.data : fallback;
+    }
+
+    return parsed as T;
   }
 
   async scanWebsite(url: string, overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
@@ -193,18 +255,27 @@ export class OpenRouterProvider implements AiProvider {
     overrides?: PromptOverrides<'strategy'>
   ): Promise<SeoStrategy> {
     const fallback: SeoStrategy = {
-      pillars: [],
-      targetTone: profile.tagline ? 'Brand voice' : undefined
+      business: {
+        name: profile.name,
+        description: profile.mission ?? profile.tagline ?? '',
+        target_audience: Array.isArray(profile.audience)
+          ? profile.audience.join(', ')
+          : profile.audience
+          ? String(profile.audience)
+          : 'Unknown audience'
+      },
+      topic_clusters: [],
+      total_clusters: 0
     };
 
     const systemPrompt =
       overrides?.systemPrompt ??
-      'You design SEO strategies with pillars and topic clusters. Respond with JSON { success, data }.';
+      'You design SEO strategies for websites. Respond strictly in JSON matching the seo_strategy schema (business, topic_clusters, total_clusters). Do not wrap the JSON in markdown fences.';
     const userPrompt =
       overrides?.userPrompt ??
       `Business profile: ${JSON.stringify(
         profile
-      )}\nGenerate an initial SEO strategy with at least one pillar and cluster keywords.`;
+      )}\nBased on this, propose an SEO strategy JSON object with keys business, topic_clusters and total_clusters, following the agreed schema.`;
 
     const forceJsonResponse = overrides?.forceJsonResponse !== false;
     return this.requestJson<SeoStrategy>('strategy', systemPrompt, userPrompt, forceJsonResponse, fallback);
@@ -226,14 +297,12 @@ export class OpenRouterProvider implements AiProvider {
     const systemPrompt =
       overrides?.systemPrompt ??
       'You write high quality SEO articles. Always return JSON { success, data } with ArticleDraft fields.';
-    const tone = options.targetTone ?? strategy.targetTone ?? 'Professional';
+    const tone = options.targetTone ?? 'Professional';
     const userPrompt =
       overrides?.userPrompt ??
       `SEO Strategy: ${JSON.stringify(strategy)}\nSelected cluster: ${
         options.clusterName
       }\nTone: ${tone}\nProduce a detailed outline, markdown body, keywords, and CTA.`;
-
-    const variables = overrides?.variables ?? {};
 
     const forceJsonResponse = overrides?.forceJsonResponse !== false;
     return this.requestJson<ArticleDraft>('article', systemPrompt, userPrompt, forceJsonResponse, fallback);

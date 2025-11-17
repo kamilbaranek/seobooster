@@ -10,6 +10,8 @@ import { Request, Response } from 'express';
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
+    // eslint-disable-next-line no-console
+    console.error(exception);
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
@@ -33,4 +35,3 @@ export class HttpExceptionFilter implements ExceptionFilter {
     });
   }
 }
-

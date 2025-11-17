@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 const projectRoot = resolve(__dirname, '../../..');
+process.env.PROJECT_ROOT = projectRoot;
 
 ['.env', '.env.local'].forEach((envFile, index) => {
   const fullPath = resolve(projectRoot, envFile);
@@ -11,16 +12,20 @@ const projectRoot = resolve(__dirname, '../../..');
   }
 });
 import { Queue, QueueEvents, Worker } from 'bullmq';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { ArticlePlanStatus, AssetStatus, Prisma, PrismaClient } from '@prisma/client';
 import {
   ANALYZE_BUSINESS_QUEUE,
   CREATE_SEO_STRATEGY_QUEUE,
+  FETCH_FAVICON_QUEUE,
   GENERATE_ARTICLE_QUEUE,
+  GENERATE_SCREENSHOT_QUEUE,
   PUBLISH_ARTICLE_QUEUE,
   SCAN_WEBSITE_QUEUE,
   AnalyzeBusinessJob,
   CreateSeoStrategyJob,
+  FetchFaviconJob,
   GenerateArticleJob,
+  GenerateHomepageScreenshotJob,
   PublishArticleJob,
   ScanWebsiteJob
 } from '@seobooster/queue-types';
@@ -29,6 +34,9 @@ import { aiProvider, aiModelMap } from './services/ai-orchestrator';
 import type { AiTaskType, BusinessProfile, ProviderName, ScanResult, SeoStrategy } from '@seobooster/ai-types';
 import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
 import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
+import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
+import { fetchAndStoreFavicon } from './services/favicon';
+import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
@@ -41,12 +49,59 @@ const redisConnection = {
   ...(process.env.REDIS_USE_TLS === 'true' ? { tls: { rejectUnauthorized: false } } : {})
 } as const;
 
+const resolveAssetStorage = () => {
+  const driver = (process.env.ASSET_STORAGE_DRIVER ?? 'local').toLowerCase() as AssetStorageDriver;
+  if (driver === 'local') {
+    const rootPath = process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets';
+    const publicUrl = process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/assets';
+    return createAssetStorage({
+      driver,
+      local: {
+        rootPath,
+        publicBaseUrl: publicUrl
+      }
+    });
+  }
+  throw new Error('S3 asset storage driver is not implemented in the worker yet');
+};
+
+const assetStorage = resolveAssetStorage();
+
 const prisma = new PrismaClient();
 const scanQueue = new Queue(SCAN_WEBSITE_QUEUE, { connection: redisConnection });
 const analyzeQueue = new Queue(ANALYZE_BUSINESS_QUEUE, { connection: redisConnection });
 const strategyQueue = new Queue(CREATE_SEO_STRATEGY_QUEUE, { connection: redisConnection });
 const generateQueue = new Queue(GENERATE_ARTICLE_QUEUE, { connection: redisConnection });
 const publishQueue = new Queue(PUBLISH_ARTICLE_QUEUE, { connection: redisConnection });
+const faviconQueue = new Queue(FETCH_FAVICON_QUEUE, { connection: redisConnection });
+const screenshotQueue = new Queue(GENERATE_SCREENSHOT_QUEUE, { connection: redisConnection });
+
+let redisLimitExceeded = false;
+
+const handleRedisError = (source: string, name: string, err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (message.includes('max requests limit exceeded')) {
+    if (redisLimitExceeded) {
+      return;
+    }
+    redisLimitExceeded = true;
+    logger.error({ source, name, err }, 'Redis max requests limit exceeded, stopping worker');
+    // V tomto stavu nemá smysl dál bombardovat Upstash, proces ukončíme.
+    setTimeout(async () => {
+      try {
+        await stop();
+      } catch (stopError) {
+        logger.error({ stopError }, 'Failed to perform graceful shutdown after Redis limit');
+      }
+      // eslint-disable-next-line no-process-exit
+      process.exit(1);
+    }, 0);
+    return;
+  }
+
+  logger.error({ source, name, err }, 'Redis error from BullMQ');
+};
 
 const stop = async () => {
   logger.info('Shutting down worker...');
@@ -55,9 +110,14 @@ const stop = async () => {
     analyzeQueue.close(),
     strategyQueue.close(),
     generateQueue.close(),
-    publishQueue.close()
+    publishQueue.close(),
+    faviconQueue.close(),
+    screenshotQueue.close()
   ]);
   await prisma.$disconnect();
+  await shutdownRenderer().catch((error) => {
+    logger.warn({ error }, 'Failed to shutdown rendering service');
+  });
 };
 
 process.on('SIGINT', async () => {
@@ -85,6 +145,9 @@ const registerQueueEvents = (queueName: string) => {
   events.on('completed', ({ jobId }) => {
     logger.info({ queueName, jobId }, 'Job completed');
   });
+  events.on('error', (err) => {
+    handleRedisError('events', queueName, err);
+  });
   return events.waitUntilReady();
 };
 
@@ -96,8 +159,8 @@ type QueueJob<T> = {
 const createWorker = <T>(
   queueName: string,
   processor: (job: QueueJob<T>) => Promise<void>
-) =>
-  new Worker(
+) => {
+  const worker = new Worker(
     queueName,
     async (job) => {
       logger.info({ queueName, jobId: job.id }, 'Processing job');
@@ -105,6 +168,13 @@ const createWorker = <T>(
     },
     { connection: redisConnection }
   );
+
+  worker.on('error', (err) => {
+    handleRedisError('worker', queueName, err);
+  });
+
+  return worker;
+};
 
 type PromptConfig = {
   systemPrompt: string | null;
@@ -168,6 +238,193 @@ const recordAiCall = async (payload: AiCallLogInput) => {
   }
 };
 
+const PLAN_WINDOW_START_HOUR = 9;
+const PLAN_WINDOW_END_HOUR = 17;
+
+const getInitialPlanStartDate = () => {
+  const base = new Date();
+  base.setUTCDate(base.getUTCDate() + 1);
+  base.setUTCHours(PLAN_WINDOW_START_HOUR, 0, 0, 0);
+  base.setUTCMinutes(0);
+  base.setUTCSeconds(0);
+  base.setUTCMilliseconds(0);
+  return base;
+};
+
+const getPlannedDateForIndex = (startDate: Date, index: number) => {
+  const date = new Date(startDate);
+  date.setUTCDate(date.getUTCDate() + index);
+  const hourWindow = Math.max(1, PLAN_WINDOW_END_HOUR - PLAN_WINDOW_START_HOUR);
+  const randomHourOffset = Math.floor(Math.random() * hourWindow);
+  const baseMinutes = Math.floor(Math.random() * 60);
+  const jitterMinutes = Math.floor(Math.random() * 90);
+  const jitterDirection = Math.random() > 0.5 ? 1 : -1;
+  date.setUTCHours(PLAN_WINDOW_START_HOUR + randomHourOffset, baseMinutes, 0, 0);
+  date.setUTCMinutes(date.getUTCMinutes() + jitterDirection * jitterMinutes);
+  return date;
+};
+
+const jsonArrayToStringArray = (value: Prisma.JsonValue | null | undefined) => {
+  if (!value || !Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => (typeof item === 'string' ? item : String(item)));
+};
+
+const persistSeoStrategyArtifacts = async (
+  webId: string,
+  strategy: SeoStrategy,
+  modelName?: string | null
+) => {
+  const topicClusters = strategy.topic_clusters ?? [];
+  const planStartDate = getInitialPlanStartDate();
+
+  const existingStrategies = await prisma.seoStrategy.findMany({
+    where: { webId, isActive: true },
+    select: { id: true }
+  });
+
+  if (existingStrategies.length > 0) {
+    const strategyIds = existingStrategies.map((item) => item.id);
+    await prisma.articlePlan.updateMany({
+      where: {
+        strategyId: { in: strategyIds },
+        status: { in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED] }
+      },
+      data: { status: ArticlePlanStatus.SKIPPED }
+    });
+  }
+
+  await prisma.seoStrategy.updateMany({
+    where: { webId, isActive: true },
+    data: { isActive: false }
+  });
+
+  const storedStrategy = await prisma.seoStrategy.create({
+    data: {
+      webId,
+      model: modelName ?? null,
+      rawJson: strategy as unknown as Prisma.InputJsonValue,
+      businessName: strategy.business?.name ?? null,
+      businessDescription: strategy.business?.description ?? null,
+      businessTargetAudience: strategy.business?.target_audience ?? null,
+      isActive: true
+    }
+  });
+
+  type ClusterRecord = {
+    clusterId: string;
+    supportingArticles: string[];
+  };
+
+  const clusterRecords: ClusterRecord[] = [];
+
+  for (let i = 0; i < topicClusters.length; i += 1) {
+    const cluster = topicClusters[i];
+    const createdCluster = await prisma.seoTopicCluster.create({
+      data: {
+        strategyId: storedStrategy.id,
+        orderIndex: i,
+        pillarPage: cluster.pillar_page ?? `Pillar ${i + 1}`,
+        pillarKeywords: (cluster.pillar_keywords ?? []) as Prisma.InputJsonValue,
+        clusterIntent: cluster.cluster_intent ?? 'informational',
+        funnelStage: cluster.funnel_stage ?? 'TOFU'
+      }
+    });
+
+    const supportingArticles = cluster.supporting_articles ?? [];
+    const supportingArticleIds: string[] = [];
+
+    for (let j = 0; j < supportingArticles.length; j += 1) {
+      const supportingArticle = supportingArticles[j];
+      const createdSupporting = await prisma.seoSupportingArticle.create({
+        data: {
+          clusterId: createdCluster.id,
+          orderIndex: j,
+          title: supportingArticle.title ?? `Supporting article ${j + 1}`,
+          keywords: (supportingArticle.keywords ?? []) as Prisma.InputJsonValue,
+          intent: supportingArticle.intent ?? 'informational',
+          funnelStage: supportingArticle.funnel_stage ?? cluster.funnel_stage ?? 'TOFU',
+          metaDescription: supportingArticle.meta_description ?? null
+        }
+      });
+      supportingArticleIds.push(createdSupporting.id);
+    }
+
+    clusterRecords.push({
+      clusterId: createdCluster.id,
+      supportingArticles: supportingArticleIds
+    });
+  }
+
+  let planIndex = 0;
+  for (const record of clusterRecords) {
+    for (const supportingArticleId of record.supportingArticles) {
+      const plannedPublishAt = getPlannedDateForIndex(planStartDate, planIndex);
+      planIndex += 1;
+      await prisma.articlePlan.create({
+        data: {
+          webId,
+          strategyId: storedStrategy.id,
+          clusterId: record.clusterId,
+          supportingArticleId,
+          plannedPublishAt
+        }
+      });
+    }
+  }
+};
+
+const ARTICLE_PLAN_POLL_INTERVAL_MS = parseInt(process.env.ARTICLE_PLAN_POLL_INTERVAL_MS ?? '600000', 10);
+const ARTICLE_PLAN_BATCH_SIZE = parseInt(process.env.ARTICLE_PLAN_BATCH_SIZE ?? '10', 10);
+
+const processDueArticlePlans = async () => {
+  const now = new Date();
+  const duePlans = await prisma.articlePlan.findMany({
+    where: {
+      status: ArticlePlanStatus.PLANNED,
+      plannedPublishAt: { lte: now },
+      strategy: { isActive: true }
+    },
+    orderBy: { plannedPublishAt: 'asc' },
+    take: ARTICLE_PLAN_BATCH_SIZE
+  });
+
+  for (const plan of duePlans) {
+    const claimed = await prisma.articlePlan.updateMany({
+      where: { id: plan.id, status: ArticlePlanStatus.PLANNED },
+      data: { status: ArticlePlanStatus.QUEUED }
+    });
+
+    if (!claimed.count) {
+      continue;
+    }
+
+    await generateQueue.add('GenerateArticle', {
+      webId: plan.webId,
+      plannedArticleId: plan.id
+    });
+
+    logger.info(
+      { planId: plan.id, webId: plan.webId, plannedPublishAt: plan.plannedPublishAt },
+      'Queued article generation from plan'
+    );
+  }
+};
+
+const startArticlePlanScheduler = () => {
+  const runScheduler = async () => {
+    try {
+      await processDueArticlePlans();
+    } catch (error) {
+      logger.error({ error }, 'Failed to process scheduled article plans');
+    }
+  };
+
+  runScheduler().catch((error) => logger.error({ error }, 'Initial article plan processing failed'));
+  setInterval(runScheduler, ARTICLE_PLAN_POLL_INTERVAL_MS);
+};
+
 const resolveProviderForTask = (
   task: AiTaskType,
   prompts: PromptConfig
@@ -200,8 +457,12 @@ const bootstrap = async () => {
     registerQueueEvents(ANALYZE_BUSINESS_QUEUE),
     registerQueueEvents(CREATE_SEO_STRATEGY_QUEUE),
     registerQueueEvents(GENERATE_ARTICLE_QUEUE),
-    registerQueueEvents(PUBLISH_ARTICLE_QUEUE)
+    registerQueueEvents(PUBLISH_ARTICLE_QUEUE),
+    registerQueueEvents(FETCH_FAVICON_QUEUE),
+    registerQueueEvents(GENERATE_SCREENSHOT_QUEUE)
   ]);
+
+  startArticlePlanScheduler();
 
   createWorker<ScanWebsiteJob>(SCAN_WEBSITE_QUEUE, async (job) => {
     const web = await prisma.web.findUnique({ where: { id: job.data.webId } });
@@ -411,8 +672,6 @@ const bootstrap = async () => {
       logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
     }
 
-    const isDebug = Boolean(job.data.debug);
-
     let strategy: SeoStrategy;
     try {
       strategy = (await providerForCall.buildSeoStrategy(businessProfile, {
@@ -462,41 +721,88 @@ const bootstrap = async () => {
       data: { seoStrategy: strategy as unknown as Prisma.InputJsonValue }
     });
 
-    if (!isDebug) {
-      await generateQueue.add('GenerateArticle', { webId: job.data.webId });
-    }
+    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName);
+
   });
 
   createWorker<GenerateArticleJob>(GENERATE_ARTICLE_QUEUE, async (job) => {
-    const web = await prisma.web.findUnique({
-      where: { id: job.data.webId },
+    if (!job.data.plannedArticleId) {
+      logger.warn({ jobId: job.id }, 'GenerateArticle job missing plannedArticleId');
+      return;
+    }
+
+    const plan = await prisma.articlePlan.findUnique({
+      where: { id: job.data.plannedArticleId },
       include: {
-        analysis: true
+        strategy: true,
+        cluster: true,
+        supportingArticle: true,
+        web: {
+          include: {
+            analysis: true,
+            user: true
+          }
+        }
       }
     });
 
-    if (!web?.analysis?.seoStrategy) {
-      logger.warn({ webId: job.data.webId }, 'Missing SEO strategy for article generation');
+    if (!plan) {
+      logger.warn({ jobId: job.id, planId: job.data.plannedArticleId }, 'Article plan not found');
       return;
     }
 
-    const strategy = web.analysis.seoStrategy as unknown as SeoStrategy;
-    const clusters =
-      (strategy.pillars ?? []).flatMap(
-        (pillar: SeoStrategy['pillars'][number]) => pillar.clusters ?? []
-      );
-    const targetCluster = clusters[0];
-
-    if (!targetCluster) {
-      logger.warn({ webId: job.data.webId }, 'No clusters available for article generation');
+    if (!plan.strategy.rawJson && !plan.web.analysis?.seoStrategy) {
+      logger.warn({ planId: plan.id, webId: plan.webId }, 'No stored SEO strategy JSON available');
       return;
     }
+
+    const seoStrategyPayload = (plan.strategy.rawJson ??
+      plan.web.analysis?.seoStrategy) as unknown as SeoStrategy | null;
+
+    if (!seoStrategyPayload) {
+      logger.warn({ planId: plan.id, webId: plan.webId }, 'Unable to parse SEO strategy payload');
+      return;
+    }
+
+    const businessProfile = plan.web.analysis?.businessProfile as BusinessProfile | null;
+    const pillarKeywords = jsonArrayToStringArray(plan.cluster.pillarKeywords);
+    const supportingKeywords = jsonArrayToStringArray(plan.supportingArticle.keywords);
+
+    const promptVariables = {
+      topicCluster: {
+        pillarPage: plan.cluster.pillarPage,
+        pillarKeywords,
+        intent: plan.cluster.clusterIntent,
+        funnelStage: plan.cluster.funnelStage,
+        order: plan.cluster.orderIndex
+      },
+      supportingArticle: {
+        title: plan.supportingArticle.title,
+        keywords: supportingKeywords,
+        intent: plan.supportingArticle.intent,
+        funnelStage: plan.supportingArticle.funnelStage,
+        metaDescription: plan.supportingArticle.metaDescription
+      },
+      business: {
+        name: plan.strategy.businessName ?? businessProfile?.name ?? plan.web.nickname ?? plan.web.url,
+        description: plan.strategy.businessDescription ?? businessProfile?.mission ?? null,
+        targetAudience:
+          plan.strategy.businessTargetAudience ?? businessProfile?.audience?.join(', ') ?? null
+      },
+      web: {
+        url: plan.web.url,
+        nickname: plan.web.nickname
+      },
+      webAudience: businessProfile?.audience ?? [],
+      webOwner: {
+        email: plan.web.user.email
+      }
+    };
 
     const prompts = await prisma.aiPromptConfig.findUnique({
       where: { task: 'article' }
     });
-    const variables = { strategy, cluster: targetCluster };
-    const renderedPrompts = renderPromptsForTask('article', prompts, variables);
+    const renderedPrompts = renderPromptsForTask('article', prompts, promptVariables);
     const providerSelection = resolveProviderForTask('article', prompts);
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
@@ -504,37 +810,40 @@ const bootstrap = async () => {
     const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
     if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: article request');
+      logger.info(
+        { planId: plan.id, variables: promptVariables, renderedPrompts },
+        'AI debug: article request'
+      );
     }
 
     let draft;
     try {
       draft = await providerForCall.generateArticle(
-        strategy,
+        seoStrategyPayload,
         {
-          clusterName: targetCluster.name,
-          targetTone: strategy.targetTone
+          clusterName: plan.supportingArticle.title,
+          targetTone: 'Professional'
         },
         {
           task: 'article',
           systemPrompt: renderedPrompts.systemPrompt,
           userPrompt: renderedPrompts.userPrompt,
-          variables,
+          variables: promptVariables,
           forceJsonResponse
         }
       );
 
       if (AI_DEBUG_LOG_PROMPTS) {
-        logger.info({ webId: job.data.webId, result: draft }, 'AI debug: article response');
+        logger.info({ planId: plan.id, result: draft }, 'AI debug: article response');
       }
 
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
-        webId: job.data.webId,
+        webId: plan.webId,
         task: 'article',
         provider: providerName,
         model: modelName,
-        variables,
+        variables: promptVariables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
         responseRaw: rawResponse ?? draft,
@@ -544,11 +853,11 @@ const bootstrap = async () => {
     } catch (error) {
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       await recordAiCall({
-        webId: job.data.webId,
+        webId: plan.webId,
         task: 'article',
         provider: providerName,
         model: modelName,
-        variables,
+        variables: promptVariables,
         systemPrompt: renderedPrompts.systemPrompt,
         userPrompt: renderedPrompts.userPrompt,
         responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
@@ -560,7 +869,7 @@ const bootstrap = async () => {
 
     const article = await prisma.article.create({
       data: {
-        webId: web.id,
+        webId: plan.webId,
         title: draft.title,
         markdown: draft.bodyMarkdown,
         html: draft.bodyMarkdown,
@@ -568,11 +877,107 @@ const bootstrap = async () => {
       }
     });
 
-    logger.info({ jobId: job.id, articleId: article.id }, 'Article draft stored');
+    await prisma.articlePlan.update({
+      where: { id: plan.id },
+      data: {
+        status: ArticlePlanStatus.GENERATED,
+        articleId: article.id
+      }
+    });
+
+    logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
   });
 
   createWorker<PublishArticleJob>(PUBLISH_ARTICLE_QUEUE, async (job) => {
     logger.info({ jobId: job.id, articleId: job.data.articleId }, 'Publishing article (stub)');
+  });
+
+  createWorker<FetchFaviconJob>(FETCH_FAVICON_QUEUE, async (job) => {
+    const web = await prisma.web.findUnique({ where: { id: job.data.webId } });
+    if (!web) {
+      logger.warn({ jobId: job.id, webId: job.data.webId }, 'Web not found for favicon job');
+      return;
+    }
+
+    try {
+      const result = await fetchAndStoreFavicon(web.id, web.url, assetStorage, logger);
+      await prisma.web.update({
+        where: { id: web.id },
+        data: {
+          faviconUrl: result.url,
+          faviconSourceUrl: result.sourceUrl,
+          faviconStatus: AssetStatus.SUCCESS,
+          faviconLastFetchedAt: new Date()
+        }
+      });
+      logger.info({ jobId: job.id, webId: web.id, source: result.sourceUrl }, 'Favicon stored');
+    } catch (error) {
+      logger.error({ jobId: job.id, webId: web.id, error }, 'Failed to store favicon');
+      await prisma.web.update({
+        where: { id: web.id },
+        data: {
+          faviconStatus: AssetStatus.FAILED,
+          faviconLastFetchedAt: new Date()
+        }
+      });
+      throw error;
+    }
+  });
+
+  createWorker<GenerateHomepageScreenshotJob>(GENERATE_SCREENSHOT_QUEUE, async (job) => {
+    const web = await prisma.web.findUnique({ where: { id: job.data.webId } });
+    if (!web) {
+      logger.warn({ jobId: job.id, webId: job.data.webId }, 'Web not found for screenshot job');
+      return;
+    }
+
+    const width = 1280;
+    const height = 720;
+
+    try {
+      const screenshot = await captureScreenshot(web.url, {
+        width,
+        height,
+        fullPage: Boolean(job.data.fullPage),
+        waitAfterLoadMs: 3000
+      });
+      const url = await assetStorage.saveFile(
+        `projects/${web.id}/screenshot-home-${width}x${height}.jpg`,
+        screenshot,
+        'image/jpeg'
+      );
+      await prisma.web.update({
+        where: { id: web.id },
+        data: {
+          screenshotUrl: url,
+          screenshotStatus: AssetStatus.SUCCESS,
+          screenshotLastGeneratedAt: new Date(),
+          screenshotWidth: width,
+          screenshotHeight: height
+        }
+      });
+      logger.info({ jobId: job.id, webId: web.id }, 'Screenshot stored');
+    } catch (error) {
+      const err = error as Error;
+      logger.error(
+        {
+          jobId: job.id,
+          webId: web.id,
+          errorName: err.name,
+          errorMessage: err.message,
+          errorStack: err.stack
+        },
+        'Screenshot generation failed'
+      );
+      await prisma.web.update({
+        where: { id: web.id },
+        data: {
+          screenshotStatus: AssetStatus.FAILED,
+          screenshotLastGeneratedAt: new Date()
+        }
+      });
+      throw error;
+    }
   });
 
   logger.info('Worker ready. Listening for jobs...');

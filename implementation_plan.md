@@ -291,6 +291,8 @@ This document translates the system architecture into a detailed, actionable imp
 - **Test:** Enqueue jobs manually.
 - **Commit if jobs process correctly.**
 
+Details of the favicon pipeline, homepage screenshot generation (rendering service) and asset storage abstraction for these jobs are documented in `screenshots.md`.
+
 ---
 
 # 12. Frontend (Next.js) Setup
@@ -378,4 +380,3 @@ This document translates the system architecture into a detailed, actionable imp
 ---
 
 # End of Implementation Plan
-

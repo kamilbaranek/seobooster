@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 import type { RedisOptions } from 'ioredis';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,12 +14,14 @@ import { MeModule } from './me/me.module';
 import { AdminPromptsModule } from './admin/prompts/admin-prompts.module';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
+import { AssetStorageModule } from './storage/asset-storage.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     BullModule.forRootAsync({
       useFactory: () => {
@@ -48,7 +51,8 @@ import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
     WebsModule,
     MeModule,
     AdminPromptsModule,
-    AdminAiLogsModule
+    AdminAiLogsModule,
+    AssetStorageModule
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard]

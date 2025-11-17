@@ -18,15 +18,17 @@
     "start:api": "npm run start --workspace @seobooster/api",
     "start:web": "npm run start --workspace @seobooster/web",
     "test": "npm run test --workspace @seobooster/api && npm run test --workspace @seobooster/web",
-    "lint": "npm run lint --workspace @seobooster/api && npm run lint --workspace @seobooster/web",
+    "lint": "eslint \"apps/api/src/**/*.ts\" \"apps/worker/src/**/*.ts\" \"apps/web/pages/**/*.tsx\" \"apps/web/pages/**/*.ts\" \"apps/web/lib/**/*.ts\" \"libs/**/*.ts\"",
     "seed:superadmin": "ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/node": "latest",
     "eslint": "latest",
     "prettier": "latest",
     "ts-node": "latest",
     "tsconfig-paths": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "typescript-eslint": "^8.46.4"
   }
 }

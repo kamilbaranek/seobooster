@@ -40,16 +40,40 @@ export class MockAiProvider implements AiProvider {
 
   async buildSeoStrategy(profile: BusinessProfile, _overrides?: PromptOverrides<'strategy'>): Promise<SeoStrategy> {
     return {
-      pillars: [
+      business: {
+        name: profile.name,
+        description: profile.mission ?? profile.tagline ?? 'Mock business description',
+        target_audience: Array.isArray(profile.audience)
+          ? profile.audience.join(', ')
+          : profile.audience
+          ? String(profile.audience)
+          : 'Mock audience'
+      },
+      topic_clusters: [
         {
-          name: `${profile.name} Growth`,
-          clusters: [
-            { name: 'keyword research', keywords: ['seo tips', 'keyword planner'], cadenceDays: 7 },
-            { name: 'content automation', keywords: ['ai articles', 'wordpress automation'], cadenceDays: 3 }
+          pillar_page: `${profile.name} Growth`,
+          pillar_keywords: ['keyword research', 'content automation'],
+          cluster_intent: 'informational',
+          funnel_stage: 'TOFU',
+          supporting_articles: [
+            {
+              title: 'keyword research',
+              keywords: ['seo tips', 'keyword planner'],
+              intent: 'informational',
+              funnel_stage: 'TOFU',
+              meta_description: 'Mock article about keyword research.'
+            },
+            {
+              title: 'content automation',
+              keywords: ['ai articles', 'wordpress automation'],
+              intent: 'commercial',
+              funnel_stage: 'MOFU',
+              meta_description: 'Mock article about content automation.'
+            }
           ]
         }
       ],
-      targetTone: 'Friendly'
+      total_clusters: 1
     };
   }
 
@@ -58,15 +82,21 @@ export class MockAiProvider implements AiProvider {
     options: GenerateArticleOptions,
     _overrides?: PromptOverrides<'article'>
   ): Promise<ArticleDraft> {
-    const clusters = strategy.pillars.flatMap((pillar) => pillar.clusters);
-    const cluster =
-      clusters.find((c) => c.name === options.clusterName) ?? clusters[0] ?? { name: 'SEO automation', keywords: [] };
+    const opportunities = (strategy.topic_clusters ?? []).flatMap(
+      (cluster) => cluster.supporting_articles ?? []
+    );
+    const opportunity =
+      opportunities.find((item) => item.title === options.clusterName) ??
+      opportunities[0] ?? {
+        title: 'SEO automation',
+        keywords: []
+      };
 
     return {
-      title: `How to master ${cluster.name} (${this.models.article})`,
+      title: `How to master ${opportunity.title} (${this.models.article})`,
       outline: ['Intro', 'Step 1', 'Step 2', 'CTA'],
       bodyMarkdown: '# Mock Article\n\nThis is a placeholder article.',
-      keywords: cluster.keywords,
+      keywords: opportunity.keywords,
       callToAction: 'Start your free trial'
     };
   }

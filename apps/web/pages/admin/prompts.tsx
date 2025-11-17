@@ -87,8 +87,65 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
   ],
   strategy: [{ name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' }],
   article: [
-    { name: '{{strategy}}', description: 'JSON SEO strategie s pilíři a clustry.' },
-    { name: '{{cluster}}', description: 'Konkrétní cluster/příležitost vybraný pro článek.' }
+    {
+      name: '{{business}}',
+      description: 'Shrnutí firmy použité pro článek (name, description, targetAudience).'
+    },
+    { name: '{{business.name}}', description: 'Název firmy / projektu.' },
+    {
+      name: '{{business.description}}',
+      description: 'Stručný popis firmy / hodnoty (z business profilu nebo strategie).'
+    },
+    {
+      name: '{{business.targetAudience}}',
+      description: 'Primární cílové publikum (string nebo seznam hodnot spojených čárkami).'
+    },
+    {
+      name: '{{topicCluster}}',
+      description: 'Vybraný SEO cluster (pillar stránka, klíčová slova, intent, fáze funnelu).'
+    },
+    { name: '{{topicCluster.pillarPage}}', description: 'Název / H1 pillar stránky pro daný cluster.' },
+    {
+      name: '{{topicCluster.pillarKeywords}}',
+      description: 'Pole hlavních klíčových slov pro pillar page (array stringů).'
+    },
+    { name: '{{topicCluster.intent}}', description: 'Search intent pro cluster (např. informational).' },
+    { name: '{{topicCluster.funnelStage}}', description: 'Funnel stage (např. TOFU / MOFU / BOFU).' },
+    {
+      name: '{{supportingArticle}}',
+      description: 'Konkrétní supporting článek plánovaný pro dnešní generování.'
+    },
+    { name: '{{supportingArticle.title}}', description: 'Nadpis supporting článku.' },
+    {
+      name: '{{supportingArticle.keywords}}',
+      description: 'Pole cílových klíčových slov pro článek (array stringů).'
+    },
+    { name: '{{supportingArticle.intent}}', description: 'Search intent supporting článku.' },
+    {
+      name: '{{supportingArticle.funnelStage}}',
+      description: 'Funnel stage supporting článku (většinou kopíruje cluster).'
+    },
+    {
+      name: '{{supportingArticle.metaDescription}}',
+      description: 'Meta description / krátké shrnutí článku (pokud je k dispozici).'
+    },
+    {
+      name: '{{web}}',
+      description: 'Základní informace o webu, pro který se článek generuje.'
+    },
+    { name: '{{web.url}}', description: 'URL webu.' },
+    {
+      name: '{{web.nickname}}',
+      description: 'Interní název / přezdívka webu (pokud je nastavená).'
+    },
+    {
+      name: '{{webAudience}}',
+      description: 'Cílové publikum webu (pole stringů z business profilu).'
+    },
+    {
+      name: '{{webOwner.email}}',
+      description: 'E‑mail vlastníka webu (uživatele).'
+    }
   ]
 };
 
@@ -206,8 +263,9 @@ const AdminPromptsPage = () => {
         if (!isMounted) return;
         setError(err instanceof Error ? err.message : 'Nastala chyba při ověřování.');
       } finally {
-        if (!isMounted) return;
-        setCheckingAuth(false);
+        if (isMounted) {
+          setCheckingAuth(false);
+        }
       }
     };
 

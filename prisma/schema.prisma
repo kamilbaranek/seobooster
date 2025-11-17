@@ -43,17 +43,31 @@ enum ArticleStatus {
   PUBLISHED
 }
 
-model User {
-  id               String         @id @default(cuid())
-  email            String         @unique
-  passwordHash     String
-  role             UserRole       @default(USER)
-  stripeCustomerId String?        @unique
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+enum ArticlePlanStatus {
+  PLANNED
+  QUEUED
+  GENERATED
+  PUBLISHED
+  SKIPPED
+}
 
-  subscriptions    Subscription[]
-  webs             Web[]
+enum AssetStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  role             UserRole @default(USER)
+  stripeCustomerId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions Subscription[]
+  webs          Web[]
 }
 
 model Subscription {
@@ -66,7 +80,7 @@ model Subscription {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  webs                 Web[]
+  webs Web[]
 }
 
 model Web {
@@ -82,10 +96,22 @@ model Web {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  credentials     WebCredentials?
-  analysis        WebAnalysis?
-  articles        Article[]
-  aiCallLogs      AiCallLog[]
+  credentials   WebCredentials?
+  analysis      WebAnalysis?
+  articles      Article[]
+  articlePlans  ArticlePlan[]
+  aiCallLogs    AiCallLog[]
+  seoStrategies SeoStrategy[]
+
+  faviconUrl                String?
+  faviconSourceUrl          String?
+  faviconStatus             AssetStatus @default(PENDING)
+  faviconLastFetchedAt      DateTime?
+  screenshotUrl             String?
+  screenshotStatus          AssetStatus @default(PENDING)
+  screenshotLastGeneratedAt DateTime?
+  screenshotWidth           Int?
+  screenshotHeight          Int?
 }
 
 model WebCredentials {
@@ -98,53 +124,54 @@ model WebCredentials {
 }
 
 model WebAnalysis {
-  id              String   @id @default(cuid())
-  web             Web      @relation(fields: [webId], references: [id])
-  webId           String   @unique
+  id              String    @id @default(cuid())
+  web             Web       @relation(fields: [webId], references: [id], onDelete: Cascade)
+  webId           String    @unique
   lastScanAt      DateTime?
   scanResult      Json?
   businessProfile Json?
   seoStrategy     Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model Article {
-  id               String               @id @default(cuid())
-  web              Web                  @relation(fields: [webId], references: [id])
-  webId            String
-  title            String
-  status           ArticleStatus        @default(DRAFT)
-  markdown         String
-  html             String
-  wordpressPostId  String?
-  publishedAt      DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id              String        @id @default(cuid())
+  web             Web           @relation(fields: [webId], references: [id])
+  webId           String
+  title           String
+  status          ArticleStatus @default(DRAFT)
+  markdown        String
+  html            String
+  wordpressPostId String?
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  approvalTokens   ArticleApprovalToken[]
+  approvalTokens ArticleApprovalToken[]
+  plan           ArticlePlan?           @relation("ArticlePlanArticle")
 }
 
 model ArticleApprovalToken {
-  id         String   @id @default(cuid())
-  article    Article  @relation(fields: [articleId], references: [id])
+  id         String    @id @default(cuid())
+  article    Article   @relation(fields: [articleId], references: [id])
   articleId  String
-  token      String   @unique
+  token      String    @unique
   expiresAt  DateTime
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 }
 
 model AiPromptConfig {
-  id           String   @id @default(cuid())
-  task         String   @unique
-  systemPrompt String
-  userPrompt   String
-  provider     String?
-  model        String?
-  forceJsonResponse Boolean @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  task              String   @unique
+  systemPrompt      String
+  userPrompt        String
+  provider          String?
+  model             String?
+  forceJsonResponse Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model AiCallLog {
@@ -162,4 +189,83 @@ model AiCallLog {
   status         String
   errorMessage   String?
   createdAt      DateTime @default(now())
+}
+
+model SeoStrategy {
+  id                     String   @id @default(cuid())
+  web                    Web      @relation(fields: [webId], references: [id])
+  webId                  String
+  model                  String?
+  generatedAt            DateTime @default(now())
+  rawJson                Json?
+  businessName           String?
+  businessDescription    String?
+  businessTargetAudience String?
+  isActive               Boolean  @default(true)
+  version                Int      @default(1)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  clusters     SeoTopicCluster[]
+  articlePlans ArticlePlan[]
+
+  @@index([webId, isActive])
+}
+
+model SeoTopicCluster {
+  id             String      @id @default(cuid())
+  strategy       SeoStrategy @relation(fields: [strategyId], references: [id])
+  strategyId     String
+  orderIndex     Int
+  pillarPage     String
+  pillarKeywords Json
+  clusterIntent  String
+  funnelStage    String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  supportingArticles SeoSupportingArticle[]
+  articlePlans       ArticlePlan[]
+
+  @@index([strategyId, orderIndex])
+}
+
+model SeoSupportingArticle {
+  id              String          @id @default(cuid())
+  cluster         SeoTopicCluster @relation(fields: [clusterId], references: [id])
+  clusterId       String
+  orderIndex      Int
+  title           String
+  keywords        Json
+  intent          String
+  funnelStage     String
+  metaDescription String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  articlePlans ArticlePlan[]
+
+  @@index([clusterId, orderIndex])
+}
+
+model ArticlePlan {
+  id                  String               @id @default(cuid())
+  web                 Web                  @relation(fields: [webId], references: [id])
+  webId               String
+  strategy            SeoStrategy          @relation(fields: [strategyId], references: [id])
+  strategyId          String
+  cluster             SeoTopicCluster      @relation(fields: [clusterId], references: [id])
+  clusterId           String
+  supportingArticle   SeoSupportingArticle @relation(fields: [supportingArticleId], references: [id])
+  supportingArticleId String
+  article             Article?             @relation("ArticlePlanArticle", fields: [articleId], references: [id])
+  articleId           String?              @unique
+  plannedPublishAt    DateTime
+  status              ArticlePlanStatus    @default(PLANNED)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([webId, plannedPublishAt])
+  @@index([strategyId])
+  @@index([status, plannedPublishAt])
 }

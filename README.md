@@ -8,6 +8,7 @@ Monorepo for the SEO Booster SaaS:
 - `libs/shared-types` – shared TypeScript types between backend and frontend.
 - `libs/queue-types` – shared queue constants + job payload contracts.
 - `libs/ai-types` – shared AI orchestrator interfaces used by API, worker, and future frontend features.
+- `libs/storage` – asset storage abstraction (local filesystem driver + future S3 driver).
 
 ## Scripts
 
@@ -43,6 +44,10 @@ Backend expects these environment variables (for local dev, put them in a non‑
 - `DATABASE_URL` – PostgreSQL connection string used by Prisma.
 - `REDIS_HOST` / `REDIS_PORT` – Redis connection for BullMQ queues (defaults: `localhost`, `6379`).
 - `REDIS_USERNAME` / `REDIS_PASSWORD` / `REDIS_USE_TLS` – optional credentials & TLS flag (set `true` for Upstash or other managed Redis).
+- `ASSET_STORAGE_DRIVER` – `local` (default) or `s3`; controls which `AssetStorage` implementation is resolved in both API and worker.
+- `ASSET_STORAGE_LOCAL_PATH` – root folder for local driver (defaults to `./storage/website-assets`).
+- `ASSET_PUBLIC_BASE_URL` – base URL used when returning favicon/screenshot links (e.g., `http://localhost:3333/assets`).
+- `ASSET_S3_BUCKET` / `ASSET_S3_REGION` – future configuration for S3 driver (ignored while driver = `local`).
 - `JWT_SECRET` – secret for signing JWTs (will be used when auth is implemented).
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID` – Stripe credentials + price id for billing (used by the billing module).
 - `ENCRYPTION_KEY` – base64-encoded 32-byte key for encrypting website credentials.
@@ -55,9 +60,18 @@ Backend expects these environment variables (for local dev, put them in a non‑
 - `NEXT_PUBLIC_DEBUG_PIPELINE` – Nastav na `true`, pokud chceš v dashboardu vidět debug panel se stavem jednotlivých fází.
 - `AI_DEBUG_PIPELINE` – pokud nastavíš na `true`, zpřístupní se `/webs/:id/pipeline-debug` a debug endpointy i mimo lokální prostředí.
 - `AI_DEBUG_LOG_PROMPTS` – pokud nastavíš na `true`, worker bude logovat do konzole finální `systemPrompt`/`userPrompt`, `variables` a výsledky pro každý AI krok.
+- `SCREENSHOT_REFRESH_DAYS` / `SCREENSHOT_REFRESH_BATCH` – volitelné parametry pro denní cron, který enqueuje refreshe screenshotů (výchozí 14 dní / 20 webů).
 
 See `development_plan.md` and `implementation_plan.md` for the full product and implementation specification.
-- `npm run start:worker` – run the compiled worker (after `npm run build --workspace @seobooster/worker`).
+
+## Asset pipeline
+
+- Backend používá abstrakci `AssetStorage` (`libs/storage`), která se konfiguruje přes `ASSET_STORAGE_DRIVER`. MVP driver ukládá soubory do `./storage/website-assets` a API je zpřístupňuje přes route `/assets/*`.
+- Při vytvoření webu se automaticky enqueuje `FetchFaviconJob` + `GenerateHomepageScreenshotJob`. Oba joby spravuje worker (`apps/worker`):
+  - favicon worker parsuje `<link rel="icon">`, stahuje asset, vytváří varianty 16/32/64 px (sharp) a ukládá je do `AssetStorage` (s fallbackem generovaným z názvu domény),
+  - screenshot worker používá Playwright (Chromium) s viewportem 1280×720, ukládá JPEG náhled a aktualizuje DB (`screenshotUrl`, rozměry, statusy).
+- Cron (`AssetRefreshService`) běží v API pomocí `@nestjs/schedule` a jednou denně znovu zařadí screenshoty starší než `SCREENSHOT_REFRESH_DAYS`.
+- Frontend dashboard ukazuje `faviconStatus`/`screenshotStatus`, náhledy a má tlačítka „Obnovit faviconu/screenshot“, která volají nové API endpointy.
 
 ## Superadmin Setup
 

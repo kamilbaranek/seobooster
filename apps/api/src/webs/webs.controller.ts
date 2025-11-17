@@ -81,6 +81,16 @@ export class WebsController {
     return this.websService.triggerArticleGeneration(user.userId, id);
   }
 
+  @Post(':id/refresh-favicon')
+  refreshFavicon(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.refreshFavicon(user.userId, id);
+  }
+
+  @Post(':id/refresh-screenshot')
+  refreshScreenshot(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.refreshScreenshot(user.userId, id);
+  }
+
   @Post(':id/debug/scan')
   debugScan(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';

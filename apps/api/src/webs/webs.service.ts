@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { IntegrationType, WebStatus } from '@prisma/client';
+import { ArticlePlanStatus, AssetStatus, IntegrationType, WebStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobQueueService } from '../queues/queues.service';
 import { EncryptionService } from '../crypto/encryption.service';
@@ -27,9 +27,16 @@ export class WebsService {
         userId,
         nickname: dto.nickname,
         integrationType: dto.integrationType ?? IntegrationType.NONE,
-        status: WebStatus.PENDING_PAYMENT
+        status: WebStatus.PENDING_PAYMENT,
+        faviconStatus: AssetStatus.PENDING,
+        screenshotStatus: AssetStatus.PENDING
       }
     });
+
+    await Promise.all([
+      this.jobQueueService.enqueueFetchFavicon(web.id, 'onboarding'),
+      this.jobQueueService.enqueueGenerateScreenshot(web.id, 'onboarding')
+    ]);
 
     return web;
   }
@@ -83,7 +90,68 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.prisma.web.delete({ where: { id } });
+    if (web.status === WebStatus.ACTIVE) {
+      throw new BadRequestException('Active website cannot be deleted. Pause or cancel it first.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.articleApprovalToken.deleteMany({
+        where: {
+          article: {
+            webId: id
+          }
+        }
+      });
+
+      await tx.articlePlan.deleteMany({
+        where: {
+          webId: id
+        }
+      });
+
+      await tx.article.deleteMany({
+        where: {
+          webId: id
+        }
+      });
+
+      await tx.webAnalysis.deleteMany({
+        where: { webId: id }
+      });
+
+      await tx.webCredentials.deleteMany({
+        where: { webId: id }
+      });
+
+      await tx.aiCallLog.deleteMany({
+        where: { webId: id }
+      });
+
+      await tx.seoSupportingArticle.deleteMany({
+        where: {
+          cluster: {
+            strategy: {
+              webId: id
+            }
+          }
+        }
+      });
+
+      await tx.seoTopicCluster.deleteMany({
+        where: {
+          strategy: {
+            webId: id
+          }
+        }
+      });
+
+      await tx.seoStrategy.deleteMany({
+        where: { webId: id }
+      });
+
+      await tx.web.delete({ where: { id } });
+    });
+
     return { deleted: true };
   }
 
@@ -98,7 +166,7 @@ export class WebsService {
     let encryptedJson: string;
     try {
       encryptedJson = this.encryptionService.encrypt(JSON.stringify(dto.credentials));
-    } catch (error) {
+    } catch (_error) {
       throw new BadRequestException('Credential encryption is not configured');
     }
     await this.prisma.webCredentials.upsert({
@@ -128,7 +196,7 @@ export class WebsService {
     let decrypted;
     try {
       decrypted = JSON.parse(this.encryptionService.decrypt(record.encryptedJson));
-    } catch (error) {
+    } catch (_error) {
       throw new BadRequestException('Credential encryption is not configured');
     }
     return {
@@ -161,6 +229,19 @@ export class WebsService {
         articles: {
           orderBy: { createdAt: 'desc' },
           take: 5
+        },
+        articlePlans: {
+          where: {
+            status: {
+              in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED]
+            }
+          },
+          orderBy: { plannedPublishAt: 'asc' },
+          take: 5,
+          include: {
+            supportingArticle: true,
+            cluster: true
+          }
         }
       }
     });
@@ -170,6 +251,19 @@ export class WebsService {
     }
 
     const analysis = web.analysis;
+    const [plannedCount, queuedCount, generatedCount, publishedCount] = await Promise.all([
+      this.prisma.articlePlan.count({ where: { webId: web.id, status: ArticlePlanStatus.PLANNED } }),
+      this.prisma.articlePlan.count({ where: { webId: web.id, status: ArticlePlanStatus.QUEUED } }),
+      this.prisma.articlePlan.count({ where: { webId: web.id, status: ArticlePlanStatus.GENERATED } }),
+      this.prisma.articlePlan.count({ where: { webId: web.id, status: ArticlePlanStatus.PUBLISHED } })
+    ]);
+    const upcomingPlans = web.articlePlans.map((plan) => ({
+      id: plan.id,
+      status: plan.status,
+      plannedPublishAt: plan.plannedPublishAt,
+      supportingArticleTitle: plan.supportingArticle.title,
+      clusterName: plan.cluster.pillarPage
+    }));
 
     return {
       web: {
@@ -177,7 +271,15 @@ export class WebsService {
         url: web.url,
         status: web.status,
         nickname: web.nickname,
-        createdAt: web.createdAt
+        createdAt: web.createdAt,
+        faviconUrl: web.faviconUrl,
+        faviconStatus: web.faviconStatus,
+        screenshotUrl: web.screenshotUrl,
+        screenshotStatus: web.screenshotStatus,
+        screenshotLastGeneratedAt: web.screenshotLastGeneratedAt,
+        faviconLastFetchedAt: web.faviconLastFetchedAt,
+        screenshotWidth: web.screenshotWidth,
+        screenshotHeight: web.screenshotHeight
       },
       analysis: {
         lastScanAt: analysis?.lastScanAt ?? null,
@@ -190,8 +292,43 @@ export class WebsService {
         title: article.title,
         status: article.status,
         createdAt: article.createdAt
-      }))
+      })),
+      plan: {
+        upcoming: upcomingPlans,
+        stats: {
+          planned: plannedCount + queuedCount,
+          generated: generatedCount,
+          published: publishedCount
+        },
+        nextPlannedAt: upcomingPlans[0]?.plannedPublishAt ?? null
+      }
     };
+  }
+
+  async refreshFavicon(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({ where: { id, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.prisma.web.update({
+      where: { id },
+      data: { faviconStatus: AssetStatus.PENDING }
+    });
+    await this.jobQueueService.enqueueFetchFavicon(id, 'manual');
+    return { queued: true };
+  }
+
+  async refreshScreenshot(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({ where: { id, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.prisma.web.update({
+      where: { id },
+      data: { screenshotStatus: AssetStatus.PENDING }
+    });
+    await this.jobQueueService.enqueueGenerateScreenshot(id, 'manual');
+    return { queued: true };
   }
 
   async triggerArticleGeneration(userId: string, id: string) {
@@ -201,8 +338,27 @@ export class WebsService {
     if (!web) {
       throw new NotFoundException('Website not found');
     }
-    await this.jobQueueService.enqueueGenerateArticle(web.id);
-    return { queued: true };
+    const plan = await this.prisma.articlePlan.findFirst({
+      where: {
+        webId: web.id,
+        status: {
+          in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED]
+        },
+        strategy: {
+          isActive: true
+        }
+      },
+      orderBy: { plannedPublishAt: 'asc' }
+    });
+    if (!plan) {
+      throw new BadRequestException('Žádný článek není aktuálně naplánován.');
+    }
+    await this.prisma.articlePlan.update({
+      where: { id: plan.id },
+      data: { status: ArticlePlanStatus.QUEUED }
+    });
+    await this.jobQueueService.enqueueGenerateArticle(web.id, plan.id);
+    return { queued: true, planId: plan.id };
   }
 
   async triggerScan(userId: string, id: string) {

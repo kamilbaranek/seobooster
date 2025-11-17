@@ -45,11 +45,11 @@ export class AuthService {
       });
 
       return this.buildAuthResponse(user);
-    } catch (error: unknown) {
-      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+    } catch (_error: unknown) {
+      if (_error instanceof PrismaClientKnownRequestError && _error.code === 'P2002') {
         throw new BadRequestException('Duplicate record detected');
       }
-      throw error;
+      throw _error;
     }
   }
 
