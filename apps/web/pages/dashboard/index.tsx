@@ -304,6 +304,8 @@ const DashboardPage = ({ bodyHtml, bodyAttributes }: InferGetStaticPropsType<typ
 
   const content = useMemo(() => ({ __html: bodyHtml }), [bodyHtml]);
 
+  useDashboardInteractions(authorized);
+
   if (!authorized) {
     return null;
   }
@@ -338,6 +340,164 @@ const DashboardPage = ({ bodyHtml, bodyAttributes }: InferGetStaticPropsType<typ
       <div dangerouslySetInnerHTML={content} />
     </>
   );
+};
+
+// Sidebar hover + tabs + card toolbar menus behavior
+const useDashboardInteractions = (enabled: boolean) => {
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const sidebarMenu = document.getElementById('kt_aside_menu');
+    const hoverBindings: Array<{ item: HTMLElement; enter: () => void; leave: () => void }> = [];
+    const hoverTimeouts = new Map<HTMLElement, number>();
+
+    const showItem = (item: HTMLElement) => {
+      const sub = item.querySelector<HTMLElement>('.menu-sub');
+      if (!sub) return;
+
+      item.classList.add('show', 'menu-dropdown', 'hover');
+      sub.classList.add('show');
+    };
+
+    const hideItem = (item: HTMLElement) => {
+      const sub = item.querySelector<HTMLElement>('.menu-sub');
+      item.classList.remove('show', 'menu-dropdown', 'hover');
+      if (sub) sub.classList.remove('show');
+    };
+
+    if (sidebarMenu) {
+      const items = Array.from(
+        sidebarMenu.querySelectorAll<HTMLElement>('[data-kt-menu-trigger]')
+      );
+
+      items.forEach((item) => {
+        const trigger = item.getAttribute('data-kt-menu-trigger') ?? '';
+        if (!trigger.includes('hover')) return;
+
+        const onEnter = () => {
+          const timeoutId = hoverTimeouts.get(item);
+          if (timeoutId) {
+            window.clearTimeout(timeoutId);
+            hoverTimeouts.delete(item);
+          }
+          showItem(item);
+        };
+
+        const onLeave = () => {
+          const id = window.setTimeout(() => {
+            hideItem(item);
+            hoverTimeouts.delete(item);
+          }, 200);
+          hoverTimeouts.set(item, id);
+        };
+
+        item.addEventListener('mouseenter', onEnter);
+        item.addEventListener('mouseleave', onLeave);
+        hoverBindings.push({ item, enter: onEnter, leave: onLeave });
+      });
+    }
+
+    const tabBindings: Array<{ link: HTMLAnchorElement; handler: (e: Event) => void }> = [];
+    const tabLinks = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('.nav [data-bs-toggle="pill"]')
+    );
+
+    tabLinks.forEach((link) => {
+      const nav = link.closest('.nav');
+      const container = nav?.parentElement;
+      const tabContent = container?.querySelector<HTMLElement>('.tab-content');
+      if (!nav || !tabContent) return;
+
+      const handler = (event: Event) => {
+        event.preventDefault();
+        const href = link.getAttribute('href') ?? '';
+        const targetId = href.startsWith('#') ? href.slice(1) : href;
+        if (!targetId) return;
+
+        const targetPane = tabContent.querySelector<HTMLElement>(`#${targetId}`);
+        if (!targetPane) return;
+
+        nav.querySelectorAll('.nav-link').forEach((el) => el.classList.remove('active'));
+        link.classList.add('active');
+
+        tabContent.querySelectorAll('.tab-pane').forEach((pane) => {
+          pane.classList.remove('show', 'active');
+        });
+        targetPane.classList.add('show', 'active');
+      };
+
+      link.addEventListener('click', handler);
+      tabBindings.push({ link, handler });
+    });
+
+    const toolbarBindings: Array<{ button: HTMLElement; handler: (e: Event) => void }> = [];
+
+    const closeToolbarMenus = () => {
+      document
+        .querySelectorAll<HTMLElement>('.card-toolbar [data-kt-menu="true"]')
+        .forEach((menu) => menu.classList.remove('show'));
+    };
+
+    const onDocumentClick = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('.card-toolbar')) {
+        return;
+      }
+      closeToolbarMenus();
+    };
+
+    document.addEventListener('click', onDocumentClick);
+
+    const toolbarTriggers = Array.from(
+      document.querySelectorAll<HTMLElement>('.card-toolbar [data-kt-menu-trigger]')
+    );
+
+    toolbarTriggers.forEach((button) => {
+      const sibling = button.nextElementSibling as HTMLElement | null;
+      const menu =
+        sibling && sibling.matches('[data-kt-menu="true"]')
+          ? sibling
+          : (button.parentElement?.querySelector<HTMLElement>('[data-kt-menu="true"]') ?? null);
+
+      if (!menu) {
+        return;
+      }
+
+      const handler = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const isShown = menu.classList.contains('show');
+        closeToolbarMenus();
+        if (!isShown) {
+          menu.classList.add('show');
+        }
+      };
+
+      button.addEventListener('click', handler);
+      toolbarBindings.push({ button, handler });
+    });
+
+    return () => {
+      hoverBindings.forEach(({ item, enter, leave }) => {
+        item.removeEventListener('mouseenter', enter);
+        item.removeEventListener('mouseleave', leave);
+      });
+      hoverTimeouts.forEach((id) => window.clearTimeout(id));
+
+      tabBindings.forEach(({ link, handler }) => {
+        link.removeEventListener('click', handler);
+      });
+
+      toolbarBindings.forEach(({ button, handler }) => {
+        button.removeEventListener('click', handler);
+      });
+      document.removeEventListener('click', onDocumentClick);
+    };
+  }, [enabled]);
 };
 
 export const getStaticProps: GetStaticProps<DashboardTemplateProps> = async () => {
