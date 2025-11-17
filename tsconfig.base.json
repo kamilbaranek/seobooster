@@ -28,6 +28,9 @@
       ],
       "@seobooster/storage": [
         "libs/storage/src"
+      ],
+      "@seobooster/wp-client": [
+        "libs/wp-client/src"
       ]
     }
   }

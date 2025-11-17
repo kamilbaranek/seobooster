@@ -17,6 +17,7 @@ import { WebsService } from './webs.service';
 import { CreateWebDto } from './dto/create-web.dto';
 import { UpdateWebDto } from './dto/update-web.dto';
 import { UpsertCredentialsDto } from './dto/upsert-credentials.dto';
+import { PublishBatchDto } from './dto/publish-batch.dto';
 
 @Controller('webs')
 @UseGuards(JwtAuthGuard)
@@ -89,6 +90,24 @@ export class WebsController {
   @Post(':id/refresh-screenshot')
   refreshScreenshot(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.refreshScreenshot(user.userId, id);
+  }
+
+  @Post(':id/articles/:articleId/publish')
+  publishArticle(
+    @CurrentUser() user: AuthenticatedUserPayload,
+    @Param('id') id: string,
+    @Param('articleId') articleId: string
+  ) {
+    return this.websService.publishArticle(user.userId, id, articleId);
+  }
+
+  @Post(':id/articles/publish-batch')
+  publishBatch(
+    @CurrentUser() user: AuthenticatedUserPayload,
+    @Param('id') id: string,
+    @Body() payload: PublishBatchDto
+  ) {
+    return this.websService.publishArticles(user.userId, id, payload.articleIds);
   }
 
   @Post(':id/debug/scan')

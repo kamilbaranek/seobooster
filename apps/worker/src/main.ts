@@ -1,4 +1,5 @@
 import { config as loadEnv } from 'dotenv';
+import { createDecipheriv } from 'crypto';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
 
@@ -12,7 +13,7 @@ process.env.PROJECT_ROOT = projectRoot;
   }
 });
 import { Queue, QueueEvents, Worker } from 'bullmq';
-import { ArticlePlanStatus, AssetStatus, Prisma, PrismaClient } from '@prisma/client';
+import { ArticlePlanStatus, AssetStatus, IntegrationType, Prisma, PrismaClient } from '@prisma/client';
 import {
   ANALYZE_BUSINESS_QUEUE,
   CREATE_SEO_STRATEGY_QUEUE,
@@ -37,6 +38,7 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
+import { createPost, updatePost, WordpressClientError, WordpressCredentials, WordpressPublishMode, WordpressPostPayload } from '@seobooster/wp-client';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
@@ -66,6 +68,89 @@ const resolveAssetStorage = () => {
 };
 
 const assetStorage = resolveAssetStorage();
+
+const resolveEncryptionKey = () => {
+  const envKey = process.env.ENCRYPTION_KEY;
+  if (!envKey) {
+    logger.warn('ENCRYPTION_KEY is not set; WordPress credentials cannot be decrypted.');
+    return null;
+  }
+  try {
+    const buffer = Buffer.from(envKey, 'base64');
+    if (buffer.length !== 32) {
+      logger.warn('ENCRYPTION_KEY must be a 32-byte base64 string; credentials will be ignored.');
+      return null;
+    }
+    return buffer;
+  } catch (error) {
+    logger.warn({ error }, 'Failed to parse ENCRYPTION_KEY; WordPress credentials will be ignored.');
+    return null;
+  }
+};
+
+const encryptionKey = resolveEncryptionKey();
+
+const decryptWordpressCredentials = (encrypted: string) => {
+  if (!encryptionKey) {
+    throw new Error('ENCRYPTION_KEY is not configured');
+  }
+  const buffer = Buffer.from(encrypted, 'base64');
+  if (buffer.length < 28) {
+    throw new Error('Encrypted payload is too short');
+  }
+  const iv = buffer.subarray(0, 12);
+  const authTag = buffer.subarray(12, 28);
+  const ciphertext = buffer.subarray(28);
+  const decipher = createDecipheriv('aes-256-gcm', encryptionKey, iv);
+  decipher.setAuthTag(authTag);
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return decrypted.toString('utf8');
+};
+
+const normalizePublishMode = (value: unknown): WordpressPublishMode => {
+  if (value === 'auto_publish' || value === 'manual_approval' || value === 'draft_only') {
+    return value;
+  }
+  return 'draft_only';
+};
+
+const parseWordpressCredentials = (encryptedRecord?: string | null): WordpressCredentials | null => {
+  if (!encryptedRecord) {
+    return null;
+  }
+  if (!encryptionKey) {
+    return null;
+  }
+  let plaintext: string;
+  try {
+    plaintext = decryptWordpressCredentials(encryptedRecord);
+  } catch (error) {
+    logger.warn({ error }, 'Unable to decrypt WordPress credentials');
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(plaintext) as Partial<WordpressCredentials>;
+    if (
+      parsed?.type !== 'wordpress_application_password' ||
+      typeof parsed.baseUrl !== 'string' ||
+      typeof parsed.username !== 'string' ||
+      typeof parsed.applicationPassword !== 'string'
+    ) {
+      logger.warn('WordPress credentials are missing required fields');
+      return null;
+    }
+    return {
+      type: 'wordpress_application_password',
+      baseUrl: parsed.baseUrl,
+      username: parsed.username,
+      applicationPassword: parsed.applicationPassword,
+      autoPublishMode: normalizePublishMode(parsed.autoPublishMode)
+    };
+  } catch (error) {
+    logger.warn({ error }, 'Unable to parse WordPress credentials JSON');
+    return null;
+  }
+};
 
 const prisma = new PrismaClient();
 const scanQueue = new Queue(SCAN_WEBSITE_QUEUE, { connection: redisConnection });
@@ -740,7 +825,8 @@ const bootstrap = async () => {
         web: {
           include: {
             analysis: true,
-            user: true
+            user: true,
+            credentials: true
           }
         }
       }
@@ -885,11 +971,111 @@ const bootstrap = async () => {
       }
     });
 
+    if (plan.web.integrationType === IntegrationType.WORDPRESS_APPLICATION_PASSWORD && plan.web.credentials?.encryptedJson) {
+      const credentials = parseWordpressCredentials(plan.web.credentials.encryptedJson);
+      if (credentials) {
+        const publishMode = credentials.autoPublishMode ?? 'draft_only';
+        const targetStatus = publishMode === 'auto_publish' ? 'publish' : 'draft';
+        await publishQueue.add('PublishArticle', {
+          articleId: article.id,
+          targetStatus,
+          trigger: 'auto'
+        });
+        logger.info(
+          {
+            jobId: job.id,
+            articleId: article.id,
+            publishMode,
+            targetStatus
+          },
+          'Enqueued WordPress publish job'
+        );
+      }
+    }
+
     logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
   });
 
   createWorker<PublishArticleJob>(PUBLISH_ARTICLE_QUEUE, async (job) => {
-    logger.info({ jobId: job.id, articleId: job.data.articleId }, 'Publishing article (stub)');
+    const { articleId, targetStatus, trigger } = job.data;
+    logger.info({ jobId: job.id, articleId, targetStatus, trigger }, 'Publishing article job started');
+
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+      include: {
+        web: {
+          include: {
+            credentials: true
+          }
+        },
+        plan: true
+      }
+    });
+
+    if (!article) {
+      logger.warn({ jobId: job.id, articleId }, 'Article not found');
+      return;
+    }
+
+    const web = article.web;
+    if (!web || web.integrationType !== IntegrationType.WORDPRESS_APPLICATION_PASSWORD) {
+      logger.warn(
+        { jobId: job.id, articleId, integrationType: web?.integrationType },
+        'Web does not support WordPress publishing'
+      );
+      return;
+    }
+
+    const credentials = parseWordpressCredentials(web.credentials?.encryptedJson ?? null);
+    if (!credentials) {
+      logger.warn({ jobId: job.id, articleId }, 'Missing or invalid WordPress credentials');
+      return;
+    }
+
+    const payload: WordpressPostPayload = {
+      title: article.title,
+      content: article.html || article.markdown,
+      status: targetStatus
+    };
+
+    try {
+      const response = article.wordpressPostId
+        ? await updatePost(credentials, article.wordpressPostId, payload)
+        : await createPost(credentials, payload);
+
+      const updateData: Prisma.ArticleUpdateInput = {
+        status: targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT'
+      };
+
+      if (!article.wordpressPostId) {
+        updateData.wordpressPostId = String(response.id);
+      }
+
+      if (targetStatus === 'publish') {
+        updateData.publishedAt = new Date();
+      }
+
+      await prisma.article.update({
+        where: { id: article.id },
+        data: updateData
+      });
+
+      if (targetStatus === 'publish' && article.plan?.id) {
+        await prisma.articlePlan.update({
+          where: { id: article.plan.id },
+          data: { status: ArticlePlanStatus.PUBLISHED }
+        });
+      }
+
+      logger.info({ jobId: job.id, articleId, targetStatus }, 'WordPress publish succeeded');
+    } catch (error) {
+      if (error instanceof WordpressClientError && error.status >= 400 && error.status < 500) {
+        logger.error({ jobId: job.id, articleId, status: error.status, response: error.responseBody }, 'WordPress client error');
+      } else {
+        logger.error({ jobId: job.id, articleId, error }, 'WordPress publish failed');
+      }
+      throw error;
+    }
   });
 
   createWorker<FetchFaviconJob>(FETCH_FAVICON_QUEUE, async (job) => {

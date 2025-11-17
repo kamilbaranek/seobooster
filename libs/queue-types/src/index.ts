@@ -30,6 +30,8 @@ export type GenerateArticleJob = {
 
 export type PublishArticleJob = {
   articleId: string;
+  targetStatus: 'draft' | 'publish';
+  trigger: 'auto' | 'manual' | 'email';
 };
 
 export type FetchFaviconJob = {

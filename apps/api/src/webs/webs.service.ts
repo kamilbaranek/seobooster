@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ArticlePlanStatus, AssetStatus, IntegrationType, WebStatus } from '@prisma/client';
+import { ArticlePlanStatus, AssetStatus, IntegrationType, WebCredentials, WebStatus } from '@prisma/client';
+import type { WordpressPublishMode } from '@seobooster/wp-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobQueueService } from '../queues/queues.service';
 import { EncryptionService } from '../crypto/encryption.service';
@@ -226,6 +227,7 @@ export class WebsService {
       where: { id, userId },
       include: {
         analysis: true,
+        credentials: true,
         articles: {
           orderBy: { createdAt: 'desc' },
           take: 5
@@ -279,7 +281,10 @@ export class WebsService {
         screenshotLastGeneratedAt: web.screenshotLastGeneratedAt,
         faviconLastFetchedAt: web.faviconLastFetchedAt,
         screenshotWidth: web.screenshotWidth,
-        screenshotHeight: web.screenshotHeight
+        screenshotHeight: web.screenshotHeight,
+        integrationType: web.integrationType,
+        hasWordpressCredentials: Boolean(web.credentials),
+        autoPublishMode: this.resolveAutoPublishMode(web.credentials ?? null)
       },
       analysis: {
         lastScanAt: analysis?.lastScanAt ?? null,
@@ -303,6 +308,75 @@ export class WebsService {
         nextPlannedAt: upcomingPlans[0]?.plannedPublishAt ?? null
       }
     };
+  }
+
+  async publishArticle(userId: string, webId: string, articleId: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId },
+      select: { id: true, integrationType: true }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    if (web.integrationType !== IntegrationType.WORDPRESS_APPLICATION_PASSWORD) {
+      throw new BadRequestException('Website is not configured for WordPress publishing.');
+    }
+    const article = await this.prisma.article.findFirst({
+      where: { id: articleId, webId }
+    });
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+    await this.jobQueueService.enqueuePublishArticle(article.id, 'publish', 'manual');
+    return { queued: true };
+  }
+
+  async publishArticles(userId: string, webId: string, articleIds: string[]) {
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId },
+      select: { id: true, integrationType: true }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    if (web.integrationType !== IntegrationType.WORDPRESS_APPLICATION_PASSWORD) {
+      throw new BadRequestException('Website is not configured for WordPress publishing.');
+    }
+    const articles = await this.prisma.article.findMany({
+      where: {
+        id: { in: articleIds },
+        webId
+      }
+    });
+    await Promise.all(
+      articles.map((article) =>
+        this.jobQueueService.enqueuePublishArticle(article.id, 'publish', 'manual')
+      )
+    );
+    return { queued: articles.length };
+  }
+
+  private resolveAutoPublishMode(credentials: WebCredentials | null): WordpressPublishMode | null {
+    if (!credentials) {
+      return null;
+    }
+    try {
+      const decrypted = this.encryptionService.decrypt(credentials.encryptedJson);
+      const parsed = JSON.parse(decrypted) as Record<string, unknown>;
+      if (parsed.type !== 'wordpress_application_password') {
+        return null;
+      }
+      return this.normalizePublishMode(parsed.autoPublishMode);
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizePublishMode(value: unknown): WordpressPublishMode {
+    if (value === 'auto_publish' || value === 'manual_approval' || value === 'draft_only') {
+      return value;
+    }
+    return 'draft_only';
   }
 
   async refreshFavicon(userId: string, id: string) {

@@ -54,8 +54,12 @@ export class JobQueueService {
     return this.generateArticleQueue.add('GenerateArticle', { webId, plannedArticleId });
   }
 
-  enqueuePublishArticle(articleId: string) {
-    return this.publishArticleQueue.add('PublishArticle', { articleId });
+  enqueuePublishArticle(
+    articleId: string,
+    targetStatus: 'draft' | 'publish',
+    trigger: 'auto' | 'manual' | 'email'
+  ) {
+    return this.publishArticleQueue.add('PublishArticle', { articleId, targetStatus, trigger });
   }
 
   enqueueFetchFavicon(webId: string, trigger: string) {

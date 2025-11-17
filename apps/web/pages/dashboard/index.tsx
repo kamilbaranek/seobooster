@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -41,6 +41,9 @@ interface OverviewResponse {
     screenshotLastGeneratedAt?: string | null;
     screenshotWidth?: number | null;
     screenshotHeight?: number | null;
+    integrationType: string;
+    hasWordpressCredentials: boolean;
+    autoPublishMode?: WordpressPublishMode | null;
   };
   analysis: {
     lastScanAt: string | null;
@@ -84,6 +87,15 @@ interface PipelineDebugResponse {
   rawScanOutput?: string | null;
 }
 
+type WordpressPublishMode = 'draft_only' | 'manual_approval' | 'auto_publish';
+
+interface WordpressFormState {
+  baseUrl: string;
+  username: string;
+  applicationPassword: string;
+  autoPublishMode: WordpressPublishMode;
+}
+
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }) : null;
 
@@ -103,10 +115,28 @@ const getStatusClassName = (status?: AssetStatus) => (status ?? 'PENDING').toLow
 const formatAssetTimestamp = (value?: string | null) =>
   value ? new Date(value).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }) : 'Nikdy';
 
+const describeWordpressMode = (mode?: string | null) => {
+  switch (mode) {
+    case 'auto_publish':
+      return 'Auto publish';
+    case 'manual_approval':
+      return 'Ruční schválení';
+    default:
+      return 'Draft only';
+  }
+};
+
 const getFaviconInitial = (web?: { nickname?: string | null; url?: string }) => {
   const source = web?.nickname ?? web?.url ?? 'S';
   const match = source.match(/[a-z0-9]/i);
   return match ? match[0].toUpperCase() : 'S';
+};
+
+const defaultWordpressForm: WordpressFormState = {
+  baseUrl: '',
+  username: '',
+  applicationPassword: '',
+  autoPublishMode: 'draft_only'
 };
 
 const DashboardPage = () => {
@@ -120,6 +150,13 @@ const DashboardPage = () => {
   const [refreshingScreenshot, setRefreshingScreenshot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugData, setDebugData] = useState<PipelineDebugResponse | null>(null);
+  const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([]);
+  const [publishingArticleId, setPublishingArticleId] = useState<string | null>(null);
+  const [batchPublishing, setBatchPublishing] = useState(false);
+  const [wordpressSettings, setWordpressSettings] = useState<WordpressFormState>(defaultWordpressForm);
+  const [wordpressLoading, setWordpressLoading] = useState(false);
+  const [wordpressSaving, setWordpressSaving] = useState(false);
+  const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
 
   const debugMode = process.env.NEXT_PUBLIC_DEBUG_PIPELINE === 'true';
   const isSuperadmin = profile?.user.role === 'SUPERADMIN';
@@ -172,6 +209,39 @@ const DashboardPage = () => {
     loadOverview(selectedWebId);
   }, [loadOverview, selectedWebId]);
 
+  useEffect(() => {
+    setSelectedArticleIds([]);
+  }, [selectedWebId]);
+
+  const loadWordpressSettings = useCallback(async () => {
+    if (!selectedWebId) {
+      setWordpressSettings(defaultWordpressForm);
+      return;
+    }
+    setWordpressLoading(true);
+    setWordpressMessage(null);
+    try {
+      const payload = await apiFetch<{
+        hasCredentials: boolean;
+        credentials?: Partial<WordpressFormState>;
+      }>(`/webs/${selectedWebId}/credentials`);
+      setWordpressSettings({
+        baseUrl: payload.credentials?.baseUrl ?? '',
+        username: payload.credentials?.username ?? '',
+        applicationPassword: payload.credentials?.applicationPassword ?? '',
+        autoPublishMode: (payload.credentials?.autoPublishMode as WordpressPublishMode) ?? 'draft_only'
+      });
+    } catch (_err) {
+      setWordpressMessage('Nepodařilo se načíst WordPress nastavení.');
+    } finally {
+      setWordpressLoading(false);
+    }
+  }, [selectedWebId]);
+
+  useEffect(() => {
+    loadWordpressSettings();
+  }, [loadWordpressSettings]);
+
   const pipelineSteps = useMemo(() => {
     if (!overview) return [];
     const nextPlanned = formatDateTime(overview.plan.nextPlannedAt) ?? undefined;
@@ -221,6 +291,8 @@ const DashboardPage = () => {
     ];
   }, [overview]);
 
+  const hasWordpressIntegration = overview?.web.integrationType === 'WORDPRESS_APPLICATION_PASSWORD';
+
   const handleGenerateArticle = async () => {
     if (!selectedWebId) return;
     setGenerateLoading(true);
@@ -234,6 +306,80 @@ const DashboardPage = () => {
       setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit generování.');
     } finally {
       setGenerateLoading(false);
+    }
+  };
+
+  const handleWordpressFieldChange = (field: keyof WordpressFormState, value: string) => {
+    setWordpressSettings((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveWordpressSettings = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedWebId) return;
+    setWordpressSaving(true);
+    setWordpressMessage(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ integrationType: 'WORDPRESS_APPLICATION_PASSWORD' })
+      });
+      await apiFetch(`/webs/${selectedWebId}/credentials`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          credentials: {
+            type: 'wordpress_application_password',
+            baseUrl: wordpressSettings.baseUrl,
+            username: wordpressSettings.username,
+            applicationPassword: wordpressSettings.applicationPassword,
+            autoPublishMode: wordpressSettings.autoPublishMode
+          }
+        })
+      });
+      setWordpressMessage('WordPress nastavení bylo uloženo.');
+      await Promise.all([loadOverview(selectedWebId), loadWordpressSettings()]);
+    } catch (_err) {
+      setWordpressMessage('Nepodařilo se uložit WordPress nastavení.');
+    } finally {
+      setWordpressSaving(false);
+    }
+  };
+
+  const toggleArticleSelection = (articleId: string) => {
+    setSelectedArticleIds((prev) =>
+      prev.includes(articleId) ? prev.filter((id) => id !== articleId) : [...prev, articleId]
+    );
+  };
+
+  const handlePublishArticle = async (articleId: string) => {
+    if (!selectedWebId) return;
+    setPublishingArticleId(articleId);
+    setError(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}/articles/${articleId}/publish`, { method: 'POST' });
+      setSelectedArticleIds((prev) => prev.filter((id) => id !== articleId));
+      await loadOverview(selectedWebId);
+    } catch (_err) {
+      setError(_err instanceof Error ? _err.message : 'Nepodařilo se publikovat článek.');
+    } finally {
+      setPublishingArticleId(null);
+    }
+  };
+
+  const handlePublishBatch = async () => {
+    if (!selectedWebId || selectedArticleIds.length === 0) return;
+    setBatchPublishing(true);
+    setError(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}/articles/publish-batch`, {
+        method: 'POST',
+        body: JSON.stringify({ articleIds: selectedArticleIds })
+      });
+      setSelectedArticleIds([]);
+      await loadOverview(selectedWebId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nepodařilo se publikovat vybrané články.');
+    } finally {
+      setBatchPublishing(false);
     }
   };
 
@@ -485,22 +631,138 @@ const DashboardPage = () => {
                 )}
               </section>
 
+              <section className="panel wordpress-panel">
+                <h3>WordPress publikace</h3>
+                <div className="wordpress-status">
+                  <span>Režim: {describeWordpressMode(overview.web.autoPublishMode)}</span>
+                  <span>Integrace: {overview.web.integrationType}</span>
+                  <span>
+                    Credentials: {overview.web.hasWordpressCredentials ? 'uložené' : 'neuložené'}
+                  </span>
+                </div>
+                <form className="wordpress-form" onSubmit={handleSaveWordpressSettings}>
+                  <div className="form-grid">
+                    <label>
+                      WordPress URL
+                      <input
+                        value={wordpressSettings.baseUrl}
+                        onChange={(event) => handleWordpressFieldChange('baseUrl', event.target.value)}
+                        disabled={wordpressLoading}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Uživatelské jméno
+                      <input
+                        value={wordpressSettings.username}
+                        onChange={(event) => handleWordpressFieldChange('username', event.target.value)}
+                        disabled={wordpressLoading}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Application password
+                      <input
+                        type="password"
+                        value={wordpressSettings.applicationPassword}
+                        onChange={(event) =>
+                          handleWordpressFieldChange('applicationPassword', event.target.value)
+                        }
+                        disabled={wordpressLoading}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Publikační režim
+                      <select
+                        value={wordpressSettings.autoPublishMode}
+                        onChange={(event) =>
+                          handleWordpressFieldChange('autoPublishMode', event.target.value)
+                        }
+                        disabled={wordpressLoading}
+                      >
+                        <option value="draft_only">Draft only</option>
+                        <option value="manual_approval">Manuální schválení</option>
+                        <option value="auto_publish">Auto publish</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="wordpress-actions">
+                    <button
+                      type="submit"
+                      className="button primary"
+                      disabled={
+                        wordpressSaving || wordpressLoading || !selectedWebId
+                      }
+                    >
+                      {wordpressSaving ? 'Ukládám…' : 'Uložit nastavení'}
+                    </button>
+                    {wordpressMessage && <span className="muted">{wordpressMessage}</span>}
+                  </div>
+                </form>
+              </section>
+
               <section className="panel">
                 <h3>Poslední články</h3>
                 {overview.articles.length === 0 ? (
                   <p className="muted">Zatím zde nic není. Jakmile generátor doběhne, uvidíte draft článku.</p>
                 ) : (
-                  <ul className="articles">
-                    {overview.articles.map((article) => (
-                      <li key={article.id}>
-                        <div>
-                          <strong>{article.title}</strong>
-                          <small>{article.status}</small>
-                        </div>
-                        <span>{new Date(article.createdAt).toLocaleDateString()}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="articles">
+                      {overview.articles.map((article) => (
+                        <li key={article.id}>
+                          <div className="article-row">
+                            <div className="article-left">
+                              {hasWordpressIntegration && (
+                                <label className="article-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedArticleIds.includes(article.id)}
+                                    onChange={() => toggleArticleSelection(article.id)}
+                                  />
+                                </label>
+                              )}
+                              <div>
+                                <strong>{article.title}</strong>
+                                <small>{article.status}</small>
+                              </div>
+                            </div>
+                            <div className="article-right">
+                              <span>{new Date(article.createdAt).toLocaleDateString()}</span>
+                              {hasWordpressIntegration && (
+                                <button
+                                  type="button"
+                                  className="button ghost"
+                                  disabled={
+                                    publishingArticleId === article.id || !selectedWebId
+                                  }
+                                  onClick={() => handlePublishArticle(article.id)}
+                                >
+                                  {publishingArticleId === article.id
+                                    ? 'Publikuji…'
+                                    : 'Publikovat na WordPress'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {hasWordpressIntegration && (
+                      <div className="batch-actions">
+                        <button
+                          type="button"
+                          className="button ghost"
+                          disabled={selectedArticleIds.length === 0 || batchPublishing || !selectedWebId}
+                          onClick={handlePublishBatch}
+                        >
+                          {batchPublishing
+                            ? 'Publikuji vybrané…'
+                            : `Publikovat ${selectedArticleIds.length} vybrané`}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
 
@@ -677,6 +939,43 @@ const DashboardPage = () => {
           padding: 2rem;
           border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .wordpress-panel .wordpress-status {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+          color: #94a3b8;
+        }
+        .wordpress-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .form-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1rem;
+        }
+        .wordpress-form label {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          font-size: 0.85rem;
+          color: #cbd5f5;
+        }
+        .wordpress-form input,
+        .wordpress-form select {
+          width: 100%;
+          padding: 0.8rem;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(15, 19, 35, 0.8);
+          color: #fff;
+        }
+        .wordpress-actions {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
         .panel-header {
           display: flex;
           justify-content: space-between;
@@ -810,12 +1109,6 @@ const DashboardPage = () => {
           flex-direction: column;
           gap: 0.75rem;
         }
-        .articles li {
-          display: flex;
-          justify-content: space-between;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding-bottom: 0.5rem;
-        }
         .plan-stats {
           display: flex;
           gap: 1.5rem;
@@ -847,6 +1140,36 @@ const DashboardPage = () => {
           align-items: center;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           padding-bottom: 0.6rem;
+        }
+        .articles li {
+          list-style: none;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          padding: 0.75rem 0;
+        }
+        .article-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .article-left {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        .article-right {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .article-checkbox input {
+          width: 1.1rem;
+          height: 1.1rem;
+          cursor: pointer;
+        }
+        .batch-actions {
+          margin-top: 0.75rem;
         }
         .plan-list small {
           display: block;
