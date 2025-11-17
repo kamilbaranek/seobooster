@@ -342,7 +342,7 @@ const DashboardPage = ({ bodyHtml, bodyAttributes }: InferGetStaticPropsType<typ
   );
 };
 
-// Sidebar hover + tabs + card toolbar menus behavior
+// Sidebar hover + tabs + card toolbar menus + theme mode behavior
 const useDashboardInteractions = (enabled: boolean) => {
   useEffect(() => {
     if (!enabled) {
@@ -433,20 +433,21 @@ const useDashboardInteractions = (enabled: boolean) => {
     });
 
     const toolbarBindings: Array<{ button: HTMLElement; handler: (e: Event) => void }> = [];
+    const sidebarMenuBindings: Array<{ button: HTMLElement; handler: (e: Event) => void }> = [];
 
-    const closeToolbarMenus = () => {
+    const closeDropdownMenus = () => {
       document
-        .querySelectorAll<HTMLElement>('.card-toolbar [data-kt-menu="true"]')
+        .querySelectorAll<HTMLElement>('.card-toolbar [data-kt-menu="true"], #kt_app_sidebar_footer [data-kt-menu="true"]')
         .forEach((menu) => menu.classList.remove('show'));
     };
 
     const onDocumentClick = (event: Event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest('.card-toolbar')) {
+      if (target.closest('.card-toolbar') || target.closest('#kt_app_sidebar_footer')) {
         return;
       }
-      closeToolbarMenus();
+      closeDropdownMenus();
     };
 
     document.addEventListener('click', onDocumentClick);
@@ -471,7 +472,7 @@ const useDashboardInteractions = (enabled: boolean) => {
         event.stopPropagation();
 
         const isShown = menu.classList.contains('show');
-        closeToolbarMenus();
+        closeDropdownMenus();
         if (!isShown) {
           menu.classList.add('show');
         }
@@ -480,6 +481,91 @@ const useDashboardInteractions = (enabled: boolean) => {
       button.addEventListener('click', handler);
       toolbarBindings.push({ button, handler });
     });
+
+    const sidebarFooter = document.getElementById('kt_app_sidebar_footer');
+    if (sidebarFooter) {
+      const sidebarTrigger = sidebarFooter.querySelector<HTMLElement>('[data-kt-menu-trigger]');
+      const sidebarMenu = sidebarFooter.querySelector<HTMLElement>('[data-kt-menu="true"]');
+
+      if (sidebarTrigger && sidebarMenu) {
+        const handler = (event: Event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const isShown = sidebarMenu.classList.contains('show');
+          closeDropdownMenus();
+          if (!isShown) {
+            sidebarMenu.classList.add('show');
+          }
+        };
+
+        sidebarTrigger.addEventListener('click', handler);
+        sidebarMenuBindings.push({ button: sidebarTrigger, handler });
+      }
+    }
+
+    const themeBindings: Array<{ link: HTMLAnchorElement; handler: (e: Event) => void }> = [];
+
+    const themeMenu = document.querySelector<HTMLElement>('[data-kt-element="theme-mode-menu"]');
+
+    if (themeMenu) {
+      const themeLinks = Array.from(
+        themeMenu.querySelectorAll<HTMLAnchorElement>('[data-kt-element="mode"]')
+      );
+
+      const getSystemTheme = () =>
+        window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+
+      const getStoredMenuMode = () => {
+        const attr = document.documentElement.getAttribute('data-bs-theme-mode');
+        if (attr) return attr;
+        const stored = typeof window !== 'undefined'
+          ? window.localStorage.getItem('data-bs-theme-mode')
+          : null;
+        return stored || 'light';
+      };
+
+      const setTheme = (menuMode: string) => {
+        let theme = menuMode;
+        if (menuMode === 'system') {
+          theme = getSystemTheme();
+        }
+
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme-mode', menuMode);
+
+        try {
+          window.localStorage.setItem('data-bs-theme', theme);
+          window.localStorage.setItem('data-bs-theme-mode', menuMode);
+        } catch {
+          // ignore storage errors
+        }
+
+        themeLinks.forEach((link) => {
+          link.classList.toggle(
+            'active',
+            link.getAttribute('data-kt-value') === menuMode
+          );
+        });
+      };
+
+      // initial state based on stored mode
+      setTheme(getStoredMenuMode());
+
+      themeLinks.forEach((link) => {
+        const handler = (event: Event) => {
+          event.preventDefault();
+          const value = link.getAttribute('data-kt-value') || 'light';
+          setTheme(value);
+        };
+
+        link.addEventListener('click', handler);
+        themeBindings.push({ link, handler });
+      });
+    }
 
     return () => {
       hoverBindings.forEach(({ item, enter, leave }) => {
@@ -495,7 +581,14 @@ const useDashboardInteractions = (enabled: boolean) => {
       toolbarBindings.forEach(({ button, handler }) => {
         button.removeEventListener('click', handler);
       });
+      sidebarMenuBindings.forEach(({ button, handler }) => {
+        button.removeEventListener('click', handler);
+      });
       document.removeEventListener('click', onDocumentClick);
+
+       themeBindings.forEach(({ link, handler }) => {
+         link.removeEventListener('click', handler);
+       });
     };
   }, [enabled]);
 };
