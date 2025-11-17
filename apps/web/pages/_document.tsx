@@ -40,6 +40,25 @@ class AppDocument extends Document {
                   --bs-app-sidebar-base-bg-color: transparent;
                   --bs-app-sidebar-panel-base-bg-color: #15171C;
                 }
+
+                .app-navbar-item {
+                  position: relative;
+                }
+
+                .menu-sub.menu-sub-dropdown {
+                  display: none;
+                }
+
+                .menu-sub.menu-sub-dropdown.show {
+                  display: block;
+                  position: absolute;
+                  inset: auto 0 auto auto;
+                  z-index: 107;
+                }
+
+                #kt_app_sidebar_footer .menu-sub.menu-sub-dropdown.show {
+                  inset: auto auto 100% auto;
+                }
               `,
             }}
           />
