@@ -1,881 +1,411 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
+import type { GetStaticProps, InferGetStaticPropsType } from 'next';
+import path from 'path';
+import { promises as fs } from 'fs';
 import { useRouter } from 'next/router';
-import { apiFetch } from '../../lib/api-client';
+import type { ApexOptions } from 'apexcharts';
 import { getToken } from '../../lib/auth-storage';
 
-type AssetStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
-
-interface MeResponse {
-  user: {
-    id: string;
-    email: string;
-    role?: string;
-  };
-  webs: Array<{
-    id: string;
-    url: string;
-    nickname?: string | null;
-    status: string;
-    createdAt: string;
-    faviconUrl?: string | null;
-    faviconStatus?: AssetStatus;
-    screenshotUrl?: string | null;
-    screenshotStatus?: AssetStatus;
-  }>;
+interface DashboardTemplateProps {
+  bodyHtml: string;
+  bodyAttributes: Record<string, string>;
 }
 
-interface OverviewResponse {
-  web: {
-    id: string;
-    url: string;
-    status: string;
-    nickname?: string | null;
-    createdAt: string;
-    faviconUrl?: string | null;
-    faviconStatus: AssetStatus;
-    faviconLastFetchedAt?: string | null;
-    screenshotUrl?: string | null;
-    screenshotStatus: AssetStatus;
-    screenshotLastGeneratedAt?: string | null;
-    screenshotWidth?: number | null;
-    screenshotHeight?: number | null;
-  };
-  analysis: {
-    lastScanAt: string | null;
-    hasScanResult: boolean;
-    hasBusinessProfile: boolean;
-    hasSeoStrategy: boolean;
-  };
-  articles: Array<{
-    id: string;
-    title: string;
-    status: string;
-    createdAt: string;
-  }>;
-  plan: {
-    upcoming: Array<{
-      id: string;
-      status: string;
-      plannedPublishAt: string;
-      supportingArticleTitle: string;
-      clusterName: string;
-    }>;
-    stats: {
-      planned: number;
-      generated: number;
-      published: number;
-    };
-    nextPlannedAt: string | null;
-  };
-}
+const frameBustingScript =
+  'if (window.top !== window.self) { window.top.location.replace(window.self.location.href); }';
 
-interface PipelineDebugResponse {
-  scanResult: unknown;
-  businessProfile: unknown;
-  seoStrategy: unknown;
-  latestArticle: {
-    id: string;
-    title: string;
-    status: string;
-    createdAt: string;
-  } | null;
-  rawScanOutput?: string | null;
-}
+const themeModeScript =
+  'var defaultThemeMode = "light"; var themeMode; if (document.documentElement) { if (document.documentElement.hasAttribute("data-bs-theme-mode")) { themeMode = document.documentElement.getAttribute("data-bs-theme-mode"); } else { if (localStorage.getItem("data-bs-theme") !== null) { themeMode = localStorage.getItem("data-bs-theme"); } else { themeMode = defaultThemeMode; } } if (themeMode === "system") { themeMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } document.documentElement.setAttribute("data-bs-theme", themeMode); }';
 
-const formatDateTime = (value?: string | null) =>
-  value ? new Date(value).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }) : null;
-
-const describeAssetStatus = (status?: AssetStatus) => {
-  switch (status) {
-    case 'SUCCESS':
-      return 'Hotovo';
-    case 'FAILED':
-      return 'Nepodařilo se, zkuste znovu';
-    default:
-      return 'Probíhá zpracování';
-  }
-};
-
-const getStatusClassName = (status?: AssetStatus) => (status ?? 'PENDING').toLowerCase();
-
-const formatAssetTimestamp = (value?: string | null) =>
-  value ? new Date(value).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }) : 'Nikdy';
-
-const getFaviconInitial = (web?: { nickname?: string | null; url?: string }) => {
-  const source = web?.nickname ?? web?.url ?? 'S';
-  const match = source.match(/[a-z0-9]/i);
-  return match ? match[0].toUpperCase() : 'S';
-};
-
-const DashboardPage = () => {
+const DashboardPage = ({ bodyHtml, bodyAttributes }: InferGetStaticPropsType<typeof getStaticProps>) => {
   const router = useRouter();
-  const [profile, setProfile] = useState<MeResponse | null>(null);
-  const [selectedWebId, setSelectedWebId] = useState<string | null>(null);
-  const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [loadingOverview, setLoadingOverview] = useState(false);
-  const [generateLoading, setGenerateLoading] = useState(false);
-  const [refreshingFavicon, setRefreshingFavicon] = useState(false);
-  const [refreshingScreenshot, setRefreshingScreenshot] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [debugData, setDebugData] = useState<PipelineDebugResponse | null>(null);
-
-  const debugMode = process.env.NEXT_PUBLIC_DEBUG_PIPELINE === 'true';
-  const isSuperadmin = profile?.user.role === 'SUPERADMIN';
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
       router.replace('/login');
       return;
     }
-
-    const fetchProfile = async () => {
-      try {
-        const me = await apiFetch<MeResponse>('/me');
-        setProfile(me);
-        if (!selectedWebId && me.webs.length > 0) {
-          setSelectedWebId(me.webs[0].id);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Nepodařilo se načíst data.');
-      }
-    };
-
-    fetchProfile();
-  }, [router, selectedWebId]);
-
-  const loadOverview = useCallback(
-    async (webId: string) => {
-      setLoadingOverview(true);
-      setError(null);
-      try {
-        const data = await apiFetch<OverviewResponse>(`/webs/${webId}/overview`);
-        setOverview(data);
-        if (debugMode) {
-          const debug = await apiFetch<PipelineDebugResponse>(`/webs/${webId}/pipeline-debug`);
-          setDebugData(debug);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Nepodařilo se načíst web.');
-      } finally {
-        setLoadingOverview(false);
-      }
-    },
-    [debugMode]
-  );
+    setAuthorized(true);
+  }, [router]);
 
   useEffect(() => {
-    if (!selectedWebId) {
+    if (!authorized) {
       return;
     }
-    loadOverview(selectedWebId);
-  }, [loadOverview, selectedWebId]);
 
-  const pipelineSteps = useMemo(() => {
-    if (!overview) return [];
-    const nextPlanned = formatDateTime(overview.plan.nextPlannedAt) ?? undefined;
-    return [
-      {
-        key: 'favicon',
-        label: 'Favicon',
-        done: overview.web.faviconStatus === 'SUCCESS',
-        description: describeAssetStatus(overview.web.faviconStatus)
-      },
-      {
-        key: 'screenshot',
-        label: 'Screenshot',
-        done: overview.web.screenshotStatus === 'SUCCESS',
-        description: describeAssetStatus(overview.web.screenshotStatus)
-      },
-      {
-        key: 'scan',
-        label: 'Scan dokončen',
-        done: overview.analysis.hasScanResult,
-        description: overview.analysis.hasScanResult ? 'Hotovo' : 'Čeká na zpracování'
-      },
-      {
-        key: 'analysis',
-        label: 'Byznys profil',
-        done: overview.analysis.hasBusinessProfile,
-        description: overview.analysis.hasBusinessProfile ? 'Hotovo' : 'Čeká na zpracování'
-      },
-      {
-        key: 'strategy',
-        label: 'SEO strategie',
-        done: overview.analysis.hasSeoStrategy,
-        description: overview.analysis.hasSeoStrategy
-          ? `Naplánováno: ${overview.plan.stats.planned} článků`
-          : 'Čeká na generování'
-      },
-      {
-        key: 'article',
-        label: 'Draft článku',
-        done: overview.articles.length > 0,
-        description: overview.articles.length > 0
-          ? 'Draft připraven'
-          : nextPlanned
-            ? `Další plán: ${nextPlanned}`
-            : 'Čeká na plán'
+    const body = document.body;
+    const originalId = body.id;
+    const originalClassName = body.className;
+    const originalAttributes: Record<string, string | null> = {};
+
+    Object.entries(bodyAttributes).forEach(([key, value]) => {
+      if (key === 'id') {
+        body.id = value;
+        return;
       }
-    ];
-  }, [overview]);
+      if (key === 'class') {
+        body.className = value;
+        return;
+      }
+      originalAttributes[key] = body.getAttribute(key);
+      body.setAttribute(key, value);
+    });
 
-  const handleGenerateArticle = async () => {
-    if (!selectedWebId) return;
-    setGenerateLoading(true);
-    setError(null);
-    try {
-      await apiFetch(`/webs/${selectedWebId}/generate-article`, {
-        method: 'POST'
-      });
-      await loadOverview(selectedWebId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit generování.');
-    } finally {
-      setGenerateLoading(false);
-    }
-  };
-
-  const handleRefreshFavicon = async () => {
-    if (!selectedWebId) return;
-    setRefreshingFavicon(true);
-    setError(null);
-    try {
-      await apiFetch(`/webs/${selectedWebId}/refresh-favicon`, { method: 'POST' });
-      await loadOverview(selectedWebId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit aktualizaci favicony.');
-    } finally {
-      setRefreshingFavicon(false);
-    }
-  };
-
-  const handleRefreshScreenshot = async () => {
-    if (!selectedWebId) return;
-    setRefreshingScreenshot(true);
-    setError(null);
-    try {
-      await apiFetch(`/webs/${selectedWebId}/refresh-screenshot`, { method: 'POST' });
-      await loadOverview(selectedWebId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se zařadit aktualizaci screenshotu.');
-    } finally {
-      setRefreshingScreenshot(false);
-    }
-  };
-
-  const handleDeleteWeb = async () => {
-    if (!selectedWebId) return;
-    if (!overview || overview.web.status === 'ACTIVE') {
-      setError('Aktivní web nelze smazat.');
-      return;
-    }
-    if (!window.confirm('Opravdu chcete tento web smazat? Tato akce je nevratná.')) {
-      return;
-    }
-    setError(null);
-    try {
-      await apiFetch(`/webs/${selectedWebId}`, {
-        method: 'DELETE'
-      });
-      if (profile) {
-        const remaining = profile.webs.filter((web) => web.id !== selectedWebId);
-        setProfile({ ...profile, webs: remaining });
-        const next = remaining[0]?.id ?? null;
-        setSelectedWebId(next);
-        setOverview(null);
-        setDebugData(null);
-        if (!next) {
-          router.push('/onboarding/add-site');
+    return () => {
+      body.id = originalId;
+      body.className = originalClassName;
+      Object.entries(bodyAttributes).forEach(([key]) => {
+        const previousValue = originalAttributes[key];
+        if (previousValue) {
+          body.setAttribute(key, previousValue);
+        } else {
+          body.removeAttribute(key);
         }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Web se nepodařilo smazat.');
-    }
-  };
+      });
+    };
+  }, [authorized, bodyAttributes]);
 
-  const triggerDebugStep = async (path: string) => {
-    if (!selectedWebId) return;
-    setError(null);
-    try {
-      await apiFetch(`/webs/${selectedWebId}/${path}`, { method: 'POST' });
-      await loadOverview(selectedWebId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se znovu spustit krok pipeline.');
+  useEffect(() => {
+    if (!authorized) {
+      return;
     }
-  };
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const getVar = (name: string, fallback: string) => rootStyles.getPropertyValue(name).trim() || fallback;
+
+    const initChart47 = (ApexChartsLib: any) => {
+      const element = document.getElementById('kt_charts_widget_47');
+      if (!element) return;
+
+      const height = parseInt(getComputedStyle(element).height || '0', 10) || 200;
+      const baseColor = getVar('--bs-white', '#ffffff');
+      const lightColor = getVar('--bs-white', '#ffffff');
+
+      const options: ApexOptions = {
+        series: [
+          {
+            name: 'Sales',
+            data: [5, 5, 15, 15, 19, 16, 27, 24, 34, 25, 40, 30, 19, 17, 22, 10, 14, 14],
+          },
+        ],
+        chart: {
+          fontFamily: 'inherit',
+          type: 'area',
+          height,
+          toolbar: { show: false },
+        },
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shadeIntensity: 1,
+            opacityFrom: 0.5,
+            opacityTo: 0,
+            stops: [0, 80, 100],
+          },
+        },
+        stroke: {
+          curve: 'smooth',
+          show: true,
+          width: 2,
+          colors: [baseColor],
+        },
+        xaxis: {
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { show: false },
+          crosshairs: {
+            position: 'front',
+            stroke: { color: baseColor, width: 1, dashArray: 3 },
+          },
+          tooltip: { enabled: false },
+        },
+        yaxis: { labels: { show: false } },
+        states: {
+          normal: { filter: { type: 'none', value: 0 } },
+          hover: { filter: { type: 'none', value: 0 } },
+          active: { allowMultipleDataPointsSelection: false, filter: { type: 'none', value: 0 } },
+        },
+        tooltip: { enabled: false },
+        colors: [lightColor],
+        grid: { yaxis: { lines: { show: false } } },
+        markers: { strokeColor: baseColor, strokeWidth: 2 },
+      };
+
+      const chart = new ApexChartsLib(element, options);
+      chart.render();
+      return chart;
+    };
+
+    const initChart48 = (ApexChartsLib: any) => {
+      const element = document.getElementById('kt_charts_widget_48');
+      if (!element) return;
+
+      const height = parseInt(getComputedStyle(element).height || '0', 10) || 200;
+      const baseColor = getVar('--bs-danger', '#f1416c');
+      const lightColor = baseColor;
+
+      const options: ApexOptions = {
+        series: [
+          {
+            name: 'Sales',
+            data: [5, 5, 15, 15, 19, 16, 27, 24, 34, 25, 40, 30, 19, 17, 22, 10, 14, 14],
+          },
+        ],
+        chart: {
+          fontFamily: 'inherit',
+          type: 'area',
+          height,
+          toolbar: { show: false },
+        },
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shadeIntensity: 1,
+            opacityFrom: 0.5,
+            opacityTo: 0,
+            stops: [0, 120, 50],
+          },
+        },
+        stroke: {
+          curve: 'smooth',
+          show: true,
+          width: 2,
+          colors: [baseColor],
+        },
+        xaxis: {
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { show: false },
+          crosshairs: {
+            position: 'front',
+            stroke: { color: baseColor, width: 1, dashArray: 3 },
+          },
+          tooltip: { enabled: false },
+        },
+        yaxis: { labels: { show: false } },
+        states: {
+          normal: { filter: { type: 'none', value: 0 } },
+          hover: { filter: { type: 'none', value: 0 } },
+          active: { allowMultipleDataPointsSelection: false, filter: { type: 'none', value: 0 } },
+        },
+        tooltip: { enabled: false },
+        colors: [lightColor],
+        grid: { yaxis: { lines: { show: false } } },
+        markers: { strokeColor: baseColor, strokeWidth: 2 },
+      };
+
+      const chart = new ApexChartsLib(element, options);
+      chart.render();
+      return chart;
+    };
+
+    const initTableChart = (ApexChartsLib: any, selector: string, data: number[]) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return;
+
+      const height = parseInt(getComputedStyle(element).height || '0', 10) || 50;
+      const color = element.getAttribute('data-kt-chart-color') ?? 'primary';
+
+      const strokeColor = getVar('--bs-gray-300', '#e4e6ef');
+      const baseColor = getVar(`--bs-${color}`, '#009ef7');
+      const lightColor = getVar('--bs-body-bg', '#ffffff');
+
+      const options: ApexOptions = {
+        series: [{ name: 'Net Profit', data }],
+        chart: {
+          fontFamily: 'inherit',
+          type: 'area',
+          height,
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          sparkline: { enabled: true },
+        },
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        fill: { type: 'solid', opacity: 1 },
+        stroke: {
+          curve: 'smooth',
+          show: true,
+          width: 2,
+          colors: [baseColor],
+        },
+        xaxis: {
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { show: false },
+          crosshairs: {
+            show: false,
+            position: 'front',
+            stroke: { color: strokeColor, width: 1, dashArray: 3 },
+          },
+          tooltip: { enabled: false },
+        },
+        yaxis: {
+          min: 0,
+          max: 60,
+          labels: { show: false },
+        },
+        states: {
+          normal: { filter: { type: 'none', value: 0 } },
+          hover: { filter: { type: 'none', value: 0 } },
+          active: { allowMultipleDataPointsSelection: false, filter: { type: 'none', value: 0 } },
+        },
+        tooltip: { enabled: false },
+        colors: [lightColor],
+        markers: {
+          colors: [lightColor],
+          strokeColor: [baseColor],
+          strokeWidth: 3,
+        },
+      };
+
+      const chart = new ApexChartsLib(element, options);
+      chart.render();
+      return chart;
+    };
+
+    let cancelled = false;
+    const charts: any[] = [];
+
+    (async () => {
+      const { default: ApexChartsLib } = await import('apexcharts');
+      if (cancelled) {
+        return;
+      }
+
+      const c47 = initChart47(ApexChartsLib);
+      if (c47) charts.push(c47);
+      const c48 = initChart48(ApexChartsLib);
+      if (c48) charts.push(c48);
+
+      const chart1Data = [7, 10, 5, 21, 6, 11, 5, 23, 5, 11, 18, 7, 21, 13];
+      const chart2Data = [17, 5, 23, 2, 21, 9, 17, 23, 4, 24, 9, 17, 21, 7];
+      const chart3Data = [2, 24, 5, 17, 7, 2, 12, 24, 5, 24, 2, 8, 12, 7];
+      const chart4Data = [24, 3, 5, 19, 3, 7, 25, 14, 5, 14, 2, 8, 5, 17];
+      const chart5Data = [3, 23, 1, 19, 3, 17, 3, 9, 25, 4, 2, 18, 25, 3];
+
+      [chart1Data, chart2Data, chart3Data, chart4Data, chart5Data].forEach((data, index) => {
+        const c = initTableChart(ApexChartsLib, `#kt_table_widget_15_chart_${index + 1}`, data);
+        if (c) charts.push(c);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      charts.forEach((chart) => chart.destroy());
+    };
+  }, [authorized]);
+
+  const content = useMemo(() => ({ __html: bodyHtml }), [bodyHtml]);
+
+  if (!authorized) {
+    return null;
+  }
 
   return (
     <>
       <Head>
-        <title>SEO Booster – Dashboard</title>
+        <title>Metronic - The World&apos;s #1 Selling Tailwind CSS &amp; Bootstrap Admin Template by KeenThemes</title>
+        <meta charSet="utf-8" />
+        <meta
+          name="description"
+          content="The most advanced Tailwind CSS & Bootstrap 5 Admin Theme with 40 unique prebuilt layouts on Themeforest trusted by 100,000 beginners and professionals. Multi-demo, Dark Mode, RTL support and complete React, Angular, Vue, Asp.Net Core, Rails, Spring, Blazor, Django, Express.js, Node.js, Flask, Symfony & Laravel versions. Grab your copy now and get life-time updates for free."
+        />
+        <meta
+          name="keywords"
+          content="tailwind, tailwindcss, metronic, bootstrap, bootstrap 5, angular, VueJs, React, Asp.Net Core, Rails, Spring, Blazor, Django, Express.js, Node.js, Flask, Symfony & Laravel starter kits, admin themes, web design, figma, web development, free templates, free admin themes, bootstrap theme, bootstrap template, bootstrap dashboard, bootstrap dak mode, bootstrap button, bootstrap datepicker, bootstrap timepicker, fullcalendar, datatables, flaticon"
+        />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:type" content="article" />
+        <meta
+          property="og:title"
+          content="Metronic - The World's #1 Selling Tailwind CSS & Bootstrap Admin Template by KeenThemes"
+        />
+        <meta property="og:url" content="https://keenthemes.com/metronic" />
+        <meta property="og:site_name" content="Metronic by Keenthemes" />
+        <link rel="canonical" href="http://preview.keenthemes.com/index.html" />
+        <link rel="shortcut icon" href="/assets/media/logos/favicon.ico" />
       </Head>
-      <div className="dashboard">
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <h1>SEO Booster</h1>
-            <p>{profile?.user.email}</p>
-          </div>
-          <div className="webs">
-            <p className="sidebar-label">Vaše weby</p>
-            {profile?.webs.length ? (
-              profile.webs.map((web) => (
-                <button
-                  key={web.id}
-                  className={`web-chip ${selectedWebId === web.id ? 'active' : ''}`}
-                  onClick={() => setSelectedWebId(web.id)}
-                >
-                  <div className="web-chip-content">
-                    <div className="web-chip-icon">
-                      {web.faviconStatus === 'SUCCESS' && web.faviconUrl ? (
-                        <img src={web.faviconUrl} alt="Favicon" />
-                      ) : (
-                        <span className="web-chip-placeholder">{getFaviconInitial(web)}</span>
-                      )}
-                    </div>
-                    <div>
-                      <span>{web.nickname ?? web.url}</span>
-                      <small>{web.status}</small>
-                    </div>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <p className="muted">Zatím žádné připojené weby.</p>
-            )}
-          </div>
-          <Link className="button ghost" href="/onboarding/add-site">
-            Přidat další web
-          </Link>
-          {selectedWebId && overview && overview.web.status !== 'ACTIVE' && (
-            <button type="button" className="button ghost danger" onClick={handleDeleteWeb}>
-              Smazat tento web
-            </button>
-          )}
-          {isSuperadmin && (
-            <Link className="button ghost" href="/admin/prompts">
-              Superadmin: prompty
-            </Link>
-          )}
-        </aside>
-
-        <main className="content">
-          <header>
-            <div>
-              <p className="eyebrow">Dashboard</p>
-              <h2>{overview?.web.nickname ?? overview?.web.url ?? 'Vyberte web'}</h2>
-            </div>
-            <button className="button primary" onClick={handleGenerateArticle} disabled={!selectedWebId || generateLoading}>
-              {generateLoading ? 'Generuji…' : 'Vygenerovat článek'}
-            </button>
-          </header>
-
-          {error && <div className="notice error">{error}</div>}
-          {loadingOverview && <div className="notice">Načítám data…</div>}
-
-          {overview && !loadingOverview && (
-            <>
-              <section className="panel">
-                <h3>Pipeline</h3>
-                <div className="pipeline">
-                  {pipelineSteps.map((step) => (
-                    <div key={step.key} className={`pipeline-step ${step.done ? 'done' : ''}`}>
-                      <div className="dot" />
-                      <div>
-                        <strong>{step.label}</strong>
-                        <p>{step.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="panel assets-panel">
-                <div className="panel-header">
-                  <h3>Vizuální assety</h3>
-                  <div className="asset-actions">
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={handleRefreshFavicon}
-                      disabled={!selectedWebId || refreshingFavicon}
-                    >
-                      {refreshingFavicon ? 'Aktualizuji faviconu…' : 'Obnovit faviconu'}
-                    </button>
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={handleRefreshScreenshot}
-                      disabled={!selectedWebId || refreshingScreenshot}
-                    >
-                      {refreshingScreenshot ? 'Aktualizuji screenshot…' : 'Obnovit screenshot'}
-                    </button>
-                  </div>
-                </div>
-                <div className="assets-grid">
-                  <div className={`asset-card ${getStatusClassName(overview.web.faviconStatus)}`}>
-                    <p className="asset-label">Favicon</p>
-                    <div className="favicon-frame">
-                      {overview.web.faviconStatus === 'SUCCESS' && overview.web.faviconUrl ? (
-                        <img src={overview.web.faviconUrl} alt="Favicon" />
-                      ) : (
-                        <span className="favicon-placeholder">{getFaviconInitial(overview.web)}</span>
-                      )}
-                    </div>
-                    <p className="asset-status-text">
-                      {describeAssetStatus(overview.web.faviconStatus)} ·{' '}
-                      {formatAssetTimestamp(overview.web.faviconLastFetchedAt)}
-                    </p>
-                  </div>
-                  <div className={`asset-card screenshot ${getStatusClassName(overview.web.screenshotStatus)}`}>
-                    <p className="asset-label">Homepage náhled</p>
-                    <div className="screenshot-frame">
-                      {overview.web.screenshotStatus === 'SUCCESS' && overview.web.screenshotUrl ? (
-                        <img src={overview.web.screenshotUrl} alt="Náhled homepage" />
-                      ) : (
-                        <div className="screenshot-placeholder">
-                          {overview.web.screenshotStatus === 'FAILED'
-                            ? 'Nepodařilo se načíst homepage.'
-                            : 'Screenshot se připravuje…'}
-                        </div>
-                      )}
-                    </div>
-                    <p className="asset-status-text">
-                      {describeAssetStatus(overview.web.screenshotStatus)} ·{' '}
-                      {formatAssetTimestamp(overview.web.screenshotLastGeneratedAt)}
-                      {overview.web.screenshotWidth && overview.web.screenshotHeight
-                        ? ` (${overview.web.screenshotWidth}×${overview.web.screenshotHeight})`
-                        : ''}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="panel">
-                <h3>Plán článků</h3>
-                <div className="plan-stats">
-                  <div>
-                    <strong>Naplánováno</strong>
-                    <span>{overview.plan.stats.planned}</span>
-                  </div>
-                  <div>
-                    <strong>Vygenerováno</strong>
-                    <span>{overview.plan.stats.generated}</span>
-                  </div>
-                  <div>
-                    <strong>Publikováno</strong>
-                    <span>{overview.plan.stats.published}</span>
-                  </div>
-                </div>
-                {overview.plan.upcoming.length === 0 ? (
-                  <p className="muted">Žádné budoucí články zatím nejsou naplánované.</p>
-                ) : (
-                  <ul className="plan-list">
-                    {overview.plan.upcoming.map((plan) => (
-                      <li key={plan.id}>
-                        <div>
-                          <strong>{plan.supportingArticleTitle}</strong>
-                          <small>{plan.clusterName}</small>
-                        </div>
-                        <span>{formatDateTime(plan.plannedPublishAt)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              <section className="panel">
-                <h3>Poslední články</h3>
-                {overview.articles.length === 0 ? (
-                  <p className="muted">Zatím zde nic není. Jakmile generátor doběhne, uvidíte draft článku.</p>
-                ) : (
-                  <ul className="articles">
-                    {overview.articles.map((article) => (
-                      <li key={article.id}>
-                        <div>
-                          <strong>{article.title}</strong>
-                          <small>{article.status}</small>
-                        </div>
-                        <span>{new Date(article.createdAt).toLocaleDateString()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              {debugMode && debugData && (
-                <section className="panel debug">
-                  <h3>Pipeline debug (local only)</h3>
-                  <div className="debug-actions">
-                    <button
-                      type="button"
-                      className="button ghost"
-                      onClick={() => triggerDebugStep('debug/scan')}
-                    >
-                      Znovu spustit scan
-                    </button>
-                    <button
-                      type="button"
-                      className="button ghost"
-                      onClick={() => triggerDebugStep('debug/analyze')}
-                    >
-                      Znovu spustit analýzu
-                    </button>
-                    <button
-                      type="button"
-                      className="button ghost"
-                      onClick={() => triggerDebugStep('debug/strategy')}
-                    >
-                      Znovu vygenerovat strategii
-                    </button>
-                  </div>
-                  <div className="debug-grid">
-                    <div>
-                      <h4>Scan result</h4>
-                      <pre>{JSON.stringify(debugData.scanResult, null, 2)}</pre>
-                    </div>
-                    <div>
-                      <h4>Business profile</h4>
-                      <pre>{JSON.stringify(debugData.businessProfile, null, 2)}</pre>
-                    </div>
-                    <div>
-                      <h4>SEO strategy</h4>
-                      <pre>{JSON.stringify(debugData.seoStrategy, null, 2)}</pre>
-                    </div>
-                    <div>
-                      <h4>Latest article</h4>
-                      <pre>{JSON.stringify(debugData.latestArticle, null, 2)}</pre>
-                    </div>
-                    {debugData.rawScanOutput && (
-                      <div>
-                        <h4>Raw scan output (model content)</h4>
-                        <pre>{debugData.rawScanOutput}</pre>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-        </main>
-      </div>
-      <style jsx>{`
-        .dashboard {
-          display: flex;
-          min-height: 100vh;
-          background: #05060b;
-          color: #fff;
-        }
-        .sidebar {
-          width: 320px;
-          padding: 2rem 1.5rem;
-          border-right: 1px solid rgba(255, 255, 255, 0.05);
-          background: #080b16;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-        .sidebar-header h1 {
-          margin: 0;
-        }
-        .sidebar-label {
-          text-transform: uppercase;
-          font-size: 0.75rem;
-          letter-spacing: 0.2em;
-          color: #94a3b8;
-          margin-bottom: 0.5rem;
-        }
-        .web-chip {
-          width: 100%;
-          text-align: left;
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 0.9rem;
-          padding: 0.9rem;
-          margin-bottom: 0.6rem;
-          color: inherit;
-          cursor: pointer;
-        }
-        .web-chip-content {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-        .web-chip-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 0.8rem;
-          background: rgba(148, 163, 184, 0.15);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          flex-shrink: 0;
-        }
-        .web-chip-icon img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .web-chip-placeholder {
-          font-weight: 600;
-        }
-        .web-chip.active {
-          border-color: #7dd3fc;
-          background: rgba(125, 211, 252, 0.1);
-        }
-        .web-chip span {
-          display: block;
-          font-weight: 600;
-        }
-        .web-chip small {
-          color: #94a3b8;
-        }
-        .button {
-          text-decoration: none;
-          display: inline-block;
-          padding: 0.8rem 1.2rem;
-          border-radius: 999px;
-          text-align: center;
-          font-weight: 600;
-          border: none;
-        }
-        .button.primary {
-          background: linear-gradient(120deg, #0ea5e9, #8b5cf6);
-          color: #fff;
-        }
-        .button.ghost {
-          border: 1px solid rgba(255, 255, 255, 0.4);
-          color: #fff;
-        }
-        .button.ghost.danger {
-          border-color: rgba(248, 113, 113, 0.6);
-          color: #fecaca;
-        }
-        .content {
-          flex: 1;
-          padding: 2.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-        header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .eyebrow {
-          text-transform: uppercase;
-          font-size: 0.8rem;
-          color: #7dd3fc;
-          letter-spacing: 0.3em;
-        }
-        .panel {
-          background: #0f1323;
-          border-radius: 1.2rem;
-          padding: 2rem;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .panel-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 1rem;
-          flex-wrap: wrap;
-          margin-bottom: 1.25rem;
-        }
-        .asset-actions {
-          display: flex;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-        }
-        .assets-panel {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-        .assets-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 1.5rem;
-        }
-        .asset-card {
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 1rem;
-          padding: 1rem;
-          background: rgba(15, 19, 35, 0.8);
-        }
-        .asset-card.pending {
-          border-color: rgba(125, 211, 252, 0.3);
-        }
-        .asset-card.failed {
-          border-color: rgba(248, 113, 113, 0.4);
-        }
-        .asset-label {
-          text-transform: uppercase;
-          font-size: 0.75rem;
-          letter-spacing: 0.2em;
-          color: #94a3b8;
-          margin-bottom: 0.5rem;
-        }
-        .favicon-frame {
-          width: 72px;
-          height: 72px;
-          border-radius: 20px;
-          background: rgba(148, 163, 184, 0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 0.75rem;
-        }
-        .favicon-frame img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .favicon-placeholder {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #e2e8f0;
-        }
-        .screenshot-frame {
-          border-radius: 1rem;
-          overflow: hidden;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(2, 6, 23, 0.8);
-          min-height: 180px;
-        }
-        .screenshot-frame img {
-          width: 100%;
-          display: block;
-        }
-        .screenshot-placeholder {
-          padding: 1.5rem;
-          text-align: center;
-          color: #94a3b8;
-        }
-        .asset-status-text {
-          color: #cbd5f5;
-          font-size: 0.9rem;
-          margin-top: 0.25rem;
-        }
-        .panel.debug pre {
-          max-height: 200px;
-          overflow: auto;
-          background: #020617;
-          border-radius: 0.6rem;
-          padding: 0.75rem 1rem;
-          font-size: 0.75rem;
-        }
-        .debug-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.75rem;
-          margin-bottom: 1rem;
-        }
-        .debug-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 1rem;
-        }
-        .pipeline {
-          display: grid;
-          gap: 1rem;
-        }
-        .pipeline-step {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-          opacity: 0.5;
-        }
-        .pipeline-step.done {
-          opacity: 1;
-        }
-        .pipeline-step .dot {
-          width: 0.9rem;
-          height: 0.9rem;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.3);
-        }
-        .pipeline-step.done .dot {
-          background: #7dd3fc;
-          box-shadow: 0 0 12px rgba(125, 211, 252, 0.4);
-        }
-        .articles {
-          list-style: none;
-          padding: 0;
-          margin: 1rem 0 0;
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-        .articles li {
-          display: flex;
-          justify-content: space-between;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          padding-bottom: 0.5rem;
-        }
-        .plan-stats {
-          display: flex;
-          gap: 1.5rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-        .plan-stats div {
-          background: rgba(255, 255, 255, 0.04);
-          border-radius: 0.9rem;
-          padding: 1rem;
-          min-width: 150px;
-        }
-        .plan-stats span {
-          display: block;
-          font-size: 1.5rem;
-          font-weight: 700;
-        }
-        .plan-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-        .plan-list li {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          padding-bottom: 0.6rem;
-        }
-        .plan-list small {
-          display: block;
-          color: #94a3b8;
-        }
-        .muted {
-          color: #94a3b8;
-        }
-        .notice {
-          padding: 1rem;
-          border-radius: 0.9rem;
-          background: rgba(125, 211, 252, 0.1);
-        }
-        .notice.error {
-          background: rgba(248, 113, 113, 0.15);
-        }
-        @media (max-width: 960px) {
-          .dashboard {
-            flex-direction: column;
-          }
-          .sidebar {
-            width: 100%;
-            border-right: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          }
-        }
-      `}</style>
+      <script dangerouslySetInnerHTML={{ __html: frameBustingScript }} />
+      <script dangerouslySetInnerHTML={{ __html: themeModeScript }} />
+      <div dangerouslySetInnerHTML={content} />
     </>
   );
+};
+
+export const getStaticProps: GetStaticProps<DashboardTemplateProps> = async () => {
+  const templateRelative = path.join('templates', 'index.html');
+  const candidateRoots = [process.cwd(), path.join(process.cwd(), '..'), path.join(process.cwd(), '..', '..')];
+  let templatePath: string | null = null;
+
+  for (const root of candidateRoots) {
+    const candidate = path.join(root, templateRelative);
+    try {
+      await fs.access(candidate);
+      templatePath = candidate;
+      break;
+    } catch {
+      // continue searching
+    }
+  }
+
+  if (!templatePath) {
+    throw new Error(`Unable to locate templates/index.html. Tried roots: ${candidateRoots.join(', ')}`);
+  }
+
+  const html = await fs.readFile(templatePath, 'utf8');
+  const bodyMatch = html.match(/<body([^>]*)>([\s\S]*?)<\/body>/i);
+
+  if (!bodyMatch) {
+    throw new Error('Unable to find <body> in Metronic template');
+  }
+
+  const bodyAttrString = bodyMatch[1];
+  let bodyContent = bodyMatch[2];
+
+  bodyContent = bodyContent.replace(
+    /<!--begin::Theme mode setup on page load-->[\s\S]*?<!--end::Theme mode setup on page load-->/i,
+    ''
+  );
+
+  const scriptsMatch = bodyContent.match(/<!--begin::Javascript-->[\s\S]*<!--end::Javascript-->/i);
+  if (scriptsMatch) {
+    bodyContent = bodyContent.replace(scriptsMatch[0], '');
+  }
+
+  const rewriteAssets = (input: string) =>
+    input
+      .replace(/src="assets\//g, 'src="/assets/')
+      .replace(/src='assets\//g, "src='/assets/")
+      .replace(/href="assets\//g, 'href="/assets/')
+      .replace(/href='assets\//g, "href='/assets/")
+      .replace(/="assets\//g, '="/assets/')
+      .replace(/='assets\//g, "='/assets/")
+      .replace(/url\((['"]?)assets\//g, 'url($1/assets/');
+
+  bodyContent = rewriteAssets(bodyContent);
+
+  const attributes: Record<string, string> = {};
+  const attrRegex = /([^\s=]+)="([^"]*)"/g;
+  let attrMatch: RegExpExecArray | null;
+
+  while ((attrMatch = attrRegex.exec(bodyAttrString)) !== null) {
+    attributes[attrMatch[1]] = attrMatch[2];
+  }
+
+  return {
+    props: {
+      bodyHtml: bodyContent.trim(),
+      bodyAttributes: attributes,
+    },
+  };
 };
 
 export default DashboardPage;

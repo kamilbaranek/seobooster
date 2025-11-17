@@ -9,10 +9,11 @@
     "test": "echo \"No frontend tests yet\""
   },
   "dependencies": {
+    "@seobooster/shared-types": "0.1.0",
+    "apexcharts": "^3.54.1",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "@seobooster/shared-types": "0.1.0"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
