@@ -1,40 +1,29 @@
-name: Deploy to DigitalOcean
+name: Deploy over SSH
+    uses: appleboy/ssh-action@v1.0.3
+    with:
+      host: ${{ secrets.DO_HOST }}
+      username: ${{ secrets.DO_USER }}   # = deploy
+      key: ${{ secrets.DO_SSH_KEY }}
+      script: |
+        set -e
 
-on:
-  push:
-    branches: [ main ]
+        cd /var/www/seobooster
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+        # Git safe directory (kvůli dřívější chybě)
+        git config --global --add safe.directory /var/www/seobooster
 
-    steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          script: |
-            set -e
+        # nvm + Node 22
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        nvm use 22
 
-            cd /var/www/seobooster
+        git fetch origin main
+        git reset --hard origin/main
 
-            # stáhni poslední změny
-            git fetch origin main
-            git reset --hard origin/main
+        npm ci
+        npx prisma generate
 
-            # instalace/aktualizace závislostí (prod režim)
-            npm ci
+        npm run build
 
-            # databázové migrace (produkční režim)
-            npx prisma migrate deploy
-
-            # build všech apps (api, web, worker)
-            npm run build
-
-            # reload všech procesů přes ecosystem.config.js
-            pm2 reload ecosystem.config.js --env production
-
-            # volitelné: zapiš stav a ulož PM2 config
-            pm2 save
+        pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+        pm2 save
