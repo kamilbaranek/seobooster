@@ -455,12 +455,12 @@ const DashboardPage = () => {
   return (
     <>
       <Head>
-        <title>SEO Booster – Dashboard</title>
+        <title>Budliki – Dashboard</title>
       </Head>
       <div className="dashboard">
         <aside className="sidebar">
           <div className="sidebar-header">
-            <h1>SEO Booster</h1>
+            <h1>Budliki</h1>
             <p>{profile?.user.email}</p>
           </div>
           <div className="webs">
