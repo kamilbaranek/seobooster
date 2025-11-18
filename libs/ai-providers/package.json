@@ -1,8 +1,8 @@
 {
   "name": "@seobooster/ai-providers",
   "version": "0.1.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/libs/ai-providers/src/index.js",
+  "types": "dist/libs/ai-providers/src/index.d.ts"
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
