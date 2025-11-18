@@ -35,7 +35,8 @@ jobs:
               npm ci
 
               # databázové migrace (produkční režim)
-              npx prisma migrate deploy
+              # pouze pokud bude DEV databáze a PROD databáze jiná
+              # npx prisma migrate deploy
 
               # build všech apps (api, web, worker)
               npm run build
