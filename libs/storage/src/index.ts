@@ -1,5 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, isAbsolute, normalize, resolve } from 'path';
+import { del, put } from '@vercel/blob';
 
 export type AssetBinary = Buffer | Uint8Array | ArrayBuffer;
 
@@ -29,6 +30,11 @@ export type S3AssetStorageOptions = {
   bucket: string;
   region: string;
   publicBaseUrl: string;
+};
+
+export type VercelBlobAssetStorageOptions = {
+  publicBaseUrl: string;
+  token?: string;
 };
 
 const sanitizeRelativePath = (path: string) => {
@@ -109,12 +115,58 @@ export class S3AssetStorage implements AssetStorage {
   }
 }
 
-export type AssetStorageDriver = 'local' | 's3';
+export class VercelBlobAssetStorage implements AssetStorage {
+  private readonly publicBaseUrl: string;
+  private readonly token?: string;
+
+  constructor(options: VercelBlobAssetStorageOptions) {
+    this.publicBaseUrl = options.publicBaseUrl.replace(/\/$/, '');
+    this.token = options.token;
+  }
+
+  private resolveToken(): string {
+    const token = this.token ?? process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      throw new Error('BLOB_READ_WRITE_TOKEN is required for Vercel Blob asset storage');
+    }
+    return token;
+  }
+
+  async saveFile(path: string, binary: AssetBinary, contentType: string): Promise<string> {
+    const token = this.resolveToken();
+    const sanitized = sanitizeRelativePath(path);
+    await put(sanitized, toBuffer(binary), {
+      access: 'public',
+      token,
+      contentType
+    });
+    return this.getPublicUrl(sanitized);
+  }
+
+  // Not used in the current codebase. Kept for future expansion.
+  async getFile(_path: string): Promise<Buffer> {
+    throw new Error('VercelBlobAssetStorage.getFile is not implemented yet');
+  }
+
+  async deleteFile(path: string): Promise<void> {
+    const token = this.resolveToken();
+    const sanitized = sanitizeRelativePath(path);
+    await del(sanitized, { token });
+  }
+
+  getPublicUrl(path: string): string {
+    const sanitized = sanitizeRelativePath(path);
+    return `${this.publicBaseUrl}/${sanitized}`;
+  }
+}
+
+export type AssetStorageDriver = 'local' | 's3' | 'vercel-blob';
 
 export type AssetStorageConfig = {
   driver: AssetStorageDriver;
   local?: LocalAssetStorageOptions;
   s3?: S3AssetStorageOptions;
+  vercelBlob?: VercelBlobAssetStorageOptions;
 };
 
 export const createAssetStorage = (config: AssetStorageConfig): AssetStorage => {
@@ -130,6 +182,13 @@ export const createAssetStorage = (config: AssetStorageConfig): AssetStorage => 
       throw new Error('S3 storage configuration missing');
     }
     return new S3AssetStorage(config.s3);
+  }
+
+  if (config.driver === 'vercel-blob') {
+    if (!config.vercelBlob) {
+      throw new Error('Vercel Blob storage configuration missing');
+    }
+    return new VercelBlobAssetStorage(config.vercelBlob);
   }
 
   throw new Error(`Unsupported asset storage driver: ${config.driver}`);

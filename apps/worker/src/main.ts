@@ -38,7 +38,17 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
-import { createPost, updatePost, WordpressClientError, WordpressCredentials, WordpressPublishMode, WordpressPostPayload } from '@seobooster/wp-client';
+import { renderArticleMarkdown } from '@seobooster/article-renderer';
+import {
+  createPost,
+  updatePost,
+  WordpressClientError,
+  WordpressCredentials,
+  WordpressPublishMode,
+  WordpressPostPayload,
+  fetchTags,
+  createTag
+} from '@seobooster/wp-client';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
@@ -53,6 +63,7 @@ const redisConnection = {
 
 const resolveAssetStorage = () => {
   const driver = (process.env.ASSET_STORAGE_DRIVER ?? 'local').toLowerCase() as AssetStorageDriver;
+
   if (driver === 'local') {
     const rootPath = process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets';
     const publicUrl = process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/assets';
@@ -64,7 +75,22 @@ const resolveAssetStorage = () => {
       }
     });
   }
-  throw new Error('S3 asset storage driver is not implemented in the worker yet');
+
+  if (driver === 'vercel-blob') {
+    const publicUrl = process.env.ASSET_PUBLIC_BASE_URL;
+    if (!publicUrl) {
+      throw new Error('ASSET_PUBLIC_BASE_URL is required for Vercel Blob asset storage');
+    }
+    return createAssetStorage({
+      driver,
+      vercelBlob: {
+        publicBaseUrl: publicUrl,
+        token: process.env.BLOB_READ_WRITE_TOKEN
+      }
+    });
+  }
+
+  throw new Error(`Unsupported asset storage driver in worker: ${driver}`);
 };
 
 const assetStorage = resolveAssetStorage();
@@ -953,12 +979,18 @@ const bootstrap = async () => {
       throw error;
     }
 
+    if (typeof draft.bodyMarkdown !== 'string' || draft.bodyMarkdown.trim().length === 0) {
+      throw new Error('Invalid ArticleDraft: missing bodyMarkdown');
+    }
+
+    const html = await renderArticleMarkdown(draft.bodyMarkdown);
+
     const article = await prisma.article.create({
       data: {
         webId: plan.webId,
         title: draft.title,
         markdown: draft.bodyMarkdown,
-        html: draft.bodyMarkdown,
+        html,
         status: 'DRAFT'
       }
     });
@@ -1005,10 +1037,19 @@ const bootstrap = async () => {
       include: {
         web: {
           include: {
-            credentials: true
+            credentials: true,
+            defaultWordpressCategory: true,
+            defaultWordpressAuthor: true,
+            analysis: true
           }
         },
-        plan: true
+        plan: {
+          include: {
+            supportingArticle: true
+          }
+        },
+        wordpressCategory: true,
+        wordpressAuthor: true
       }
     });
 
@@ -1032,24 +1073,112 @@ const bootstrap = async () => {
       return;
     }
 
-    const payload: WordpressPostPayload = {
-      title: article.title,
-      content: article.html || article.markdown,
-      status: targetStatus
-    };
-
     try {
-      const response = article.wordpressPostId
-        ? await updatePost(credentials, article.wordpressPostId, payload)
-        : await createPost(credentials, payload);
+      const renderedHtml = await renderArticleMarkdown(article.markdown);
+      const htmlContent =
+        renderedHtml.trim().length > 0
+          ? renderedHtml
+          : article.html?.trim().length
+          ? article.html
+          : article.markdown;
+      // Resolve WordPress category (article override -> web default)
+      const categoryRemoteId =
+        article.wordpressCategory?.remoteId ?? article.web.defaultWordpressCategory?.remoteId ?? null;
+      const categories = categoryRemoteId ? [categoryRemoteId] : undefined;
 
-      const updateData: Prisma.ArticleUpdateInput = {
-        status: targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT'
+      // Resolve WordPress author (article override -> web default)
+      const authorRemoteId =
+        article.wordpressAuthor?.remoteId ?? article.web.defaultWordpressAuthor?.remoteId ?? undefined;
+
+      // Resolve tags from article or SEO keywords
+      const resolveArticleTags = (): string[] => {
+        const explicit = jsonArrayToStringArray(article.tags as unknown as Prisma.JsonValue);
+        if (explicit.length > 0) {
+          return explicit;
+        }
+        if (article.web.wordpressTagsMode !== 'AUTO_FROM_KEYWORDS') {
+          return [];
+        }
+        const keywords =
+          article.plan?.supportingArticle?.keywords ??
+          article.web.analysis?.seoStrategy ??
+          null;
+        return jsonArrayToStringArray(keywords as Prisma.JsonValue);
       };
 
-      if (!article.wordpressPostId) {
-        updateData.wordpressPostId = String(response.id);
+      const tagNames = resolveArticleTags();
+      let tagIds: number[] | undefined;
+
+      if (tagNames.length > 0) {
+        const uniqueNames = Array.from(
+          new Set(
+            tagNames
+              .map((name) => name.trim())
+              .filter((name) => name.length > 0)
+          )
+        );
+
+        const resolvedIds: number[] = [];
+        for (const name of uniqueNames) {
+          try {
+            const existing = await fetchTags(credentials, name);
+            const exactMatch = existing.find(
+              (tag) =>
+                tag.name.toLowerCase() === name.toLowerCase() ||
+                tag.slug.toLowerCase() === name.toLowerCase()
+            );
+            if (exactMatch) {
+              resolvedIds.push(exactMatch.id);
+              continue;
+            }
+            const created = await createTag(credentials, name);
+            resolvedIds.push(created.id);
+          } catch (err) {
+            logger.warn(
+              { jobId: job.id, articleId, tagName: name, error: (err as Error).message },
+              'Failed to resolve WordPress tag'
+            );
+          }
+        }
+        if (resolvedIds.length > 0) {
+          tagIds = resolvedIds;
+        }
       }
+
+      const payload: WordpressPostPayload = {
+        title: article.title,
+        content: htmlContent,
+        status: targetStatus,
+        author: authorRemoteId,
+        categories,
+        tags: tagIds
+      };
+
+      let response;
+      try {
+        response = article.wordpressPostId
+          ? await updatePost(credentials, article.wordpressPostId, payload)
+          : await createPost(credentials, payload);
+      } catch (error) {
+        if (
+          error instanceof WordpressClientError &&
+          error.status === 404 &&
+          article.wordpressPostId
+        ) {
+          logger.warn(
+            { jobId: job.id, articleId, wordpressPostId: article.wordpressPostId },
+            'WordPress post not found; retrying as new post'
+          );
+          response = await createPost(credentials, payload);
+        } else {
+          throw error;
+        }
+      }
+
+      const updateData: Prisma.ArticleUpdateInput = {
+        status: targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT',
+        wordpressPostId: String(response.id)
+      };
 
       if (targetStatus === 'publish') {
         updateData.publishedAt = new Date();
@@ -1057,7 +1186,10 @@ const bootstrap = async () => {
 
       await prisma.article.update({
         where: { id: article.id },
-        data: updateData
+        data: {
+          ...updateData,
+          html: htmlContent
+        }
       });
 
       if (targetStatus === 'publish' && article.plan?.id) {

@@ -26,11 +26,14 @@ const bootstrap = async () => {
     origin: webOrigin,
     credentials: false
   });
-  const assetPath = resolve(
-    projectRoot,
-    process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
-  );
-  app.use('/assets', express.static(assetPath, { index: false, maxAge: '1d' }));
+  const assetDriver = (process.env.ASSET_STORAGE_DRIVER ?? 'local').toLowerCase();
+  if (assetDriver === 'local') {
+    const assetPath = resolve(
+      projectRoot,
+      process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
+    );
+    app.use('/assets', express.static(assetPath, { index: false, maxAge: '1d' }));
+  }
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
