@@ -25,7 +25,7 @@ jobs:
             git reset --hard origin/main
 
             # instalace/aktualizace závislostí (prod režim)
-            npm ci --omit=dev
+            npm ci
 
             # databázové migrace (produkční režim)
             npx prisma migrate deploy
