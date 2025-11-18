@@ -1,0 +1,40 @@
+name: Deploy to DigitalOcean
+
+  on:
+    push:
+      branches: [ main ]
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Deploy over SSH
+          uses: appleboy/ssh-action@v1.0.3
+          with:
+            host: ${{ secrets.DO_HOST }}
+            username: ${{ secrets.DO_USER }}
+            key: ${{ secrets.DO_SSH_KEY }}
+            script: |
+              set -e
+
+              cd /var/www/seobooster
+
+              # stáhni poslední změny
+              git fetch origin main
+              git reset --hard origin/main
+
+              # instalace/aktualizace závislostí (prod režim)
+              npm ci --omit=dev
+
+              # databázové migrace (produkční režim)
+              npx prisma migrate deploy
+
+              # build všech apps (api, web, worker)
+              npm run build
+
+              # reload všech procesů přes ecosystem.config.js
+              pm2 reload ecosystem.config.js --env production
+
+              # volitelné: zapiš stav a ulož PM2 config
+              pm2 save
