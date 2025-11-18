@@ -38,7 +38,7 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
-import { renderArticleMarkdown } from '@seobooster/article-renderer';
+import { renderArticleMarkdown } from '../../../libs/article-renderer/dist';
 import {
   createPost,
   updatePost,
@@ -48,7 +48,7 @@ import {
   WordpressPostPayload,
   fetchTags,
   createTag
-} from '@seobooster/wp-client';
+} from '../../../libs/wp-client/dist';
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';

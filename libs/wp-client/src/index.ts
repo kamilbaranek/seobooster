@@ -20,6 +20,7 @@ export interface WordpressPostPayload {
   status?: WordpressPostStatus;
   slug?: string;
   excerpt?: string;
+  author?: number;
   categories?: number[];
   tags?: number[];
 }
@@ -29,6 +30,24 @@ export interface WordpressPostResponse {
   status: string;
   link?: string;
   [key: string]: unknown;
+}
+
+export interface WordpressCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface WordpressAuthor {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface WordpressTag {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 export class WordpressClientError extends Error {
@@ -46,16 +65,18 @@ const buildAuthHeader = (credentials: WordpressCredentials) => {
 const sendRequest = async <T>(
   credentials: WordpressCredentials,
   path: string,
-  method: 'POST' | 'PUT',
-  payload: unknown
+  method: 'GET' | 'POST' | 'PUT',
+  payload?: unknown
 ): Promise<T> => {
   const url = new URL(path, credentials.baseUrl);
   const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
-  const body = JSON.stringify(payload);
-  const headers = {
-    Authorization: buildAuthHeader(credentials),
-    'Content-Type': 'application/json'
+  const body = payload !== undefined ? JSON.stringify(payload) : null;
+  const headers: Record<string, string> = {
+    Authorization: buildAuthHeader(credentials)
   };
+  if (body) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   return new Promise<T>((resolve, reject) => {
     const req = transport(
@@ -88,7 +109,9 @@ const sendRequest = async <T>(
     );
 
     req.on('error', (error) => reject(error));
-    req.write(body);
+    if (body) {
+      req.write(body);
+    }
     req.end();
   });
 };
@@ -96,12 +119,43 @@ const sendRequest = async <T>(
 export const createPost = (
   credentials: WordpressCredentials,
   payload: WordpressPostPayload
-): Promise<WordpressPostResponse> =>
-  sendRequest(credentials, '/wp-json/wp/v2/posts', 'POST', payload);
+): Promise<WordpressPostResponse> => sendRequest(credentials, '/wp-json/wp/v2/posts', 'POST', payload);
 
 export const updatePost = (
   credentials: WordpressCredentials,
   postId: string | number,
   payload: WordpressPostPayload
-): Promise<WordpressPostResponse> =>
-  sendRequest(credentials, `/wp-json/wp/v2/posts/${postId}`, 'POST', payload);
+): Promise<WordpressPostResponse> => sendRequest(credentials, `/wp-json/wp/v2/posts/${postId}`, 'POST', payload);
+
+export const fetchCategories = (credentials: WordpressCredentials): Promise<WordpressCategory[]> =>
+  sendRequest(credentials, '/wp-json/wp/v2/categories?per_page=100', 'GET');
+
+export const fetchAuthors = async (credentials: WordpressCredentials): Promise<WordpressAuthor[]> => {
+  try {
+    return await sendRequest<WordpressAuthor[]>(
+      credentials,
+      '/wp-json/wp/v2/users?roles=author&per_page=100',
+      'GET'
+    );
+  } catch (error) {
+    if (error instanceof WordpressClientError && error.status === 403) {
+      // Fallback: current user only (no permission to list all authors)
+      const me = await sendRequest<WordpressAuthor>(credentials, '/wp-json/wp/v2/users/me', 'GET');
+      return [me];
+    }
+    throw error;
+  }
+};
+
+export const fetchTags = (
+  credentials: WordpressCredentials,
+  search?: string
+): Promise<WordpressTag[]> => {
+  const query = search ? `?search=${encodeURIComponent(search)}&per_page=100` : '?per_page=100';
+  return sendRequest(credentials, `/wp-json/wp/v2/tags${query}`, 'GET');
+};
+
+export const createTag = (
+  credentials: WordpressCredentials,
+  name: string
+): Promise<WordpressTag> => sendRequest(credentials, '/wp-json/wp/v2/tags', 'POST', { name });
