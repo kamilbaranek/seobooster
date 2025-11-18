@@ -5,13 +5,20 @@
   },
   "include": [
     "src"
-  ],
+  ]
+  ,
   "references": [
     {
       "path": "../../libs/queue-types"
     },
     {
       "path": "../../libs/storage"
+    },
+    {
+      "path": "../../libs/article-renderer"
+    },
+    {
+      "path": "../../libs/wp-client"
     }
   ]
 }
