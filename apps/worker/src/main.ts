@@ -1032,7 +1032,7 @@ const bootstrap = async () => {
     const { articleId, targetStatus, trigger } = job.data;
     logger.info({ jobId: job.id, articleId, targetStatus, trigger }, 'Publishing article job started');
 
-    const article = await prisma.article.findUnique({
+    const article = (await (prisma as unknown as { article: { findUnique: (args: unknown) => Promise<unknown> } }).article.findUnique({
       where: { id: articleId },
       include: {
         web: {
@@ -1051,7 +1051,7 @@ const bootstrap = async () => {
         wordpressCategory: true,
         wordpressAuthor: true
       }
-    });
+    })) as any;
 
     if (!article) {
       logger.warn({ jobId: job.id, articleId }, 'Article not found');
