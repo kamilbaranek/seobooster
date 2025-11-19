@@ -20,36 +20,40 @@ export default function MagicLinkAction() {
     const [comment, setComment] = useState('');
 
     useEffect(() => {
-        if (!token) return;
+        if (!router.isReady || !token) return;
 
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/magic-links/${token}`)
+        const tokenStr = Array.isArray(token) ? token[0] : token;
+        console.log('MagicLink: Validating token', tokenStr);
+
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/magic-links/${tokenStr}`)
             .then(async (res) => {
+                console.log('MagicLink: Response status', res.status);
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.message || 'Invalid token');
+                    const text = await res.text();
+                    console.error('MagicLink: Error response body', text);
+                    try {
+                        const err = JSON.parse(text);
+                        throw new Error(err.message || 'Invalid token');
+                    } catch (e) {
+                        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+                    }
                 }
                 return res.json();
             })
             .then((data) => {
+                console.log('MagicLink: Data received', data);
                 setData(data);
                 setLoading(false);
-                // If it's a PUBLISH link, trigger action immediately (or wait for user confirmation if preferred, but requirement said "po stisku zveřejnit se pouze zobrazí...")
-                // Actually, the email button says "Publish", so clicking it lands here. 
-                // Requirement: "po stisku zveřejnit se pouze zobrazí, že už se na to pracuje"
-                // So we should probably trigger it immediately or show a "Confirm Publish" button?
-                // Let's trigger it immediately for smoother UX if the email intent was clear.
-                // BUT, to prevent accidental clicks, maybe a big button "Confirm Publish" is safer?
-                // User said: "po stisku zveřejnit se pouze zobrazí..." -> implies the click in email triggers the "working on it" state.
-                // Let's auto-trigger for PUBLISH.
                 if (data.type === 'PUBLISH') {
-                    executeAction(token as string, 'PUBLISH');
+                    executeAction(tokenStr, 'PUBLISH');
                 }
             })
             .catch((err) => {
-                setError(err.message);
+                console.error('MagicLink: Error caught', err);
+                setError(err.message || 'Unknown error');
                 setLoading(false);
             });
-    }, [token]);
+    }, [router.isReady, token]);
 
     const executeAction = async (token: string, type: string, payload?: any) => {
         setActionStatus('processing');
