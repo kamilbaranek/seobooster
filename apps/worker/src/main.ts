@@ -38,22 +38,27 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { renderArticleMarkdown } = require(resolve(projectRoot, 'libs/article-renderer/dist'));
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const {
+import {
   createPost,
   updatePost,
   WordpressClientError,
-  WordpressCredentials,
-  WordpressPublishMode,
-  WordpressPostPayload,
   fetchTags,
   createTag
-} = require(resolve(projectRoot, 'libs/wp-client/dist'));
+} from '@seobooster/wp-client';
+import type {
+  WordpressPublishMode,
+  WordpressCredentials,
+  WordpressPostPayload,
+  WordpressPostResponse
+} from '@seobooster/wp-client';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { renderArticleMarkdown } = require(resolve(projectRoot, 'libs/article-renderer/dist'));
 
 const logger = createLogger('worker');
+const formatUnknownError = (error: unknown) =>
+  error instanceof Error
+    ? { message: error.message, stack: error.stack }
+    : { raw: typeof error === 'string' ? error : JSON.stringify(error) };
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
 
 const redisConnection = {
@@ -1157,7 +1162,7 @@ const bootstrap = async () => {
         tags: tagIds
       };
 
-      let response;
+      let response: WordpressPostResponse;
       try {
         response = article.wordpressPostId
           ? await updatePost(credentials, article.wordpressPostId, payload)
@@ -1207,7 +1212,7 @@ const bootstrap = async () => {
       if (error instanceof WordpressClientError && error.status >= 400 && error.status < 500) {
         logger.error({ jobId: job.id, articleId, status: error.status, response: error.responseBody }, 'WordPress client error');
       } else {
-        logger.error({ jobId: job.id, articleId, error }, 'WordPress publish failed');
+        logger.error({ jobId: job.id, articleId, error: formatUnknownError(error) }, 'WordPress publish failed');
       }
       throw error;
     }
