@@ -1377,7 +1377,7 @@ const bootstrap = async () => {
     const imageBuffer = toBuffer(imageResult.data);
     const mimeType = imageResult.mimeType || 'image/png';
     const extension = getImageExtensionFromMime(mimeType);
-    const storagePath = buildArticleImagePath(article.id, extension);
+    const storagePath = buildArticleImagePath(article.webId, article.id, articleImage.id);
     const publicUrl = await assetStorage.saveFile(storagePath, imageBuffer, mimeType);
 
     await prisma.article.update({
