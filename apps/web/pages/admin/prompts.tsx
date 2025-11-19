@@ -194,10 +194,14 @@ const PROVIDER_OPTIONS = [
 const MODEL_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
   openrouter: [],
   google: [
-    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental (image generation)' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { value: 'gemini-2.0-flash-thinking-exp-1219', label: 'Gemini 2.0 Flash Thinking' }
+    { value: 'imagen-4.0-generate-001', label: 'Imagen 4.0 Standard (recommended for images)' },
+    { value: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4.0 Ultra (highest quality)' },
+    { value: 'imagen-4.0-fast-generate-001', label: 'Imagen 4.0 Fast (quickest)' },
+    { value: 'imagen-3.0-generate-002', label: 'Imagen 3.0' },
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental (multimodal)' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (text)' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (text)' },
+    { value: 'gemini-2.0-flash-thinking-exp-1219', label: 'Gemini 2.0 Thinking (text)' }
   ],
   openai: [
     { value: 'openai/gpt-4o-mini', label: 'gpt-4o-mini' },

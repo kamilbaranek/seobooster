@@ -50,6 +50,30 @@ type GoogleGenerateContentResponse = {
   };
 };
 
+type ImagenPredictRequest = {
+  instances: Array<{
+    prompt: string;
+  }>;
+  parameters?: {
+    sampleCount?: number;
+    aspectRatio?: string;
+    negativePrompt?: string;
+    personGeneration?: string;
+  };
+};
+
+type ImagenPredictResponse = {
+  predictions: Array<{
+    bytesBase64Encoded?: string;
+    mimeType?: string;
+  }>;
+  error?: {
+    code: number;
+    message: string;
+    status: string;
+  };
+};
+
 export class GoogleAiProvider implements AiProvider {
   readonly name = 'google' as const;
   private lastRawResponse: unknown;
@@ -247,13 +271,81 @@ export class GoogleAiProvider implements AiProvider {
       throw new Error('Google AI API key is missing');
     }
 
-    // Use Gemini 2.0 Flash Experimental for image generation
-    // Default model for article_image task
-    const model = this.config.modelMap.article_image ?? 'gemini-2.0-flash-exp';
-
+    const model = this.config.modelMap.article_image ?? 'imagen-4.0-generate-001';
     this.lastRawResponse = undefined;
     this.lastMessageContent = prompt;
 
+    // Determine if this is an Imagen model or Gemini model
+    const isImagenModel = model.startsWith('imagen-');
+
+    if (isImagenModel) {
+      // Use Imagen API (:predict endpoint)
+      return this.generateImageWithImagen(model, prompt, request, apiKey);
+    } else {
+      // Use Gemini API (:generateContent endpoint)
+      return this.generateImageWithGemini(model, prompt, request, apiKey);
+    }
+  }
+
+  private async generateImageWithImagen(
+    model: string,
+    prompt: string,
+    request: GenerateImageRequest,
+    apiKey: string
+  ): Promise<GeneratedImageResult> {
+    const requestBody: ImagenPredictRequest = {
+      instances: [{ prompt }],
+      parameters: {
+        sampleCount: 1
+      }
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Imagen API failed ${response.status}: ${text}`);
+    }
+
+    const result = (await response.json()) as ImagenPredictResponse;
+    this.lastRawResponse = result;
+
+    if (result.error) {
+      throw new Error(`Imagen API error: ${result.error.message} (${result.error.status})`);
+    }
+
+    const prediction = result.predictions?.[0];
+    if (!prediction?.bytesBase64Encoded) {
+      throw new Error('No image data in Imagen response');
+    }
+
+    const buffer = Buffer.from(prediction.bytesBase64Encoded, 'base64');
+    const mimeType = prediction.mimeType ?? 'image/png';
+
+    return {
+      data: buffer,
+      mimeType,
+      source: `google:${model}`,
+      suggestedFileName: request.suggestedFileName ?? 'article-image'
+    };
+  }
+
+  private async generateImageWithGemini(
+    model: string,
+    prompt: string,
+    request: GenerateImageRequest,
+    apiKey: string
+  ): Promise<GeneratedImageResult> {
     const requestBody: GoogleGenerateContentRequest = {
       contents: [
         {
@@ -278,19 +370,19 @@ export class GoogleAiProvider implements AiProvider {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Google AI image generation failed ${response.status}: ${text}`);
+      throw new Error(`Gemini image generation failed ${response.status}: ${text}`);
     }
 
     const result = (await response.json()) as GoogleGenerateContentResponse;
     this.lastRawResponse = result;
 
     if (result.error) {
-      throw new Error(`Google AI API error: ${result.error.message} (${result.error.status})`);
+      throw new Error(`Gemini API error: ${result.error.message} (${result.error.status})`);
     }
 
     const candidate = result.candidates?.[0];
     if (!candidate?.content?.parts) {
-      throw new Error('No content in Google AI image generation response');
+      throw new Error('No content in Gemini image generation response');
     }
 
     // Look for inline image data in parts
@@ -303,7 +395,7 @@ export class GoogleAiProvider implements AiProvider {
     }
 
     if (!imageData) {
-      throw new Error('No image data found in Google AI response. The model may not support image generation.');
+      throw new Error('No image data found in Gemini response. The model may not support image generation.');
     }
 
     const buffer = Buffer.from(imageData.data, 'base64');

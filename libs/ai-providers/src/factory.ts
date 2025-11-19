@@ -16,7 +16,7 @@ const buildModelMap = (overrides?: Partial<AiModelMap>, providerName?: ProviderN
   // Determine default image model based on provider
   let defaultImageModel = 'pollinations/image'; // OpenRouter default
   if (providerName === 'google') {
-    defaultImageModel = 'gemini-2.0-flash-exp';
+    defaultImageModel = 'imagen-4.0-generate-001'; // Imagen 4.0 Standard
   }
 
   return {
