@@ -723,7 +723,16 @@ const DashboardPage = () => {
                                 </label>
                               )}
                               <div>
-                                <strong>{article.title}</strong>
+                                {overview?.web.id ? (
+                                  <Link
+                                    href={`/dashboard/webs/${overview.web.id}/articles/${article.id}`}
+                                    className="article-title-link"
+                                  >
+                                    <strong>{article.title}</strong>
+                                  </Link>
+                                ) : (
+                                  <strong>{article.title}</strong>
+                                )}
                                 <small>{article.status}</small>
                               </div>
                             </div>
@@ -1167,6 +1176,13 @@ const DashboardPage = () => {
           width: 1.1rem;
           height: 1.1rem;
           cursor: pointer;
+        }
+        .article-title-link {
+          color: inherit;
+          text-decoration: none;
+        }
+        .article-title-link:hover strong {
+          text-decoration: underline;
         }
         .batch-actions {
           margin-top: 0.75rem;
