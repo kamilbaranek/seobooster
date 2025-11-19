@@ -229,12 +229,18 @@ const ArticleDetailPage = () => {
     setImageGenerating(true);
     setActionStatus('Spouštím generování obrázku…');
     try {
-      await apiFetch(`/webs/${webId}/articles/${articleId}/images/generate`, {
+      const response = await apiFetch<{ success: boolean; image: ArticleImage }>(`/webs/${webId}/articles/${articleId}/images/generate`, {
         method: 'POST',
         body: JSON.stringify({ force })
       });
+
+      // Add new image to the list immediately
+      if (response.image) {
+        setImages((prev) => [...prev, response.image]);
+        setImagesGenerated((prev) => prev + 1);
+      }
+
       setActionStatus('Obrázek byl zařazen do fronty.');
-      await fetchImages();
     } catch (err) {
       setActionStatus((err as Error).message ?? 'Generování obrázku selhalo.');
     } finally {

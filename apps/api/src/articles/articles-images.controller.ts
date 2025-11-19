@@ -57,7 +57,7 @@ export class ArticlesImagesController {
       throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
     }
 
-    const limit = article.web.subscription?.imageGenerationLimit ?? 1;
+    const limit = article.web.subscription?.imageGenerationLimit ?? 3;
     const generatedCount = article.images.filter((img) => img.status !== 'FAILED').length;
 
     return {
@@ -100,17 +100,31 @@ export class ArticlesImagesController {
       throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
     }
 
-    const limit = article.web.subscription?.imageGenerationLimit ?? 1;
+    const limit = article.web.subscription?.imageGenerationLimit ?? 3;
     if (article.images.length >= limit && !body.force) {
       throw new HttpException(`Image generation limit reached (${limit} images per article)`, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    await this.imageQueue.add('generate-image', {
-      articleId,
-      force: body.force ?? false
+    // Create ArticleImage record with PENDING status
+    const position = article.images.length;
+    const newImage = await this.prisma.articleImage.create({
+      data: {
+        articleId,
+        status: 'PENDING',
+        prompt: '', // Will be set by worker
+        position,
+        isFeatured: article.images.length === 0 // First image is featured
+      }
     });
 
-    return { success: true, message: 'Image generation queued' };
+    // Queue the generation job
+    await this.imageQueue.add('generate-image', {
+      articleId,
+      force: body.force ?? false,
+      imageId: newImage.id
+    });
+
+    return { success: true, image: newImage };
   }
 
   // PATCH /api/webs/:webId/articles/:articleId/images/:imageId/featured

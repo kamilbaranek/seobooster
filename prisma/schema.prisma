@@ -82,7 +82,7 @@ model Subscription {
   stripeSubscriptionId  String             @unique
   status                SubscriptionStatus
   currentPeriodEnd      DateTime?
-  imageGenerationLimit  Int                @default(1)
+  imageGenerationLimit  Int                @default(3)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 

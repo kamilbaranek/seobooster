@@ -1307,26 +1307,28 @@ const bootstrap = async () => {
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
 
-    // Create ArticleImage record with PENDING status
-    const position = await prisma.articleImage.count({
-      where: { articleId: article.id }
+    // Get or update ArticleImage record
+    let articleImage = await prisma.articleImage.findUnique({
+      where: { id: job.data.imageId }
     });
 
-    const articleImage = await prisma.articleImage.create({
+    if (!articleImage) {
+      throw new Error(`ArticleImage not found: ${job.data.imageId}`);
+    }
+
+    // Update with prompt, provider, model
+    articleImage = await prisma.articleImage.update({
+      where: { id: articleImage.id },
       data: {
-        articleId: article.id,
-        status: 'PENDING',
         prompt: renderedPrompts.userPrompt,
         provider: providerName,
-        model: modelName,
-        position,
-        isFeatured: existingImagesCount === 0 // First image is featured
+        model: modelName
       }
     });
 
     logger.info(
       { jobId: job.id, articleId: article.id, imageId: articleImage.id, isFeatured: articleImage.isFeatured },
-      'ArticleImage record created with PENDING status'
+      'ArticleImage record updated with generation details'
     );
 
     let imageResult;

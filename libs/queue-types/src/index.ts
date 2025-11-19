@@ -49,6 +49,7 @@ export type GenerateHomepageScreenshotJob = {
 
 export type GenerateArticleImageJob = {
   articleId: string;
+  imageId: string;
   force?: boolean;
   publishOptions?: {
     targetStatus: 'draft' | 'publish';
