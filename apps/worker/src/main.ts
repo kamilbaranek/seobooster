@@ -243,10 +243,11 @@ const screenshotQueue = new Queue(GENERATE_SCREENSHOT_QUEUE, { connection: redis
 const articleImageQueue = new Queue(GENERATE_ARTICLE_IMAGE_QUEUE, { connection: redisConnection });
 
 const emailService = new EmailService({
-  apiKey: process.env.MAILGUN_API_KEY ?? '',
-  domain: process.env.MAILGUN_DOMAIN ?? '',
-  host: process.env.MAILGUN_HOST,
-  fromEmail: process.env.MAILGUN_FROM_EMAIL ?? `noreply@${process.env.MAILGUN_DOMAIN ?? 'example.com'}`
+  apiKey: process.env.MAILGUN_API_KEY || '',
+  domain: process.env.MAILGUN_DOMAIN || '',
+  host: process.env.MAILGUN_HOST || 'api.eu.mailgun.net',
+  fromEmail: process.env.MAILGUN_FROM_EMAIL || `noreply@${process.env.MAILGUN_DOMAIN || 'example.com'}`,
+  fromName: 'Budliki budliki'
 });
 
 logger.info({
@@ -1705,9 +1706,21 @@ const bootstrap = async () => {
           links.edit = `${adminBase}/post.php?post=${response.id}&action=edit`;
         }
 
+        // Extract excerpt (first paragraph or first 200 chars)
+        let excerpt = '';
+        if (article.markdown) {
+          // Simple regex to find first paragraph
+          const match = article.markdown.match(/^(?!#)(.+)$/m);
+          if (match) {
+            excerpt = match[1].substring(0, 300) + (match[1].length > 300 ? '...' : '');
+          } else {
+            excerpt = article.markdown.substring(0, 300) + '...';
+          }
+        }
+
         const emailContent = getArticleGeneratedEmail(
           article.title,
-          article.featuredImageUrl, // Now we have the image URL
+          excerpt,
           targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT',
           links
         );

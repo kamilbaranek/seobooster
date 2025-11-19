@@ -1,6 +1,6 @@
 export const getArticleGeneratedEmail = (
   articleTitle: string,
-  articleImageUrl: string | null,
+  articleExcerpt: string,
   status: 'DRAFT' | 'PUBLISHED',
   links: {
     view?: string;
@@ -9,10 +9,6 @@ export const getArticleGeneratedEmail = (
     feedback: string;
   }
 ) => {
-  const imageHtml = articleImageUrl
-    ? `<div style="margin-bottom: 20px;"><img src="${articleImageUrl}" alt="${articleTitle}" style="max-width: 100%; border-radius: 5px;" /></div>`
-    : '';
-
   let ctaHtml = '';
   if (status === 'PUBLISHED') {
     ctaHtml = `
@@ -35,7 +31,9 @@ export const getArticleGeneratedEmail = (
       <h2>Your Article is Ready!</h2>
       <p>We have generated a new article for you: <strong>${articleTitle}</strong></p>
       
-      ${imageHtml}
+      <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0070f3; margin: 20px 0; font-style: italic; color: #555;">
+        ${articleExcerpt}
+      </div>
       
       ${ctaHtml}
 

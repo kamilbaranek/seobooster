@@ -8,6 +8,7 @@ export interface EmailConfig {
     domain: string;
     host?: string; // e.g. 'api.eu.mailgun.net'
     fromEmail: string;
+    fromName?: string;
 }
 
 export interface SendEmailOptions {
@@ -21,6 +22,7 @@ export class EmailService {
     private client: ReturnType<Mailgun['client']>;
     private domain: string;
     private fromEmail: string;
+    private fromName?: string;
 
     constructor(config: EmailConfig) {
         const mailgun = new Mailgun(FormData);
@@ -31,12 +33,14 @@ export class EmailService {
         });
         this.domain = config.domain.trim();
         this.fromEmail = config.fromEmail.trim();
+        this.fromName = config.fromName?.trim();
     }
 
     async sendEmail(options: SendEmailOptions): Promise<any> {
         try {
+            const from = this.fromName ? `${this.fromName} <${this.fromEmail}>` : this.fromEmail;
             return await this.client.messages.create(this.domain, {
-                from: this.fromEmail,
+                from,
                 to: options.to,
                 subject: options.subject,
                 html: options.html,
