@@ -32,7 +32,15 @@ const bootstrap = async () => {
       projectRoot,
       process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
     );
-    app.use('/assets', express.static(assetPath, { index: false, maxAge: '1d' }));
+    app.use(
+      '/assets',
+      (req: express.Request, res: express.Response, next: express.NextFunction) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET');
+        next();
+      },
+      express.static(assetPath, { index: false, maxAge: '1d' })
+    );
   }
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
