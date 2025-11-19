@@ -9,8 +9,17 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 
-const projectRoot = resolve(__dirname, '../../..');
+const resolveProjectRoot = () => {
+  if (process.env.PROJECT_ROOT) {
+    return process.env.PROJECT_ROOT;
+  }
+  // Fallback: assume we are in dist/apps/api/src/main.js
+  return resolve(__dirname, '../../../..');
+};
+
+const projectRoot = resolveProjectRoot();
 process.env.PROJECT_ROOT = projectRoot;
+console.log(`API starting with PROJECT_ROOT: ${projectRoot}`);
 
 ['.env', '.env.local'].forEach((envFile, index) => {
   const fullPath = resolve(projectRoot, envFile);
@@ -32,6 +41,7 @@ const bootstrap = async () => {
       projectRoot,
       process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
     );
+    console.log(`Serving static assets from: ${assetPath}`);
     app.use(
       '/api/assets',
       (req: express.Request, res: express.Response, next: express.NextFunction) => {
