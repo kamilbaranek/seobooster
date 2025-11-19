@@ -40,6 +40,7 @@ process.env.PROJECT_ROOT = projectRoot;
   }
 });
 import { Queue, QueueEvents, Worker } from 'bullmq';
+import { fetch } from 'undici';
 import { ArticlePlanStatus, AssetStatus, IntegrationType, Prisma, PrismaClient } from '@prisma/client';
 import {
   ANALYZE_BUSINESS_QUEUE,
@@ -73,7 +74,8 @@ import {
   updatePost,
   WordpressClientError,
   fetchTags,
-  createTag
+  createTag,
+  uploadMedia
 } from '@seobooster/wp-client';
 import type {
   WordpressPublishMode,
@@ -456,6 +458,72 @@ const getImageExtensionFromMime = (mimeType?: string | null) => {
 
 const buildArticleImagePath = (articleId: string, extension: string) =>
   `article-images/${articleId}/featured-${Date.now()}.${extension}`;
+
+const getMimeTypeFromExtension = (extension?: string) => {
+  const normalized = (extension ?? '').toLowerCase();
+  if (normalized === 'jpg' || normalized === 'jpeg') {
+    return 'image/jpeg';
+  }
+  if (normalized === 'webp') {
+    return 'image/webp';
+  }
+  return 'image/png';
+};
+
+type DownloadedImage = {
+  buffer: Buffer;
+  mimeType: string;
+  filename: string;
+};
+
+const downloadFeaturedImageBinary = async (
+  publicUrl: string | null | undefined,
+  localPath: string | null
+): Promise<DownloadedImage | null> => {
+  if (!publicUrl) {
+    return null;
+  }
+
+  if (localPath) {
+    try {
+      const buffer = await assetStorage.getFile(localPath);
+      const filename = localPath.split('/').pop() ?? 'featured-image.png';
+      const ext = filename.includes('.') ? filename.split('.').pop() ?? 'png' : 'png';
+      return {
+        buffer,
+        mimeType: getMimeTypeFromExtension(ext),
+        filename
+      };
+    } catch (error) {
+      logger.warn(
+        { localPath, error: formatUnknownError(error) },
+        'Failed to read featured image from asset storage'
+      );
+    }
+  }
+
+  try {
+    const response = await fetch(publicUrl);
+    if (!response.ok) {
+      throw new Error(`Image download responded with status ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const filenameFromUrl = publicUrl.split('/').pop()?.split('?')[0] ?? 'featured-image';
+    const ext = filenameFromUrl.includes('.') ? filenameFromUrl.split('.').pop() ?? 'png' : 'png';
+    const mimeType = response.headers.get('content-type') ?? getMimeTypeFromExtension(ext);
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      mimeType,
+      filename: filenameFromUrl
+    };
+  } catch (error) {
+    logger.warn(
+      { url: publicUrl, error: formatUnknownError(error) },
+      'Failed to download featured image over HTTP'
+    );
+    return null;
+  }
+};
 
 const persistSeoStrategyArtifacts = async (
   webId: string,
@@ -1312,6 +1380,41 @@ const bootstrap = async () => {
       const authorRemoteId =
         article.wordpressAuthor?.remoteId ?? article.web.defaultWordpressAuthor?.remoteId ?? undefined;
 
+      let featuredMediaId: number | undefined;
+      let featuredMediaSourceUrl: string | undefined;
+      const localFeaturedImagePath = storagePathFromPublicUrl(article.featuredImageUrl);
+      if (localFeaturedImagePath) {
+        const downloaded = await downloadFeaturedImageBinary(
+          article.featuredImageUrl,
+          localFeaturedImagePath
+        );
+        if (downloaded) {
+          try {
+            const media = await uploadMedia(credentials, downloaded.buffer, {
+              filename: downloaded.filename,
+              mimeType: downloaded.mimeType,
+              title: article.title,
+              altText: article.title
+            });
+            featuredMediaId = media.id;
+            featuredMediaSourceUrl = media.source_url;
+            try {
+              await assetStorage.deleteFile(localFeaturedImagePath);
+            } catch (deleteError) {
+              logger.warn(
+                { jobId: job.id, articleId, localFeaturedImagePath, error: formatUnknownError(deleteError) },
+                'Failed to delete local featured image after upload'
+              );
+            }
+          } catch (uploadError) {
+            logger.warn(
+              { jobId: job.id, articleId, error: formatUnknownError(uploadError) },
+              'Failed to upload featured image to WordPress'
+            );
+          }
+        }
+      }
+
       // Resolve tags from article or SEO keywords
       const resolveArticleTags = (): string[] => {
         const explicit = jsonArrayToStringArray(article.tags as unknown as Prisma.JsonValue);
@@ -1375,6 +1478,9 @@ const bootstrap = async () => {
         categories,
         tags: tagIds
       };
+      if (featuredMediaId) {
+        payload.featured_media = featuredMediaId;
+      }
 
       let response: WordpressPostResponse;
       try {
@@ -1401,6 +1507,9 @@ const bootstrap = async () => {
         status: targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT',
         wordpressPostId: String(response.id)
       };
+      if (featuredMediaSourceUrl) {
+        updateData.featuredImageUrl = featuredMediaSourceUrl;
+      }
 
       if (targetStatus === 'publish') {
         updateData.publishedAt = new Date();

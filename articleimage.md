@@ -311,7 +311,7 @@ interface WordpressMediaResponse {
 
 **Cíl:** Pokud má článek lokální `featuredImageUrl`, publish worker jej před odesláním na WP nahraje jako media, přiřadí jako featured image a v DB nahradí URL za WP URL.
 
-- [ ] 3.1 Implementuj `uploadMedia` v `@seobooster/wp-client`
+- [x] 3.1 Implementuj `uploadMedia` v `@seobooster/wp-client`
   - **Co:** Přidat funkci, která:
     - vezme `credentials`, binární obsah obrázku a metadata (`filename`, `mimeType`, `title`),
     - zavolá `wp-json/wp/v2/media` (POST multipart nebo vhodný formát),
@@ -322,14 +322,14 @@ interface WordpressMediaResponse {
     - ošetři chyby pomocí `WordpressClientError` (stejný styl jako posts),
     - build: `npm run build --workspace @seobooster/wp-client`.
 
-- [ ] 3.2 Rozšíř payload o `featured_media`
+- [x] 3.2 Rozšíř payload o `featured_media`
   - **Co:** V `WordpressPostPayload` přidej nepovinné pole `featured_media?: number`.
   - **Proč:** WordPress očekává ID média jako číslo, které se použije jako featured image.
   - **Jak:**
     - aktualizuj typ v `libs/wp-client/src/index.ts`,
     - ověř, že to nenaruší existující volání create/update post (pole je volitelné).
 
-- [ ] 3.3 Napoj upload do publish workeru
+- [x] 3.3 Napoj upload do publish workeru
   - **Co:** V `publish-article` workeru:
     - pokud `article.featuredImageUrl` vypadá jako lokální asset (např. začíná na naší `ASSET_PUBLIC_BASE_URL`),
       - načti binární obsah ze storage,
@@ -341,7 +341,7 @@ interface WordpressMediaResponse {
     - zachovej stávající log flow (WordpressClientError, další chyby),
     - pokud upload selže, loguj a pokračuj bez `featured_media`.
 
-- [ ] 3.4 Po publish přepiš URL a smaž lokální soubor
+- [x] 3.4 Po publish přepiš URL a smaž lokální soubor
   - **Co:** Po úspěšném publish:
     - vezmi `source_url` z `WordpressMediaResponse`,
     - aktualizuj `Article.featuredImageUrl` na WP URL,
