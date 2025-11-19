@@ -1400,16 +1400,28 @@ const bootstrap = async () => {
     const storagePath = buildArticleImagePath(article.webId, article.id, articleImage.id);
     const publicUrl = await assetStorage.saveFile(storagePath, imageBuffer, mimeType);
 
-    await prisma.article.update({
-      where: { id: article.id },
+    // Update ArticleImage to SUCCESS status with imageUrl
+    await prisma.articleImage.update({
+      where: { id: articleImage.id },
       data: {
-        featuredImageUrl: publicUrl
+        status: 'SUCCESS',
+        imageUrl: publicUrl
       }
     });
 
+    // Update Article.featuredImageUrl only if this image is featured
+    if (articleImage.isFeatured) {
+      await prisma.article.update({
+        where: { id: article.id },
+        data: {
+          featuredImageUrl: publicUrl
+        }
+      });
+    }
+
     logger.info(
-      { jobId: job.id, articleId: article.id, publicUrl },
-      'Article featured image stored'
+      { jobId: job.id, articleId: article.id, imageId: articleImage.id, publicUrl, isFeatured: articleImage.isFeatured },
+      'Article image stored'
     );
 
     if (job.data.publishOptions) {
