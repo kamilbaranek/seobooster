@@ -245,7 +245,7 @@ const articleImageQueue = new Queue(GENERATE_ARTICLE_IMAGE_QUEUE, { connection: 
 const emailService = new EmailService({
   apiKey: process.env.MAILGUN_API_KEY || '',
   domain: process.env.MAILGUN_DOMAIN || '',
-  host: process.env.MAILGUN_HOST || 'api.eu.mailgun.net',
+  host: process.env.MAILGUN_HOST,
   fromEmail: process.env.MAILGUN_FROM_EMAIL || `noreply@${process.env.MAILGUN_DOMAIN || 'example.com'}`,
   fromName: 'Budliki budliki'
 });
