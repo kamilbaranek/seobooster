@@ -39,13 +39,4 @@ export class ArticlesController {
     return this.articlesService.updateArticleMetadata(user.userId, webId, articleId, dto);
   }
 
-  @Post(':articleId/image')
-  generateImage(
-    @CurrentUser() user: AuthenticatedUserPayload,
-    @Param('webId') webId: string,
-    @Param('articleId') articleId: string,
-    @Query('force') force?: string
-  ) {
-    return this.articlesService.enqueueArticleImage(user.userId, webId, articleId, force === 'true');
-  }
 }
