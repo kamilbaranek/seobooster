@@ -27,6 +27,6 @@ import {
     )
   ],
   providers: [JobQueueService, AssetRefreshService],
-  exports: [JobQueueService]
+  exports: [JobQueueService, BullModule]
 })
-export class QueuesModule {}
+export class QueuesModule { }
