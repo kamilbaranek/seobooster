@@ -26,11 +26,11 @@ export class EmailService {
         const mailgun = new Mailgun(FormData);
         this.client = mailgun.client({
             username: 'api',
-            key: config.apiKey,
-            url: config.host ? `https://${config.host}` : undefined
+            key: config.apiKey.trim(),
+            url: config.host ? `https://${config.host.trim()}` : undefined
         });
-        this.domain = config.domain;
-        this.fromEmail = config.fromEmail;
+        this.domain = config.domain.trim();
+        this.fromEmail = config.fromEmail.trim();
     }
 
     async sendEmail(options: SendEmailOptions): Promise<any> {
