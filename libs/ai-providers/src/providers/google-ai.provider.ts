@@ -79,7 +79,7 @@ export class GoogleAiProvider implements AiProvider {
   private lastRawResponse: unknown;
   private lastMessageContent: string | undefined;
 
-  constructor(private readonly config: GoogleAiProviderConfig) {}
+  constructor(private readonly config: GoogleAiProviderConfig) { }
 
   getLastRawResponse(): unknown {
     return this.lastRawResponse;
@@ -165,7 +165,12 @@ export class GoogleAiProvider implements AiProvider {
 
     if (forceJsonResponse) {
       try {
-        return JSON.parse(text) as T;
+        let cleanText = text.trim();
+        // Strip markdown code blocks if present
+        if (cleanText.startsWith('```')) {
+          cleanText = cleanText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        }
+        return JSON.parse(cleanText) as T;
       } catch (error) {
         throw new Error(`Failed to parse JSON response from Google AI: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }

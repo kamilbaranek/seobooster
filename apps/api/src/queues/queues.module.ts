@@ -19,7 +19,16 @@ import {
       { name: SCAN_WEBSITE_QUEUE },
       { name: ANALYZE_BUSINESS_QUEUE },
       { name: CREATE_SEO_STRATEGY_QUEUE },
-      { name: GENERATE_ARTICLE_QUEUE },
+      {
+        name: GENERATE_ARTICLE_QUEUE,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 1000
+          }
+        }
+      },
       { name: GENERATE_ARTICLE_IMAGE_QUEUE },
       { name: PUBLISH_ARTICLE_QUEUE },
       { name: FETCH_FAVICON_QUEUE },
