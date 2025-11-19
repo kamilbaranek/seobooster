@@ -44,6 +44,7 @@ interface OverviewResponse {
     integrationType: string;
     hasWordpressCredentials: boolean;
     autoPublishMode?: WordpressPublishMode | null;
+    articleImageGenerationEnabled: boolean;
   };
   analysis: {
     lastScanAt: string | null;
@@ -157,6 +158,8 @@ const DashboardPage = () => {
   const [wordpressLoading, setWordpressLoading] = useState(false);
   const [wordpressSaving, setWordpressSaving] = useState(false);
   const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
+  const [articleImageEnabled, setArticleImageEnabled] = useState(true);
+  const [articleImageSaving, setArticleImageSaving] = useState(false);
 
   const debugMode = process.env.NEXT_PUBLIC_DEBUG_PIPELINE === 'true';
   const isSuperadmin = profile?.user.role === 'SUPERADMIN';
@@ -212,6 +215,13 @@ const DashboardPage = () => {
   useEffect(() => {
     setSelectedArticleIds([]);
   }, [selectedWebId]);
+
+  useEffect(() => {
+    if (!overview?.web) {
+      return;
+    }
+    setArticleImageEnabled(overview.web.articleImageGenerationEnabled);
+  }, [overview]);
 
   const loadWordpressSettings = useCallback(async () => {
     if (!selectedWebId) {
@@ -341,6 +351,24 @@ const DashboardPage = () => {
       setWordpressMessage('Nepodařilo se uložit WordPress nastavení.');
     } finally {
       setWordpressSaving(false);
+    }
+  };
+
+  const handleToggleArticleImages = async () => {
+    if (!selectedWebId) return;
+    setArticleImageSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/webs/${selectedWebId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ articleImageGenerationEnabled: !articleImageEnabled })
+      });
+      setArticleImageEnabled((prev) => !prev);
+      await loadOverview(selectedWebId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nepodařilo se upravit nastavení obrázků.');
+    } finally {
+      setArticleImageSaving(false);
     }
   };
 
@@ -687,6 +715,18 @@ const DashboardPage = () => {
                       </select>
                     </label>
                   </div>
+                  <div className="wordpress-toggle">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={articleImageEnabled}
+                        onChange={handleToggleArticleImages}
+                        disabled={articleImageSaving || !selectedWebId}
+                      />
+                      Automaticky generovat obrázky k novým článkům
+                    </label>
+                    {articleImageSaving && <span className="muted">Ukládám…</span>}
+                  </div>
                   <div className="wordpress-actions">
                     <button
                       type="submit"
@@ -970,6 +1010,17 @@ const DashboardPage = () => {
           gap: 0.35rem;
           font-size: 0.85rem;
           color: #cbd5f5;
+        }
+        .wordpress-toggle {
+          margin: 0.5rem 0 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          color: #cbd5f5;
+        }
+        .wordpress-toggle input {
+          width: 1rem;
+          height: 1rem;
         }
         .wordpress-form input,
         .wordpress-form select {

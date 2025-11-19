@@ -1,4 +1,5 @@
 import { fetch } from 'undici';
+import { Buffer } from 'node:buffer';
 import {
   AiModelMap,
   AiProvider,
@@ -6,6 +7,9 @@ import {
   ArticleDraft,
   BusinessProfile,
   GenerateArticleOptions,
+  GenerateImageRequest,
+  GenerateImageSize,
+  GeneratedImageResult,
   ScanResult,
   SeoStrategy,
   AiTaskType,
@@ -306,5 +310,55 @@ export class OpenRouterProvider implements AiProvider {
 
     const forceJsonResponse = overrides?.forceJsonResponse !== false;
     return this.requestJson<ArticleDraft>('article', systemPrompt, userPrompt, forceJsonResponse, fallback);
+  }
+
+  async generateImage(
+    request: GenerateImageRequest,
+    overrides?: PromptOverrides<'article_image'>
+  ): Promise<GeneratedImageResult> {
+    const prompt = (overrides?.userPrompt ?? request.prompt ?? '').trim();
+    if (!prompt) {
+      throw new Error('Image prompt is empty');
+    }
+
+    const dimensions = this.resolveImageDimensions(request.size);
+    const baseEndpoint = process.env.IMAGE_GENERATOR_BASE_URL ?? 'https://image.pollinations.ai/prompt/';
+    const normalizedBase = baseEndpoint.endsWith('/') ? baseEndpoint : `${baseEndpoint}/`;
+    const url = new URL(`${normalizedBase}${encodeURIComponent(prompt)}`);
+    url.searchParams.set('width', String(dimensions.width));
+    url.searchParams.set('height', String(dimensions.height));
+
+    this.lastRawResponse = undefined;
+    this.lastMessageContent = prompt;
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Image generator responded ${response.status}: ${text}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const mimeType = response.headers.get('content-type') ?? 'image/jpeg';
+    const buffer = Buffer.from(arrayBuffer);
+    this.lastRawResponse = { source: url.toString(), bytes: buffer.length };
+
+    return {
+      data: buffer,
+      mimeType,
+      source: url.toString(),
+      suggestedFileName: request.suggestedFileName ?? 'article-image'
+    };
+  }
+
+  private resolveImageDimensions(size?: GenerateImageSize): { width: number; height: number } {
+    switch (size) {
+      case 'landscape':
+        return { width: 1280, height: 720 };
+      case 'portrait':
+        return { width: 768, height: 1024 };
+      case 'square':
+      default:
+        return { width: 1024, height: 1024 };
+    }
   }
 }

@@ -30,7 +30,13 @@ export const DEFAULT_PROMPTS: PromptTemplates = {
       'You write high quality SEO articles. Always return a single JSON object with ArticleDraft fields (title, outline, bodyMarkdown, keywords, callToAction). Do not use markdown fences.',
     userPrompt:
       'Business context:\n{{business}}\n\nTopic cluster (pillar, intent, funnel stage, pillar keywords):\n{{topicCluster}}\n\nSupporting article brief (title, keywords, intent, funnel stage, meta description):\n{{supportingArticle}}\n\nWebsite info: {{web}}\nPrimary audience: {{webAudience}}\nWebsite owner: {{webOwner}}\n\nUsing this structured context, write an ArticleDraft JSON. Keep tone professional, reflect the declared funnel stage, weave in the supporting article keywords naturally, and end with a relevant call to action.'
+  },
+  article_image: {
+    systemPrompt:
+      'You are an art director generating concise prompts for photorealistic marketing imagery. Describe concrete visual details (subject, setting, lighting, mood, color palette) in under 400 characters. Do not mention camera brands or render engines unless provided. Output only the final prompt text.',
+    userPrompt:
+      'Business: {{business}}\nArticle title: {{article.title}}\nArticle summary: {{article.summary}}\nTarget audience: {{business.targetAudience}}\nSEO keywords: {{article.keywords}}\nWebsite branding cues: {{web}}\n\nCreate a single vivid text-to-image prompt for a featured blog illustration matching the article.'
   }
 };
 
-export const AI_TASKS: AiTaskType[] = ['scan', 'analyze', 'strategy', 'article'];
+export const AI_TASKS: AiTaskType[] = ['scan', 'analyze', 'strategy', 'article', 'article_image'];

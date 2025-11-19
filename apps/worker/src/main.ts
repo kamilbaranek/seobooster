@@ -40,6 +40,7 @@ process.env.PROJECT_ROOT = projectRoot;
   }
 });
 import { Queue, QueueEvents, Worker } from 'bullmq';
+import { fetch } from 'undici';
 import { ArticlePlanStatus, AssetStatus, IntegrationType, Prisma, PrismaClient } from '@prisma/client';
 import {
   ANALYZE_BUSINESS_QUEUE,
@@ -47,6 +48,7 @@ import {
   FETCH_FAVICON_QUEUE,
   GENERATE_ARTICLE_QUEUE,
   GENERATE_SCREENSHOT_QUEUE,
+  GENERATE_ARTICLE_IMAGE_QUEUE,
   PUBLISH_ARTICLE_QUEUE,
   SCAN_WEBSITE_QUEUE,
   AnalyzeBusinessJob,
@@ -54,6 +56,7 @@ import {
   FetchFaviconJob,
   GenerateArticleJob,
   GenerateHomepageScreenshotJob,
+  GenerateArticleImageJob,
   PublishArticleJob,
   ScanWebsiteJob
 } from '@seobooster/queue-types';
@@ -71,7 +74,8 @@ import {
   updatePost,
   WordpressClientError,
   fetchTags,
-  createTag
+  createTag,
+  uploadMedia
 } from '@seobooster/wp-client';
 import type {
   WordpressPublishMode,
@@ -127,6 +131,21 @@ const resolveAssetStorage = () => {
 };
 
 const assetStorage = resolveAssetStorage();
+const assetPublicBaseUrl = (process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/assets').replace(
+  /\/$/,
+  ''
+);
+
+const storagePathFromPublicUrl = (url?: string | null) => {
+  if (!url) {
+    return null;
+  }
+  const normalized = url.replace(/\/$/, '');
+  if (normalized.startsWith(`${assetPublicBaseUrl}/`)) {
+    return normalized.slice(assetPublicBaseUrl.length + 1);
+  }
+  return null;
+};
 
 const resolveEncryptionKey = () => {
   const envKey = process.env.ENCRYPTION_KEY;
@@ -219,6 +238,7 @@ const generateQueue = new Queue(GENERATE_ARTICLE_QUEUE, { connection: redisConne
 const publishQueue = new Queue(PUBLISH_ARTICLE_QUEUE, { connection: redisConnection });
 const faviconQueue = new Queue(FETCH_FAVICON_QUEUE, { connection: redisConnection });
 const screenshotQueue = new Queue(GENERATE_SCREENSHOT_QUEUE, { connection: redisConnection });
+const articleImageQueue = new Queue(GENERATE_ARTICLE_IMAGE_QUEUE, { connection: redisConnection });
 
 let redisLimitExceeded = false;
 
@@ -415,6 +435,102 @@ const jsonArrayToStringArray = (value: Prisma.JsonValue | null | undefined) => {
   return value.map((item) => (typeof item === 'string' ? item : String(item)));
 };
 
+const toBuffer = (input: ArrayBuffer | Uint8Array | Buffer): Buffer => {
+  if (Buffer.isBuffer(input)) {
+    return input;
+  }
+  if (input instanceof ArrayBuffer) {
+    return Buffer.from(input);
+  }
+  return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+};
+
+const getImageExtensionFromMime = (mimeType?: string | null) => {
+  const normalized = mimeType?.toLowerCase() ?? '';
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) {
+    return 'jpg';
+  }
+  if (normalized.includes('webp')) {
+    return 'webp';
+  }
+  return 'png';
+};
+
+const buildArticleImagePath = (articleId: string, extension: string) =>
+  `article-images/${articleId}/featured-${Date.now()}.${extension}`;
+
+const getMimeTypeFromExtension = (extension?: string) => {
+  const normalized = (extension ?? '').toLowerCase();
+  if (normalized === 'jpg' || normalized === 'jpeg') {
+    return 'image/jpeg';
+  }
+  if (normalized === 'webp') {
+    return 'image/webp';
+  }
+  return 'image/png';
+};
+
+type DownloadedImage = {
+  buffer: Buffer;
+  mimeType: string;
+  filename: string;
+};
+
+const downloadFeaturedImageBinary = async (
+  publicUrl: string | null | undefined,
+  localPath: string | null
+): Promise<DownloadedImage | null> => {
+  if (!publicUrl) {
+    return null;
+  }
+
+  if (localPath) {
+    try {
+      const buffer = await assetStorage.getFile(localPath);
+      const filename = localPath.split('/').pop() ?? 'featured-image.png';
+      const ext = filename.includes('.') ? filename.split('.').pop() ?? 'png' : 'png';
+      return {
+        buffer,
+        mimeType: getMimeTypeFromExtension(ext),
+        filename
+      };
+    } catch (error) {
+      logger.warn(
+        { localPath, error: formatUnknownError(error) },
+        'Failed to read featured image from asset storage'
+      );
+    }
+  }
+
+  try {
+    const response = await fetch(publicUrl);
+    if (!response.ok) {
+      throw new Error(`Image download responded with status ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const filenameFromUrl = publicUrl.split('/').pop()?.split('?')[0] ?? 'featured-image';
+    const ext = filenameFromUrl.includes('.') ? filenameFromUrl.split('.').pop() ?? 'png' : 'png';
+    const mimeType = response.headers.get('content-type') ?? getMimeTypeFromExtension(ext);
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      mimeType,
+      filename: filenameFromUrl
+    };
+  } catch (error) {
+    logger.warn(
+      { url: publicUrl, error: formatUnknownError(error) },
+      'Failed to download featured image over HTTP'
+    );
+    return null;
+  }
+};
+
+const buildArticleImageJobOptions = (articleId: string, force?: boolean) => ({
+  jobId: force ? `article-image-${articleId}-${Date.now()}` : `article-image-${articleId}`,
+  removeOnComplete: true,
+  removeOnFail: true
+});
+
 const persistSeoStrategyArtifacts = async (
   webId: string,
   strategy: SeoStrategy,
@@ -601,6 +717,7 @@ const bootstrap = async () => {
     registerQueueEvents(ANALYZE_BUSINESS_QUEUE),
     registerQueueEvents(CREATE_SEO_STRATEGY_QUEUE),
     registerQueueEvents(GENERATE_ARTICLE_QUEUE),
+    registerQueueEvents(GENERATE_ARTICLE_IMAGE_QUEUE),
     registerQueueEvents(PUBLISH_ARTICLE_QUEUE),
     registerQueueEvents(FETCH_FAVICON_QUEUE),
     registerQueueEvents(GENERATE_SCREENSHOT_QUEUE)
@@ -1058,7 +1175,173 @@ const bootstrap = async () => {
       }
     }
 
+    if (plan.web.articleImageGenerationEnabled !== false) {
+      await articleImageQueue.add(
+        'GenerateArticleImage',
+        {
+          articleId: article.id,
+          force: false
+        },
+        buildArticleImageJobOptions(article.id)
+      );
+    } else {
+      logger.info(
+        { jobId: job.id, articleId: article.id, webId: plan.webId },
+        'Skipping article image generation because it is disabled for this web'
+      );
+    }
+
     logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
+  });
+
+  createWorker<GenerateArticleImageJob>(GENERATE_ARTICLE_IMAGE_QUEUE, async (job) => {
+    const article = await prisma.article.findUnique({
+      where: { id: job.data.articleId },
+      include: {
+        web: {
+          include: {
+            analysis: true,
+            user: true
+          }
+        },
+        plan: {
+          include: {
+            supportingArticle: true,
+            cluster: true,
+            strategy: true
+          }
+        }
+      }
+    });
+
+    if (!article) {
+      logger.warn({ jobId: job.id, articleId: job.data.articleId }, 'Article not found for image generation');
+      return;
+    }
+
+    if (article.web.articleImageGenerationEnabled === false && !job.data.force) {
+      logger.info(
+        { jobId: job.id, articleId: article.id, webId: article.webId },
+        'Article image generation disabled; skipping job'
+      );
+      return;
+    }
+
+    if (article.featuredImageUrl && !job.data.force) {
+      logger.info(
+        { jobId: job.id, articleId: article.id },
+        'Article already has featured image; skipping generation'
+      );
+      return;
+    }
+
+    const businessProfile = article.web.analysis?.businessProfile as BusinessProfile | null;
+    const supportingKeywords = article.plan?.supportingArticle
+      ? jsonArrayToStringArray(article.plan.supportingArticle.keywords as Prisma.JsonValue)
+      : [];
+    const articleTags = jsonArrayToStringArray(article.tags as Prisma.JsonValue);
+    const articleKeywords = articleTags.length > 0 ? articleTags : supportingKeywords;
+    const articleSummary = article.markdown.replace(/\s+/g, ' ').trim().slice(0, 500);
+
+    const promptVariables = {
+      business: {
+        name: businessProfile?.name ?? article.web.nickname ?? article.web.url,
+        description: businessProfile?.mission ?? null,
+        targetAudience: businessProfile?.audience ?? []
+      },
+      web: {
+        url: article.web.url,
+        nickname: article.web.nickname ?? article.web.url
+      },
+      article: {
+        title: article.title,
+        summary: articleSummary,
+        keywords: articleKeywords
+      },
+      supportingArticle: article.plan?.supportingArticle ?? null,
+      seoCluster: article.plan?.cluster ?? null
+    };
+
+    const prompts = await prisma.aiPromptConfig.findUnique({
+      where: { task: 'article_image' }
+    });
+    const renderedPrompts = renderPromptsForTask('article_image', prompts, promptVariables);
+    if (!renderedPrompts.userPrompt) {
+      throw new Error('Article image prompt template produced an empty user prompt');
+    }
+    const providerSelection = resolveProviderForTask('article_image', prompts);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
+
+    let imageResult;
+    try {
+      imageResult = await providerForCall.generateImage(
+        {
+          prompt: renderedPrompts.userPrompt,
+          size: 'landscape',
+          suggestedFileName: `${article.id}-featured`
+        },
+        {
+          task: 'article_image',
+          systemPrompt: renderedPrompts.systemPrompt,
+          userPrompt: renderedPrompts.userPrompt,
+          variables: promptVariables
+        }
+      );
+      const rawResponse =
+        typeof providerForCall.getLastRawResponse === 'function'
+          ? providerForCall.getLastRawResponse()
+          : undefined;
+      await recordAiCall({
+        webId: article.webId,
+        task: 'article_image',
+        provider: providerName,
+        model: modelName,
+        variables: promptVariables,
+        systemPrompt: renderedPrompts.systemPrompt ?? '',
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: rawResponse ?? { source: imageResult.source },
+        responseParsed: { source: imageResult.source },
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      const rawResponse =
+        typeof providerForCall.getLastRawResponse === 'function'
+          ? providerForCall.getLastRawResponse()
+          : undefined;
+      await recordAiCall({
+        webId: article.webId,
+        task: 'article_image',
+        provider: providerName,
+        model: modelName,
+        variables: promptVariables,
+        systemPrompt: renderedPrompts.systemPrompt ?? '',
+        userPrompt: renderedPrompts.userPrompt,
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : undefined),
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+
+    const imageBuffer = toBuffer(imageResult.data);
+    const mimeType = imageResult.mimeType || 'image/png';
+    const extension = getImageExtensionFromMime(mimeType);
+    const storagePath = buildArticleImagePath(article.id, extension);
+    const publicUrl = await assetStorage.saveFile(storagePath, imageBuffer, mimeType);
+
+    await prisma.article.update({
+      where: { id: article.id },
+      data: {
+        featuredImageUrl: publicUrl
+      }
+    });
+
+    logger.info(
+      { jobId: job.id, articleId: article.id, publicUrl },
+      'Article featured image stored'
+    );
   });
 
   createWorker<PublishArticleJob>(PUBLISH_ARTICLE_QUEUE, async (job) => {
@@ -1123,6 +1406,41 @@ const bootstrap = async () => {
       const authorRemoteId =
         article.wordpressAuthor?.remoteId ?? article.web.defaultWordpressAuthor?.remoteId ?? undefined;
 
+      let featuredMediaId: number | undefined;
+      let featuredMediaSourceUrl: string | undefined;
+      const localFeaturedImagePath = storagePathFromPublicUrl(article.featuredImageUrl);
+      if (localFeaturedImagePath) {
+        const downloaded = await downloadFeaturedImageBinary(
+          article.featuredImageUrl,
+          localFeaturedImagePath
+        );
+        if (downloaded) {
+          try {
+            const media = await uploadMedia(credentials, downloaded.buffer, {
+              filename: downloaded.filename,
+              mimeType: downloaded.mimeType,
+              title: article.title,
+              altText: article.title
+            });
+            featuredMediaId = media.id;
+            featuredMediaSourceUrl = media.source_url;
+            try {
+              await assetStorage.deleteFile(localFeaturedImagePath);
+            } catch (deleteError) {
+              logger.warn(
+                { jobId: job.id, articleId, localFeaturedImagePath, error: formatUnknownError(deleteError) },
+                'Failed to delete local featured image after upload'
+              );
+            }
+          } catch (uploadError) {
+            logger.warn(
+              { jobId: job.id, articleId, error: formatUnknownError(uploadError) },
+              'Failed to upload featured image to WordPress'
+            );
+          }
+        }
+      }
+
       // Resolve tags from article or SEO keywords
       const resolveArticleTags = (): string[] => {
         const explicit = jsonArrayToStringArray(article.tags as unknown as Prisma.JsonValue);
@@ -1186,6 +1504,9 @@ const bootstrap = async () => {
         categories,
         tags: tagIds
       };
+      if (featuredMediaId) {
+        payload.featured_media = featuredMediaId;
+      }
 
       let response: WordpressPostResponse;
       try {
@@ -1212,6 +1533,9 @@ const bootstrap = async () => {
         status: targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT',
         wordpressPostId: String(response.id)
       };
+      if (featuredMediaSourceUrl) {
+        updateData.featuredImageUrl = featuredMediaSourceUrl;
+      }
 
       if (targetStatus === 'publish') {
         updateData.publishedAt = new Date();

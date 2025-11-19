@@ -5,10 +5,13 @@ import {
   ArticleDraft,
   BusinessProfile,
   GenerateArticleOptions,
+  GenerateImageRequest,
+  GeneratedImageResult,
   PromptOverrides,
   ScanResult,
   SeoStrategy
 } from '@seobooster/ai-types';
+import { Buffer } from 'node:buffer';
 
 export class MockAiProvider implements AiProvider {
   name: AiProvider['name'] = 'openai';
@@ -98,6 +101,21 @@ export class MockAiProvider implements AiProvider {
       bodyMarkdown: '# Mock Article\n\nThis is a placeholder article.',
       keywords: opportunity.keywords,
       callToAction: 'Start your free trial'
+    };
+  }
+
+  async generateImage(
+    request: GenerateImageRequest,
+    overrides?: PromptOverrides<'article_image'>
+  ): Promise<GeneratedImageResult> {
+    const prompt = overrides?.userPrompt ?? request.prompt ?? 'Mock featured image';
+    const pngBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVR4nGNgYGD4z8DAwMIAAAslAwnsGCsOAAAAAElFTkSuQmCC';
+    return {
+      data: Buffer.from(pngBase64, 'base64'),
+      mimeType: 'image/png',
+      source: `mock://${encodeURIComponent(prompt.slice(0, 32))}`,
+      suggestedFileName: request.suggestedFileName ?? 'mock-image'
     };
   }
 }

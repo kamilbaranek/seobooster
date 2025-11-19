@@ -5,6 +5,7 @@ export const GENERATE_ARTICLE_QUEUE = 'generate-article' as const;
 export const PUBLISH_ARTICLE_QUEUE = 'publish-article' as const;
 export const FETCH_FAVICON_QUEUE = 'fetch-favicon' as const;
 export const GENERATE_SCREENSHOT_QUEUE = 'generate-screenshot' as const;
+export const GENERATE_ARTICLE_IMAGE_QUEUE = 'generate-article-image' as const;
 
 export type ScanWebsiteJob = {
   webId: string;
@@ -44,4 +45,9 @@ export type GenerateHomepageScreenshotJob = {
   webId: string;
   trigger?: string;
   fullPage?: boolean;
+};
+
+export type GenerateArticleImageJob = {
+  articleId: string;
+  force?: boolean;
 };

@@ -108,22 +108,23 @@ model Web {
   aiCallLogs    AiCallLog[]
   seoStrategies SeoStrategy[]
 
-  faviconUrl                 String?
-  faviconSourceUrl           String?
-  faviconStatus              AssetStatus            @default(PENDING)
-  faviconLastFetchedAt       DateTime?
-  screenshotUrl              String?
-  screenshotStatus           AssetStatus            @default(PENDING)
-  screenshotLastGeneratedAt  DateTime?
-  screenshotWidth            Int?
-  screenshotHeight           Int?
-  wordpressTagsMode          WordpressTagsMode      @default(AUTO_FROM_KEYWORDS)
-  defaultWordpressCategory   WebWordpressCategory?  @relation("WebDefaultCategory", fields: [defaultWordpressCategoryId], references: [id])
-  defaultWordpressCategoryId String?                @unique
-  defaultWordpressAuthor     WebWordpressAuthor?    @relation("WebDefaultAuthor", fields: [defaultWordpressAuthorId], references: [id])
-  defaultWordpressAuthorId   String?                @unique
-  wordpressCategories        WebWordpressCategory[]
-  wordpressAuthors           WebWordpressAuthor[]
+  faviconUrl                    String?
+  faviconSourceUrl              String?
+  faviconStatus                 AssetStatus            @default(PENDING)
+  faviconLastFetchedAt          DateTime?
+  screenshotUrl                 String?
+  screenshotStatus              AssetStatus            @default(PENDING)
+  screenshotLastGeneratedAt     DateTime?
+  screenshotWidth               Int?
+  screenshotHeight              Int?
+  articleImageGenerationEnabled Boolean                @default(true)
+  wordpressTagsMode             WordpressTagsMode      @default(AUTO_FROM_KEYWORDS)
+  defaultWordpressCategory      WebWordpressCategory?  @relation("WebDefaultCategory", fields: [defaultWordpressCategoryId], references: [id])
+  defaultWordpressCategoryId    String?                @unique
+  defaultWordpressAuthor        WebWordpressAuthor?    @relation("WebDefaultAuthor", fields: [defaultWordpressAuthorId], references: [id])
+  defaultWordpressAuthorId      String?                @unique
+  wordpressCategories           WebWordpressCategory[]
+  wordpressAuthors              WebWordpressAuthor[]
 }
 
 model WebWordpressCategory {

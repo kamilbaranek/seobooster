@@ -23,6 +23,7 @@ export interface WordpressPostPayload {
   author?: number;
   categories?: number[];
   tags?: number[];
+  featured_media?: number;
 }
 
 export interface WordpressPostResponse {
@@ -30,6 +31,25 @@ export interface WordpressPostResponse {
   status: string;
   link?: string;
   [key: string]: unknown;
+}
+
+export interface WordpressMediaResponse {
+  id: number;
+  source_url: string;
+  media_type?: string;
+  mime_type?: string;
+  alt_text?: string;
+  title?: { rendered: string } | string;
+  [key: string]: unknown;
+}
+
+export type MediaBinary = Buffer | Uint8Array | ArrayBuffer;
+
+export interface UploadMediaOptions {
+  filename: string;
+  mimeType: string;
+  title?: string;
+  altText?: string;
 }
 
 export interface WordpressCategory {
@@ -159,3 +179,70 @@ export const createTag = (
   credentials: WordpressCredentials,
   name: string
 ): Promise<WordpressTag> => sendRequest(credentials, '/wp-json/wp/v2/tags', 'POST', { name });
+
+const toBuffer = (binary: MediaBinary) => {
+  if (Buffer.isBuffer(binary)) {
+    return binary;
+  }
+  if (binary instanceof ArrayBuffer) {
+    return Buffer.from(binary);
+  }
+  return Buffer.from(binary.buffer, binary.byteOffset, binary.byteLength);
+};
+
+export const uploadMedia = (
+  credentials: WordpressCredentials,
+  binary: MediaBinary,
+  options: UploadMediaOptions
+): Promise<WordpressMediaResponse> => {
+  const url = new URL('/wp-json/wp/v2/media', credentials.baseUrl);
+  const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
+  const body = toBuffer(binary);
+  const headers: Record<string, string> = {
+    Authorization: buildAuthHeader(credentials),
+    'Content-Type': options.mimeType,
+    'Content-Length': String(body.byteLength),
+    'Content-Disposition': `attachment; filename="${options.filename}"`
+  };
+  if (options.title) {
+    headers['X-WP-Title'] = options.title;
+  }
+  if (options.altText) {
+    headers['X-WP-Alt-Text'] = options.altText;
+  }
+
+  return new Promise<WordpressMediaResponse>((resolve, reject) => {
+    const req = transport(
+      url,
+      {
+        method: 'POST',
+        headers
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          const status = res.statusCode ?? 0;
+          let payloadData: unknown = null;
+          if (text) {
+            try {
+              payloadData = JSON.parse(text);
+            } catch {
+              payloadData = text;
+            }
+          }
+          if (status >= 400) {
+            reject(new WordpressClientError(`WordPress responded with status ${status}`, status, payloadData));
+            return;
+          }
+          resolve(payloadData as WordpressMediaResponse);
+        });
+      }
+    );
+
+    req.on('error', (error) => reject(error));
+    req.write(body);
+    req.end();
+  });
+};

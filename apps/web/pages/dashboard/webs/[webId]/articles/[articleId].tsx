@@ -49,6 +49,7 @@ const ArticleDetailPage = () => {
   const [formCategoryId, setFormCategoryId] = useState('');
   const [formAuthorId, setFormAuthorId] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [imageGenerating, setImageGenerating] = useState(false);
 
   const fetchArticle = useCallback(async () => {
     if (!webId || !articleId) {
@@ -167,6 +168,23 @@ const ArticleDetailPage = () => {
     setActionStatus(`${label} zatím není připraveno.`);
   };
 
+  const handleGenerateImage = async (force = false) => {
+    if (!webId || !articleId) {
+      return;
+    }
+    setImageGenerating(true);
+    setActionStatus('Spouštím generování obrázku…');
+    try {
+      const query = force ? '?force=true' : '';
+      await apiFetch(`/webs/${webId}/articles/${articleId}/image${query}`, { method: 'POST' });
+      setActionStatus('Generování obrázku bylo zařazeno do fronty. Zkuste stránku obnovit za pár minut.');
+    } catch (err) {
+      setActionStatus((err as Error).message ?? 'Generování obrázku selhalo.');
+    } finally {
+      setImageGenerating(false);
+    }
+  };
+
   const formatDate = (value?: string | null) =>
     value ? new Date(value).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
@@ -240,14 +258,18 @@ const ArticleDetailPage = () => {
               <button type="button" className="primary" onClick={handlePublish} disabled={!article}>
                 Publikovat na WordPress
               </button>
-              <button type="button" onClick={() => handlePlaceholderAction('Regenerace')}>
-                Vygenerovat znovu
+              <button
+                type="button"
+                onClick={() => handleGenerateImage()}
+                disabled={!article || imageGenerating}
+              >
+                {imageGenerating ? 'Generuji obrázek…' : 'Vygenerovat obrázek'}
               </button>
               <button type="button" onClick={() => handlePlaceholderAction('Schvalovací e-mail')}>
                 Odeslat ke schválení
               </button>
-              <button type="button" onClick={() => handlePlaceholderAction('Vygenerovat obrázek')}>
-                Vygenerovat obrázek
+              <button type="button" onClick={() => handlePlaceholderAction('Regenerace článku')}>
+                Vygenerovat článek znovu
               </button>
               <button type="button" onClick={() => handlePlaceholderAction('Smazat')}>
                 Smazat článek
