@@ -334,7 +334,8 @@ export class OpenRouterProvider implements AiProvider {
       return this.generateImageWithPollinations(request, prompt);
     }
 
-    // Use OpenRouter chat completions API with modalities for image generation
+    // Use OpenRouter chat completions API for image generation
+    // Note: Some models may not support the modalities parameter
     const payload = {
       model,
       messages: [
@@ -343,8 +344,7 @@ export class OpenRouterProvider implements AiProvider {
           content: prompt
         }
       ],
-      modalities: ['image', 'text'],
-      max_tokens: 1000
+      max_tokens: 4096  // Increased for potential base64 image data
     };
 
     this.lastRawResponse = undefined;
@@ -372,13 +372,26 @@ export class OpenRouterProvider implements AiProvider {
           content: string | Array<{ type: string; image_url?: { url: string }; text?: string }>;
         };
       }>;
+      error?: { message: string };
     };
 
     this.lastRawResponse = result;
 
+    // Check for API error in response
+    if (result.error) {
+      throw new Error(`OpenRouter API error: ${result.error.message}`);
+    }
+
     // Extract image from response
     const choice = result.choices?.[0];
-    if (!choice?.message?.content) {
+    if (!choice?.message) {
+      // Log the full response for debugging
+      console.error('OpenRouter response missing message:', JSON.stringify(result, null, 2));
+      throw new Error('No message in OpenRouter image generation response');
+    }
+
+    if (!choice.message.content) {
+      console.error('OpenRouter message missing content:', JSON.stringify(choice.message, null, 2));
       throw new Error('No content in OpenRouter image generation response');
     }
 
