@@ -26,11 +26,23 @@ export class ArticlesImagesController {
     private readonly imageQueue: Queue<GenerateArticleImageJob>
   ) {}
 
-  // GET /api/articles/:articleId/images
+  // GET /api/webs/:webId/articles/:articleId/images
   @Get()
-  async listImages(@Param('articleId') articleId: string, @Req() req: any) {
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
+  async listImages(
+    @Param('webId') webId: string,
+    @Param('articleId') articleId: string,
+    @Req() req: any
+  ) {
+    // Verify user owns the web
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId: req.user.id }
+    });
+    if (!web) {
+      throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
+    }
+
+    const article = await this.prisma.article.findFirst({
+      where: { id: articleId, webId },
       include: {
         web: {
           include: { subscription: { select: { imageGenerationLimit: true } } }
@@ -41,7 +53,7 @@ export class ArticlesImagesController {
       }
     });
 
-    if (!article || article.web.userId !== req.user.id) {
+    if (!article) {
       throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
     }
 
@@ -56,11 +68,24 @@ export class ArticlesImagesController {
     };
   }
 
-  // POST /api/articles/:articleId/images/generate
+  // POST /api/webs/:webId/articles/:articleId/images/generate
   @Post('generate')
-  async generateImage(@Param('articleId') articleId: string, @Req() req: any, @Body() body: { force?: boolean } = {}) {
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
+  async generateImage(
+    @Param('webId') webId: string,
+    @Param('articleId') articleId: string,
+    @Req() req: any,
+    @Body() body: { force?: boolean } = {}
+  ) {
+    // Verify user owns the web
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId: req.user.id }
+    });
+    if (!web) {
+      throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
+    }
+
+    const article = await this.prisma.article.findFirst({
+      where: { id: articleId, webId },
       include: {
         web: {
           include: { subscription: { select: { imageGenerationLimit: true } } }
@@ -71,7 +96,7 @@ export class ArticlesImagesController {
       }
     });
 
-    if (!article || article.web.userId !== req.user.id) {
+    if (!article) {
       throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
     }
 
@@ -88,15 +113,28 @@ export class ArticlesImagesController {
     return { success: true, message: 'Image generation queued' };
   }
 
-  // PATCH /api/articles/:articleId/images/:imageId/featured
+  // PATCH /api/webs/:webId/articles/:articleId/images/:imageId/featured
   @Patch(':imageId/featured')
-  async setFeatured(@Param('articleId') articleId: string, @Param('imageId') imageId: string, @Req() req: any) {
-    const image = await this.prisma.articleImage.findUnique({
-      where: { id: imageId },
-      include: { article: { include: { web: true } } }
+  async setFeatured(
+    @Param('webId') webId: string,
+    @Param('articleId') articleId: string,
+    @Param('imageId') imageId: string,
+    @Req() req: any
+  ) {
+    // Verify user owns the web
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId: req.user.id }
+    });
+    if (!web) {
+      throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
+    }
+
+    const image = await this.prisma.articleImage.findFirst({
+      where: { id: imageId, articleId },
+      include: { article: true }
     });
 
-    if (!image || image.articleId !== articleId || image.article.web.userId !== req.user.id) {
+    if (!image || image.article.webId !== webId) {
       throw new HttpException('Image not found', HttpStatus.NOT_FOUND);
     }
 
@@ -125,15 +163,28 @@ export class ArticlesImagesController {
     return { success: true };
   }
 
-  // DELETE /api/articles/:articleId/images/:imageId
+  // DELETE /api/webs/:webId/articles/:articleId/images/:imageId
   @Delete(':imageId')
-  async deleteImage(@Param('articleId') articleId: string, @Param('imageId') imageId: string, @Req() req: any) {
-    const image = await this.prisma.articleImage.findUnique({
-      where: { id: imageId },
-      include: { article: { include: { web: true } } }
+  async deleteImage(
+    @Param('webId') webId: string,
+    @Param('articleId') articleId: string,
+    @Param('imageId') imageId: string,
+    @Req() req: any
+  ) {
+    // Verify user owns the web
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId: req.user.id }
+    });
+    if (!web) {
+      throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
+    }
+
+    const image = await this.prisma.articleImage.findFirst({
+      where: { id: imageId, articleId },
+      include: { article: true }
     });
 
-    if (!image || image.articleId !== articleId || image.article.web.userId !== req.user.id) {
+    if (!image || image.article.webId !== webId) {
       throw new HttpException('Image not found', HttpStatus.NOT_FOUND);
     }
 
