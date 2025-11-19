@@ -1446,7 +1446,8 @@ const bootstrap = async () => {
             credentials: true,
             defaultWordpressCategory: true,
             defaultWordpressAuthor: true,
-            analysis: true
+            analysis: true,
+            user: true
           }
         },
         plan: {
