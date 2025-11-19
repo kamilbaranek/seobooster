@@ -1661,23 +1661,26 @@ const bootstrap = async () => {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
 
-        await (prisma as any).magicLink.createMany({
-          data: [
-            {
-              token: publishToken,
-              webId: article.webId,
-              articleId: article.id,
-              type: 'PUBLISH',
-              expiresAt
-            },
-            {
-              token: feedbackToken,
-              webId: article.webId,
-              articleId: article.id,
-              type: 'FEEDBACK',
-              expiresAt
-            }
-          ]
+        logger.info({ jobId: job.id, articleId, publishToken, feedbackToken }, 'Generated magic link tokens');
+
+        await (prisma as any).magicLink.create({
+          data: {
+            token: publishToken,
+            webId: article.webId,
+            articleId: article.id,
+            type: 'PUBLISH',
+            expiresAt
+          }
+        });
+
+        await (prisma as any).magicLink.create({
+          data: {
+            token: feedbackToken,
+            webId: article.webId,
+            articleId: article.id,
+            type: 'FEEDBACK',
+            expiresAt
+          }
         });
 
         const frontendUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
