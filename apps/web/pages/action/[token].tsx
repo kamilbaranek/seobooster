@@ -41,8 +41,10 @@ export default function MagicLinkAction() {
                 }
                 return res.json();
             })
-            .then((data) => {
-                console.log('MagicLink: Data received', data);
+            .then((response) => {
+                console.log('MagicLink: Data received', response);
+                // API wraps response in { success: true, data: ... }
+                const data = response.data || response;
                 setData(data);
                 setLoading(false);
                 if (data.type === 'PUBLISH') {
