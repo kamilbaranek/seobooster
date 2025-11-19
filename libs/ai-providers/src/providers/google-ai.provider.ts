@@ -1,0 +1,319 @@
+import { fetch } from 'undici';
+import { Buffer } from 'node:buffer';
+import {
+  AiModelMap,
+  AiProvider,
+  AiProviderConfig,
+  ArticleDraft,
+  BusinessProfile,
+  GenerateArticleOptions,
+  GenerateImageRequest,
+  GeneratedImageResult,
+  ScanResult,
+  SeoStrategy,
+  AiTaskType,
+  PromptOverrides
+} from '@seobooster/ai-types';
+
+interface GoogleAiProviderConfig extends AiProviderConfig {
+  modelMap: AiModelMap;
+}
+
+type GoogleGenerateContentRequest = {
+  contents: Array<{
+    parts: Array<{ text: string }>;
+  }>;
+  generationConfig?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+    responseMimeType?: string;
+  };
+};
+
+type GoogleGenerateContentResponse = {
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text?: string;
+        inlineData?: {
+          mimeType: string;
+          data: string;
+        };
+      }>;
+    };
+    finishReason?: string;
+  }>;
+  error?: {
+    code: number;
+    message: string;
+    status: string;
+  };
+};
+
+export class GoogleAiProvider implements AiProvider {
+  readonly name = 'google' as const;
+  private lastRawResponse: unknown;
+  private lastMessageContent: string | undefined;
+
+  constructor(private readonly config: GoogleAiProviderConfig) {}
+
+  getLastRawResponse(): unknown {
+    return this.lastRawResponse;
+  }
+
+  getLastMessageContent(): string | undefined {
+    return this.lastMessageContent;
+  }
+
+  private async callGemini<T>(
+    task: AiTaskType,
+    systemPrompt: string,
+    userPrompt: string,
+    forceJsonResponse: boolean,
+    fallback: T
+  ): Promise<T> {
+    const apiKey = this.config.apiKey;
+    const model = this.config.modelMap[task] ?? this.config.model;
+    this.lastRawResponse = undefined;
+    this.lastMessageContent = undefined;
+
+    if (!apiKey) {
+      this.lastRawResponse = { error: 'missing_api_key' };
+      return fallback;
+    }
+
+    // Combine system and user prompts for Gemini
+    const combinedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
+
+    const requestBody: GoogleGenerateContentRequest = {
+      contents: [
+        {
+          parts: [{ text: combinedPrompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: this.config.temperature ?? 0.7,
+        maxOutputTokens: 8192
+      }
+    };
+
+    if (forceJsonResponse) {
+      requestBody.generationConfig!.responseMimeType = 'application/json';
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    const responseText = await response.text();
+    this.lastRawResponse = responseText;
+
+    if (!response.ok) {
+      throw new Error(`Google AI API error ${response.status}: ${responseText}`);
+    }
+
+    let parsed: GoogleGenerateContentResponse;
+    try {
+      parsed = JSON.parse(responseText) as GoogleGenerateContentResponse;
+    } catch (error) {
+      throw new Error(`Failed to parse Google AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    if (parsed.error) {
+      this.lastRawResponse = parsed;
+      throw new Error(`Google AI API error: ${parsed.error.message} (${parsed.error.status})`);
+    }
+
+    const candidate = parsed.candidates?.[0];
+    if (!candidate?.content?.parts?.[0]?.text) {
+      return fallback;
+    }
+
+    const text = candidate.content.parts[0].text;
+    this.lastMessageContent = text;
+
+    if (forceJsonResponse) {
+      try {
+        return JSON.parse(text) as T;
+      } catch (error) {
+        throw new Error(`Failed to parse JSON response from Google AI: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    return text as T;
+  }
+
+  async scanWebsite(url: string, overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
+    const fallback: ScanResult = {
+      url,
+      title: `Scan of ${url}`,
+      description: '',
+      keywords: [],
+      detectedTechnologies: []
+    };
+
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You are a website analyzer. Return a JSON object with: url, title, description, keywords (array), detectedTechnologies (array).';
+    const userPrompt = overrides?.userPrompt ?? `Analyze this website: ${url}`;
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+
+    return this.callGemini<ScanResult>('scan', systemPrompt, userPrompt, forceJsonResponse, fallback);
+  }
+
+  async analyzeBusiness(scan: ScanResult, overrides?: PromptOverrides<'analyze'>): Promise<BusinessProfile> {
+    const fallback: BusinessProfile = {
+      name: scan.title || scan.url,
+      tagline: '',
+      mission: '',
+      audience: [],
+      differentiators: []
+    };
+
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You are a business analyst. Based on website scan, create a business profile JSON with: name, tagline, mission, audience (array), differentiators (array).';
+    const userPrompt =
+      overrides?.userPrompt ?? `Create business profile from this scan: ${JSON.stringify(scan)}`;
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+
+    return this.callGemini<BusinessProfile>('analyze', systemPrompt, userPrompt, forceJsonResponse, fallback);
+  }
+
+  async buildSeoStrategy(profile: BusinessProfile, overrides?: PromptOverrides<'strategy'>): Promise<SeoStrategy> {
+    const fallback: SeoStrategy = {
+      business: {
+        name: profile.name,
+        description: profile.mission ?? profile.tagline ?? '',
+        target_audience: Array.isArray(profile.audience) ? profile.audience.join(', ') : String(profile.audience || 'Unknown audience')
+      },
+      topic_clusters: [],
+      total_clusters: 0
+    };
+
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You are an SEO strategist. Create an SEO strategy JSON with: business (name, description, target_audience), topic_clusters (array), total_clusters (number).';
+    const userPrompt =
+      overrides?.userPrompt ?? `Create SEO strategy for: ${JSON.stringify(profile)}`;
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+
+    return this.callGemini<SeoStrategy>('strategy', systemPrompt, userPrompt, forceJsonResponse, fallback);
+  }
+
+  async generateArticle(
+    strategy: SeoStrategy,
+    options: GenerateArticleOptions,
+    overrides?: PromptOverrides<'article'>
+  ): Promise<ArticleDraft> {
+    const fallback: ArticleDraft = {
+      title: `Article for ${options.clusterName}`,
+      outline: [],
+      bodyMarkdown: '',
+      keywords: [],
+      callToAction: undefined
+    };
+
+    const systemPrompt =
+      overrides?.systemPrompt ??
+      'You are a professional content writer. Generate SEO-optimized article in JSON format with: title, outline (array), bodyMarkdown, keywords (array), callToAction.';
+    const tone = options.targetTone ?? 'Professional';
+    const userPrompt =
+      overrides?.userPrompt ??
+      `Strategy: ${JSON.stringify(strategy)}\nCluster: ${options.clusterName}\nTone: ${tone}\nGenerate article.`;
+    const forceJsonResponse = overrides?.forceJsonResponse !== false;
+
+    return this.callGemini<ArticleDraft>('article', systemPrompt, userPrompt, forceJsonResponse, fallback);
+  }
+
+  async generateImage(
+    request: GenerateImageRequest,
+    overrides?: PromptOverrides<'article_image'>
+  ): Promise<GeneratedImageResult> {
+    const prompt = (overrides?.userPrompt ?? request.prompt ?? '').trim();
+    if (!prompt) {
+      throw new Error('Image prompt is empty');
+    }
+
+    const apiKey = this.config.apiKey;
+    if (!apiKey) {
+      throw new Error('Google AI API key is missing');
+    }
+
+    // Use Gemini 2.0 Flash Experimental for image generation
+    // Default model for article_image task
+    const model = this.config.modelMap.article_image ?? 'gemini-2.0-flash-exp';
+
+    this.lastRawResponse = undefined;
+    this.lastMessageContent = prompt;
+
+    const requestBody: GoogleGenerateContentRequest = {
+      contents: [
+        {
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7
+      }
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Google AI image generation failed ${response.status}: ${text}`);
+    }
+
+    const result = (await response.json()) as GoogleGenerateContentResponse;
+    this.lastRawResponse = result;
+
+    if (result.error) {
+      throw new Error(`Google AI API error: ${result.error.message} (${result.error.status})`);
+    }
+
+    const candidate = result.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      throw new Error('No content in Google AI image generation response');
+    }
+
+    // Look for inline image data in parts
+    let imageData: { mimeType: string; data: string } | null = null;
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        imageData = part.inlineData;
+        break;
+      }
+    }
+
+    if (!imageData) {
+      throw new Error('No image data found in Google AI response. The model may not support image generation.');
+    }
+
+    const buffer = Buffer.from(imageData.data, 'base64');
+    const mimeType = imageData.mimeType;
+
+    return {
+      data: buffer,
+      mimeType,
+      source: `google:${model}`,
+      suggestedFileName: request.suggestedFileName ?? 'article-image'
+    };
+  }
+}

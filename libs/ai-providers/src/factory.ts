@@ -5,6 +5,7 @@ import {
 } from '@seobooster/ai-types';
 import { MockAiProvider } from './providers/mock.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
+import { GoogleAiProvider } from './providers/google-ai.provider';
 
 export interface ProviderFactoryOptions {
   modelOverrides?: Partial<AiModelMap>;
@@ -36,6 +37,18 @@ export const buildAiProviderFromEnv = (
         modelMap,
         siteUrl: process.env.OPENROUTER_SITE_URL ?? 'http://localhost:3333',
         appName: process.env.OPENROUTER_APP_NAME ?? 'SEO Booster'
+      })
+    };
+  }
+
+  if (providerName === 'google') {
+    return {
+      modelMap,
+      provider: new GoogleAiProvider({
+        name: 'google',
+        apiKey: process.env.GOOGLE_AI_API_KEY ?? '',
+        model: modelMap.article,
+        modelMap
       })
     };
   }

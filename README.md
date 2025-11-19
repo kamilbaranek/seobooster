@@ -51,9 +51,10 @@ Backend expects these environment variables (for local dev, put them in a non‑
 - `JWT_SECRET` – secret for signing JWTs (will be used when auth is implemented).
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID` – Stripe credentials + price id for billing (used by the billing module).
 - `ENCRYPTION_KEY` – base64-encoded 32-byte key for encrypting website credentials.
-- `AI_PROVIDER` – defaults to `openrouter`, keeps the orchestrator extensible for future providers.
+- `AI_PROVIDER` – defaults to `openrouter`, supports: `openrouter`, `google`, `openai`, `anthropic`, `perplexity`.
 - `OPENROUTER_API_KEY` / `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` / `OPENROUTER_BASE_URL` – OpenRouter credentials + metadata required by their API.
-- `AI_MODEL_SCAN` / `AI_MODEL_ANALYZE` / `AI_MODEL_STRATEGY` / `AI_MODEL_ARTICLE` – model identifiers (via OpenRouter) used per orchestrator phase.
+- `GOOGLE_AI_API_KEY` – Google AI (Gemini) API key for text generation and image generation. For image generation, use model `gemini-2.0-flash-exp`.
+- `AI_MODEL_SCAN` / `AI_MODEL_ANALYZE` / `AI_MODEL_STRATEGY` / `AI_MODEL_ARTICLE` / `AI_MODEL_ARTICLE_IMAGE` – model identifiers used per orchestrator phase.
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `PERPLEXITY_API_KEY` – reserved for future providers.
 - `WEB_APP_URL` – allowed origin for CORS (defaults to `http://localhost:3000`, set to production frontend URL in prod).
 - `NEXT_PUBLIC_API_BASE_URL` – Frontend volá API přes tuto adresu (pro lokální vývoj `http://localhost:3333/api`).

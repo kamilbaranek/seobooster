@@ -1,4 +1,4 @@
-export type ProviderName = 'openrouter' | 'openai' | 'anthropic' | 'perplexity';
+export type ProviderName = 'openrouter' | 'openai' | 'anthropic' | 'perplexity' | 'google';
 
 export type AiTaskType = 'scan' | 'analyze' | 'strategy' | 'article' | 'article_image';
 
