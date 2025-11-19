@@ -249,6 +249,14 @@ const emailService = new EmailService({
   fromEmail: process.env.MAILGUN_FROM_EMAIL ?? `noreply@${process.env.MAILGUN_DOMAIN ?? 'example.com'}`
 });
 
+logger.info({
+  apiKeyPresent: !!process.env.MAILGUN_API_KEY,
+  apiKeyLength: process.env.MAILGUN_API_KEY?.length,
+  domain: process.env.MAILGUN_DOMAIN,
+  host: process.env.MAILGUN_HOST,
+  fromEmail: process.env.MAILGUN_FROM_EMAIL
+}, 'EmailService initialized');
+
 let redisLimitExceeded = false;
 
 const handleRedisError = (source: string, name: string, err: unknown) => {
