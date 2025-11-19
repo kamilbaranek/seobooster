@@ -6,6 +6,24 @@ import { apiFetch } from '../../../../../lib/api-client';
 
 type ArticleStatus = 'DRAFT' | 'QUEUED' | 'PUBLISHED';
 
+type ArticleImage = {
+  id: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  imageUrl?: string | null;
+  prompt: string;
+  isFeatured: boolean;
+  position: number;
+  errorMessage?: string | null;
+  createdAt: string;
+};
+
+type ArticleImagesResponse = {
+  images: ArticleImage[];
+  limit: number;
+  generated: number;
+  remaining: number;
+};
+
 type ArticleDetail = {
   id: string;
   title: string;
@@ -50,6 +68,10 @@ const ArticleDetailPage = () => {
   const [formAuthorId, setFormAuthorId] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [imageGenerating, setImageGenerating] = useState(false);
+  const [images, setImages] = useState<ArticleImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [imagesLimit, setImagesLimit] = useState(1);
+  const [imagesGenerated, setImagesGenerated] = useState(0);
 
   const fetchArticle = useCallback(async () => {
     if (!webId || !articleId) {
@@ -81,6 +103,20 @@ const ArticleDetailPage = () => {
     }
   }, [webId]);
 
+  const fetchImages = useCallback(async () => {
+    if (!articleId) {
+      return;
+    }
+    try {
+      const payload = await apiFetch<ArticleImagesResponse>(`/articles/${articleId}/images`);
+      setImages(payload.images);
+      setImagesLimit(payload.limit);
+      setImagesGenerated(payload.generated);
+    } catch (err) {
+      // Silently fail on polling
+    }
+  }, [articleId]);
+
   useEffect(() => {
     fetchArticle();
   }, [fetchArticle]);
@@ -88,6 +124,24 @@ const ArticleDetailPage = () => {
   useEffect(() => {
     fetchMetadata();
   }, [fetchMetadata]);
+
+  useEffect(() => {
+    fetchImages();
+  }, [fetchImages]);
+
+  // Polling for image status updates every 5 seconds
+  useEffect(() => {
+    const hasPending = images.some((img) => img.status === 'PENDING');
+    if (!hasPending) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchImages();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [images, fetchImages]);
 
   useEffect(() => {
     if (!article) {
@@ -169,19 +223,48 @@ const ArticleDetailPage = () => {
   };
 
   const handleGenerateImage = async (force = false) => {
-    if (!webId || !articleId) {
+    if (!articleId) {
       return;
     }
     setImageGenerating(true);
     setActionStatus('Spouštím generování obrázku…');
     try {
-      const query = force ? '?force=true' : '';
-      await apiFetch(`/webs/${webId}/articles/${articleId}/image${query}`, { method: 'POST' });
-      setActionStatus('Generování obrázku bylo zařazeno do fronty. Zkuste stránku obnovit za pár minut.');
+      await apiFetch(`/articles/${articleId}/images/generate`, {
+        method: 'POST',
+        body: JSON.stringify({ force })
+      });
+      setActionStatus('Obrázek byl zařazen do fronty.');
+      await fetchImages();
     } catch (err) {
       setActionStatus((err as Error).message ?? 'Generování obrázku selhalo.');
     } finally {
       setImageGenerating(false);
+    }
+  };
+
+  const handleSetFeatured = async (imageId: string) => {
+    if (!articleId) {
+      return;
+    }
+    try {
+      await apiFetch(`/articles/${articleId}/images/${imageId}/featured`, { method: 'PATCH' });
+      setActionStatus('Obrázek nastaven jako hlavní.');
+      await fetchImages();
+    } catch (err) {
+      setActionStatus((err as Error).message ?? 'Nepodařilo se nastavit hlavní obrázek.');
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!articleId || !confirm('Smazat tento obrázek?')) {
+      return;
+    }
+    try {
+      await apiFetch(`/articles/${articleId}/images/${imageId}`, { method: 'DELETE' });
+      setActionStatus('Obrázek smazán.');
+      await fetchImages();
+    } catch (err) {
+      setActionStatus((err as Error).message ?? 'Nepodařilo se smazat obrázek.');
     }
   };
 
@@ -258,13 +341,6 @@ const ArticleDetailPage = () => {
               <button type="button" className="primary" onClick={handlePublish} disabled={!article}>
                 Publikovat na WordPress
               </button>
-              <button
-                type="button"
-                onClick={() => handleGenerateImage()}
-                disabled={!article || imageGenerating}
-              >
-                {imageGenerating ? 'Generuji obrázek…' : 'Vygenerovat obrázek'}
-              </button>
               <button type="button" onClick={() => handlePlaceholderAction('Schvalovací e-mail')}>
                 Odeslat ke schválení
               </button>
@@ -276,12 +352,66 @@ const ArticleDetailPage = () => {
               </button>
               {actionStatus && <p className="muted">{actionStatus}</p>}
             </div>
-            {article?.featuredImageUrl && (
-              <div className="panel">
-                <h2>Hlavní obrázek</h2>
-                <img src={article.featuredImageUrl} alt="Featured" />
+            <div className="panel">
+              <h2>Obrázky články</h2>
+              <div className="image-stats">
+                <span>{imagesGenerated} / {imagesLimit} vygenerováno</span>
               </div>
-            )}
+              {images.length === 0 ? (
+                <p className="muted">Zatím žádné obrázky</p>
+              ) : (
+                <div className="image-gallery">
+                  {images.map((img) => (
+                    <div key={img.id} className="image-card">
+                      <div className="image-container">
+                        {img.status === 'PENDING' && (
+                          <div className="image-placeholder loading">⏳ Generuji…</div>
+                        )}
+                        {img.status === 'SUCCESS' && img.imageUrl && (
+                          <img src={img.imageUrl} alt="Article" />
+                        )}
+                        {img.status === 'FAILED' && (
+                          <div className="image-placeholder failed">❌ Selhalo</div>
+                        )}
+                        {img.isFeatured && <div className="featured-badge">⭐ Hlavní</div>}
+                      </div>
+                      <div className="image-actions">
+                        {img.status === 'SUCCESS' && !img.isFeatured && (
+                          <button
+                            type="button"
+                            className="small"
+                            onClick={() => handleSetFeatured(img.id)}
+                          >
+                            Nastavit
+                          </button>
+                        )}
+                        {!img.isFeatured && (
+                          <button
+                            type="button"
+                            className="small delete"
+                            onClick={() => handleDeleteImage(img.id)}
+                          >
+                            Smazat
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className="primary"
+                onClick={() => handleGenerateImage()}
+                disabled={!article || imageGenerating || imagesGenerated >= imagesLimit}
+              >
+                {imageGenerating
+                  ? 'Generuji…'
+                  : imagesGenerated >= imagesLimit
+                    ? 'Limit vyčerpán'
+                    : 'Vygenerovat obrázek'}
+              </button>
+            </div>
           </section>
           <section className="preview">
             <header className="preview-header">
@@ -478,6 +608,99 @@ const ArticleDetailPage = () => {
           color: #94a3b8;
           font-size: 0.9rem;
           text-decoration: underline;
+        }
+        .image-stats {
+          font-size: 0.85rem;
+          color: #94a3b8;
+          margin-bottom: 0.5rem;
+        }
+        .image-gallery {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+        }
+        .image-card {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .image-container {
+          position: relative;
+          border-radius: 0.5rem;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          background: #020617;
+          aspect-ratio: 16 / 9;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .image-container img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .image-placeholder {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+          color: #94a3b8;
+          background: #0f172a;
+        }
+        .image-placeholder.loading {
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        .image-placeholder.failed {
+          background: rgba(239, 68, 68, 0.1);
+          color: #ef4444;
+        }
+        .featured-badge {
+          position: absolute;
+          top: 0.5rem;
+          right: 0.5rem;
+          background: rgba(34, 197, 94, 0.9);
+          color: #fff;
+          padding: 0.3rem 0.6rem;
+          border-radius: 0.3rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+        .image-actions {
+          display: flex;
+          gap: 0.5rem;
+        }
+        .image-actions button {
+          flex: 1;
+        }
+        button.small {
+          padding: 0.35rem 0.6rem;
+          font-size: 0.8rem;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          border-radius: 0.4rem;
+          background: transparent;
+          color: #fff;
+          cursor: pointer;
+        }
+        button.small:hover:not(:disabled) {
+          border-color: #0ea5e9;
+          background: rgba(14, 165, 233, 0.1);
+        }
+        button.small.delete:hover:not(:disabled) {
+          border-color: #ef4444;
+          background: rgba(239, 68, 68, 0.1);
+          color: #ef4444;
         }
         @media (max-width: 1000px) {
           .grid {
