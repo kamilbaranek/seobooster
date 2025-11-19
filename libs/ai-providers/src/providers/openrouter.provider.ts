@@ -325,120 +325,13 @@ export class OpenRouterProvider implements AiProvider {
       throw new Error('No model configured for article_image task');
     }
 
-    // Check if model supports image generation (has 'image' in output_modalities)
-    // For now, we'll try to use it and fall back to Pollinations if it fails
-    const supportsImageGeneration = model.includes('image') || model.includes('gemini');
+    // Most models on OpenRouter don't support direct image generation via chat API
+    // Gemini Flash Image is for image understanding/editing, not text-to-image generation
+    // For now, we use Pollinations AI for all image generation
+    // In the future, we can add support for specific image generation models
+    // that have "image" in their output_modalities (e.g., DALL-E, Stable Diffusion via OpenRouter)
 
-    if (!supportsImageGeneration) {
-      // Fallback to Pollinations AI for models that don't support image generation
-      return this.generateImageWithPollinations(request, prompt);
-    }
-
-    // Use OpenRouter chat completions API for image generation
-    // Note: Some models may not support the modalities parameter
-    const payload = {
-      model,
-      messages: [
-        {
-          role: 'user' as const,
-          content: prompt
-        }
-      ],
-      max_tokens: 4096  // Increased for potential base64 image data
-    };
-
-    this.lastRawResponse = undefined;
-    this.lastMessageContent = prompt;
-
-    const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.apiKey}`,
-        'HTTP-Referer': this.config.siteUrl,
-        'X-Title': this.config.appName
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`OpenRouter image generation failed ${response.status}: ${text}`);
-    }
-
-    const result = (await response.json()) as {
-      choices: Array<{
-        message: {
-          content: string | Array<{ type: string; image_url?: { url: string }; text?: string }>;
-        };
-      }>;
-      error?: { message: string };
-    };
-
-    this.lastRawResponse = result;
-
-    // Check for API error in response
-    if (result.error) {
-      throw new Error(`OpenRouter API error: ${result.error.message}`);
-    }
-
-    // Extract image from response
-    const choice = result.choices?.[0];
-    if (!choice?.message) {
-      // Log the full response for debugging
-      console.error('OpenRouter response missing message:', JSON.stringify(result, null, 2));
-      throw new Error('No message in OpenRouter image generation response');
-    }
-
-    if (!choice.message.content) {
-      console.error('OpenRouter message missing content:', JSON.stringify(choice.message, null, 2));
-      throw new Error('No content in OpenRouter image generation response');
-    }
-
-    let imageDataUrl: string | null = null;
-
-    // Content can be string or array of content parts
-    if (typeof choice.message.content === 'string') {
-      // Some models return base64 data URL directly as string
-      if (choice.message.content.startsWith('data:image/')) {
-        imageDataUrl = choice.message.content;
-      }
-    } else if (Array.isArray(choice.message.content)) {
-      // Look for image_url in content parts
-      for (const part of choice.message.content) {
-        if (part.type === 'image_url' && part.image_url?.url) {
-          imageDataUrl = part.image_url.url;
-          break;
-        }
-      }
-    }
-
-    if (!imageDataUrl) {
-      throw new Error('No image data URL found in OpenRouter response');
-    }
-
-    // Parse base64 data URL
-    const match = imageDataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
-    if (!match) {
-      throw new Error('Invalid image data URL format from OpenRouter');
-    }
-
-    const [, format, base64Data] = match;
-    const mimeType = `image/${format}`;
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    return {
-      data: buffer,
-      mimeType,
-      source: `openrouter:${model}`,
-      suggestedFileName: request.suggestedFileName ?? 'article-image'
-    };
-  }
-
-  private async generateImageWithPollinations(
-    request: GenerateImageRequest,
-    prompt: string
-  ): Promise<GeneratedImageResult> {
+    // Use Pollinations AI for image generation
     const dimensions = this.resolveImageDimensions(request.size);
     const baseEndpoint = process.env.IMAGE_GENERATOR_BASE_URL ?? 'https://image.pollinations.ai/prompt/';
     const normalizedBase = baseEndpoint.endsWith('/') ? baseEndpoint : `${baseEndpoint}/`;
