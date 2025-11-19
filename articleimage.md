@@ -361,7 +361,7 @@ interface WordpressMediaResponse {
 
 **Cíl:** Umožnit z dashboardu (detailu článku) ručně spustit generování obrázku a vidět jeho výsledek.
 
-- [ ] 4.1 Přidej endpoint `POST /webs/:webId/articles/:articleId/image`
+- [x] 4.1 Přidej endpoint `POST /webs/:webId/articles/:articleId/image`
   - **Co:** V `apps/api` přidat do articles/webs logiky endpoint, který:
     - ověří, že `webId` patří přihlášenému uživateli,
     - ověří, že článek existuje a patří danému webu,
@@ -372,7 +372,7 @@ interface WordpressMediaResponse {
     - v service využij existující pattern pro enqueuování jobů (koukni, jak se to dělá u publish/scan),
     - build: `npm run build --workspace @seobooster/api`.
 
-- [ ] 4.2 Propoj UI na detailu článku
+- [x] 4.2 Propoj UI na detailu článku
   - **Co:** V `apps/web/pages/dashboard/webs/[webId]/articles/[articleId].tsx` napoj tlačítko „Vygenerovat obrázek“:
     - na volání API endpointu,
     - na zobrazení „job zařazen“ / „chyba“.
@@ -382,7 +382,7 @@ interface WordpressMediaResponse {
     - po úspěchu nastav krátkou hlášku do `statusMessage` nebo podobného stavu,
     - případně nabídni „Obnovit“ (refetch detailu).
 
-- [ ] 4.3 Ověř zobrazení v UI
+- [x] 4.3 Ověř zobrazení v UI
   - **Co:** Ujisti se, že:
     - pokud má článek `featuredImageUrl`, UI ho zobrazuje,
     - pokud ne, ale job je v běhu, UI aspoň ukazuje informativní text (např. „Obrázek se generuje“ – může být jen text podle stavu, který vrací API nebo worker log).

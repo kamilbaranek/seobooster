@@ -5,6 +5,7 @@ import { EncryptionService } from '../crypto/encryption.service';
 import { ArticleListQueryDto } from './dto/article-list-query.dto';
 import { ArticleMetadataDto } from './dto/article-metadata.dto';
 import { WordpressDefaultsDto } from './dto/wordpress-defaults.dto';
+import { JobQueueService } from '../queues/queues.service';
 import {
   WordpressAuthor,
   WordpressCategory,
@@ -23,7 +24,11 @@ type ArticleWithWordpressRelations = Prisma.ArticleGetPayload<{
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService, private readonly encryptionService: EncryptionService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+    private readonly jobQueueService: JobQueueService
+  ) {}
 
   async listArticles(userId: string, webId: string, query: ArticleListQueryDto) {
     await this.ensureWebOwnedByUser(userId, webId);
@@ -117,6 +122,16 @@ export class ArticlesService {
 
     await this.prisma.article.update({ where: { id: article.id }, data });
     return this.getArticle(userId, webId, articleId);
+  }
+
+  async enqueueArticleImage(userId: string, webId: string, articleId: string, force = false) {
+    await this.ensureWebOwnedByUser(userId, webId);
+    const article = await this.prisma.article.findFirst({ where: { id: articleId, webId } });
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+    await this.jobQueueService.enqueueGenerateArticleImage(article.id, force);
+    return { queued: true };
   }
 
   async getWordpressMetadata(userId: string, webId: string) {

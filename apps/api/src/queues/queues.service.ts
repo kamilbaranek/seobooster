@@ -5,6 +5,7 @@ import {
   ANALYZE_BUSINESS_QUEUE,
   CREATE_SEO_STRATEGY_QUEUE,
   FETCH_FAVICON_QUEUE,
+  GENERATE_ARTICLE_IMAGE_QUEUE,
   GENERATE_ARTICLE_QUEUE,
   GENERATE_SCREENSHOT_QUEUE,
   PUBLISH_ARTICLE_QUEUE,
@@ -17,6 +18,7 @@ export class JobQueueService {
     @InjectQueue(ANALYZE_BUSINESS_QUEUE) private readonly analyzeBusinessQueue: Queue,
     @InjectQueue(CREATE_SEO_STRATEGY_QUEUE) private readonly createSeoStrategyQueue: Queue,
     @InjectQueue(GENERATE_ARTICLE_QUEUE) private readonly generateArticleQueue: Queue,
+    @InjectQueue(GENERATE_ARTICLE_IMAGE_QUEUE) private readonly generateArticleImageQueue: Queue,
     @InjectQueue(PUBLISH_ARTICLE_QUEUE) private readonly publishArticleQueue: Queue,
     @InjectQueue(FETCH_FAVICON_QUEUE) private readonly fetchFaviconQueue: Queue,
     @InjectQueue(GENERATE_SCREENSHOT_QUEUE) private readonly generateScreenshotQueue: Queue
@@ -52,6 +54,10 @@ export class JobQueueService {
 
   enqueueGenerateArticle(webId: string, plannedArticleId: string) {
     return this.generateArticleQueue.add('GenerateArticle', { webId, plannedArticleId });
+  }
+
+  enqueueGenerateArticleImage(articleId: string, force = false) {
+    return this.generateArticleImageQueue.add('GenerateArticleImage', { articleId, force });
   }
 
   enqueuePublishArticle(
