@@ -32,6 +32,16 @@ export interface WordpressPostResponse {
   [key: string]: unknown;
 }
 
+export interface WordpressMediaResponse {
+  id: number;
+  source_url: string;
+  media_type?: string;
+  mime_type?: string;
+  alt_text?: string;
+  title?: { rendered: string } | string;
+  [key: string]: unknown;
+}
+
 export interface WordpressCategory {
   id: number;
   name: string;
