@@ -1170,25 +1170,17 @@ const bootstrap = async () => {
       }
     });
 
+    let publishOptions: { targetStatus: 'draft' | 'publish'; trigger: 'auto' | 'manual' | 'email' } | undefined;
+
     if (plan.web.integrationType === IntegrationType.WORDPRESS_APPLICATION_PASSWORD && plan.web.credentials?.encryptedJson) {
       const credentials = parseWordpressCredentials(plan.web.credentials.encryptedJson);
       if (credentials) {
         const publishMode = credentials.autoPublishMode ?? 'draft_only';
         const targetStatus = publishMode === 'auto_publish' ? 'publish' : 'draft';
-        await publishQueue.add('PublishArticle', {
-          articleId: article.id,
+        publishOptions = {
           targetStatus,
           trigger: 'auto'
-        });
-        logger.info(
-          {
-            jobId: job.id,
-            articleId: article.id,
-            publishMode,
-            targetStatus
-          },
-          'Enqueued WordPress publish job'
-        );
+        };
       }
     }
 
@@ -1197,69 +1189,29 @@ const bootstrap = async () => {
         'GenerateArticleImage',
         {
           articleId: article.id,
-          force: false
+          force: false,
+          publishOptions
         },
         buildArticleImageJobOptions(article.id)
       );
+      logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued GenerateArticleImage job');
     } else {
       logger.info(
         { jobId: job.id, articleId: article.id, webId: plan.webId },
         'Skipping article image generation because it is disabled for this web'
       );
+
+      if (publishOptions) {
+        await publishQueue.add('PublishArticle', {
+          articleId: article.id,
+          targetStatus: publishOptions.targetStatus,
+          trigger: publishOptions.trigger
+        });
+        logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued PublishArticle job directly');
+      }
     }
 
     logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
-
-    // Generate Magic Links and Send Email
-    try {
-      const publishToken = randomBytes(32).toString('hex');
-      const feedbackToken = randomBytes(32).toString('hex');
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
-
-      await (prisma as any).magicLink.createMany({
-        data: [
-          {
-            token: publishToken,
-            webId: plan.webId,
-            articleId: article.id,
-            type: 'PUBLISH',
-            expiresAt
-          },
-          {
-            token: feedbackToken,
-            webId: plan.webId,
-            articleId: article.id,
-            type: 'FEEDBACK',
-            expiresAt
-          }
-        ]
-      });
-
-      const frontendUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-      const publishLink = `${frontendUrl}/action/${publishToken}`;
-      const feedbackLink = `${frontendUrl}/action/${feedbackToken}`;
-
-      const emailContent = getArticleGeneratedEmail(article.title, publishLink, feedbackLink);
-
-      // Send to user email (or configured notification email)
-      const recipientEmail = plan.web.user.email;
-
-      if (process.env.MAILGUN_API_KEY && recipientEmail) {
-        await emailService.sendEmail({
-          to: recipientEmail,
-          subject: emailContent.subject,
-          html: emailContent.html
-        });
-        logger.info({ jobId: job.id, articleId: article.id, recipient: recipientEmail }, 'Notification email sent');
-      } else {
-        logger.warn({ jobId: job.id, articleId: article.id }, 'Skipping email: Missing API key or recipient');
-      }
-
-    } catch (emailError) {
-      logger.error({ jobId: job.id, articleId: article.id, error: formatUnknownError(emailError) }, 'Failed to send notification email');
-      // Don't fail the job just because email failed
-    }
   });
 
   createWorker<GenerateArticleImageJob>(GENERATE_ARTICLE_IMAGE_QUEUE, async (job) => {
@@ -1382,7 +1334,7 @@ const bootstrap = async () => {
         {
           prompt: renderedPrompts.userPrompt,
           size: 'landscape',
-          suggestedFileName: `${article.id}-featured`
+          suggestedFileName: `${article.id} - featured`
         },
         {
           task: 'article_image',
@@ -1459,6 +1411,15 @@ const bootstrap = async () => {
       { jobId: job.id, articleId: article.id, publicUrl },
       'Article featured image stored'
     );
+
+    if (job.data.publishOptions) {
+      await publishQueue.add('PublishArticle', {
+        articleId: article.id,
+        targetStatus: job.data.publishOptions.targetStatus,
+        trigger: job.data.publishOptions.trigger
+      });
+      logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued PublishArticle job after image generation');
+    }
   });
 
   createWorker<PublishArticleJob>(PUBLISH_ARTICLE_QUEUE, async (job) => {
@@ -1674,6 +1635,88 @@ const bootstrap = async () => {
       }
 
       logger.info({ jobId: job.id, articleId, targetStatus }, 'WordPress publish succeeded');
+
+      // Generate Magic Links and Send Email
+      try {
+        // Check if magic links already exist to avoid duplicates if job retries? 
+        // Actually, new tokens for new notification is fine, but let's check if we want to reuse.
+        // For simplicity, generate new ones.
+
+        const publishToken = randomBytes(32).toString('hex');
+        const feedbackToken = randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
+
+        await (prisma as any).magicLink.createMany({
+          data: [
+            {
+              token: publishToken,
+              webId: article.webId,
+              articleId: article.id,
+              type: 'PUBLISH',
+              expiresAt
+            },
+            {
+              token: feedbackToken,
+              webId: article.webId,
+              articleId: article.id,
+              type: 'FEEDBACK',
+              expiresAt
+            }
+          ]
+        });
+
+        const frontendUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+        // For published articles, "Publish" link might be "View" link?
+        // The email template handles "View" vs "Publish" based on status.
+        // We pass the magic link for "Publish" action (which might be used if user wants to re-publish or it's a draft).
+        // But if it's ALREADY published, we might want to show the public URL.
+
+        const publishMagicLink = `${frontendUrl}/action/${publishToken}`;
+        const feedbackMagicLink = `${frontendUrl}/action/${feedbackToken}`;
+
+        const links = {
+          feedback: feedbackMagicLink,
+          publish: targetStatus === 'draft' ? publishMagicLink : undefined,
+          view: targetStatus === 'publish' && response.link ? response.link : undefined,
+          edit: response.link ? response.link.replace(/\/$/, '') + '/wp-admin/post.php?post=' + response.id + '&action=edit' : undefined // Rough guess, or just link to WP admin
+          // Better to just use generic WP admin or if we have the edit link. 
+          // WordPress API response usually has 'link' (permalink). Edit link is not standard in response but we can construct it if we knew the admin URL.
+          // Let's stick to what we have. If we don't have edit link, omit it.
+        };
+
+        // If we don't have a direct edit link, maybe we can construct it from web url?
+        // web.url + /wp-admin/post.php?post=ID&action=edit
+        if (!links.edit && web.url && response.id) {
+          const adminBase = web.url.replace(/\/$/, '') + '/wp-admin';
+          links.edit = `${adminBase}/post.php?post=${response.id}&action=edit`;
+        }
+
+        const emailContent = getArticleGeneratedEmail(
+          article.title,
+          article.featuredImageUrl, // Now we have the image URL
+          targetStatus === 'publish' ? 'PUBLISHED' : 'DRAFT',
+          links
+        );
+
+        // Send to user email
+        const recipientEmail = web.user?.email;
+
+        if (process.env.MAILGUN_API_KEY && recipientEmail) {
+          await emailService.sendEmail({
+            to: recipientEmail,
+            subject: emailContent.subject,
+            html: emailContent.html
+          });
+          logger.info({ jobId: job.id, articleId: article.id, recipient: recipientEmail }, 'Notification email sent');
+        } else {
+          logger.warn({ jobId: job.id, articleId: article.id }, 'Skipping email: Missing API key or recipient');
+        }
+
+      } catch (emailError) {
+        logger.error({ jobId: job.id, articleId: article.id, error: formatUnknownError(emailError) }, 'Failed to send notification email');
+      }
+
     } catch (error) {
       if (error instanceof WordpressClientError && error.status >= 400 && error.status < 500) {
         logger.error({ jobId: job.id, articleId, status: error.status, response: error.responseBody }, 'WordPress client error');
@@ -1734,7 +1777,7 @@ const bootstrap = async () => {
         waitAfterLoadMs: 3000
       });
       const url = await assetStorage.saveFile(
-        `projects/${web.id}/screenshot-home-${width}x${height}.jpg`,
+        `projects / ${web.id} / screenshot - home - ${width}x${height}.jpg`,
         screenshot,
         'image/jpeg'
       );

@@ -50,4 +50,8 @@ export type GenerateHomepageScreenshotJob = {
 export type GenerateArticleImageJob = {
   articleId: string;
   force?: boolean;
+  publishOptions?: {
+    targetStatus: 'draft' | 'publish';
+    trigger: 'auto' | 'manual' | 'email';
+  };
 };
