@@ -3,8 +3,15 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { PUBLISH_ARTICLE_QUEUE, PublishArticleJob } from '@seobooster/queue-types';
+
 @Controller('magic-links')
 export class MagicLinksController {
+    constructor(
+        @InjectQueue(PUBLISH_ARTICLE_QUEUE) private publishQueue: Queue<PublishArticleJob>
+    ) { }
     @Get(':token')
     async validateToken(@Param('token') token: string) {
         const magicLink = await (prisma as any).magicLink.findUnique({
@@ -47,21 +54,15 @@ export class MagicLinksController {
         }
 
         if (magicLink.type === 'PUBLISH') {
-            // Trigger publish job (handled via queue in worker, but for now we update status directly or trigger via API if queue service is available)
-            // Ideally, we should inject a Queue service here. For MVP, let's update status to QUEUED and let scheduler pick it up? 
-            // Or better: create a PublishArticleJob.
-            // Since we don't have Queue injection setup in this simple controller yet, let's update ArticlePlan status to QUEUED if exists, or Article status directly?
-            // The requirement says: "po stisku zveřejnit se pouze zobrazí, že už se na to pracuje".
-
-            // Let's mark article as QUEUED for publishing.
+            // Trigger publish job via queue
             if (magicLink.articleId) {
-                // Find associated plan and set to QUEUED
-                await prisma.articlePlan.updateMany({
-                    where: { articleId: magicLink.articleId },
-                    data: { status: 'QUEUED', plannedPublishAt: new Date() } // Publish immediately
+                await this.publishQueue.add('PublishArticle', {
+                    articleId: magicLink.articleId,
+                    targetStatus: 'publish',
+                    trigger: 'email'
                 });
 
-                // Also update article status to QUEUED just in case
+                // Update article status to QUEUED to reflect immediate action in UI if needed
                 await prisma.article.update({
                     where: { id: magicLink.articleId },
                     data: { status: 'QUEUED' }
