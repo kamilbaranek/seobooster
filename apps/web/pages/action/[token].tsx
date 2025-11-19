@@ -25,7 +25,8 @@ export default function MagicLinkAction() {
         const tokenStr = Array.isArray(token) ? token[0] : token;
         console.log('MagicLink: Validating token', tokenStr);
 
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/magic-links/${tokenStr}`)
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
+        fetch(`${baseUrl}/magic-links/${tokenStr}`)
             .then(async (res) => {
                 console.log('MagicLink: Response status', res.status);
                 if (!res.ok) {
@@ -58,7 +59,8 @@ export default function MagicLinkAction() {
     const executeAction = async (token: string, type: string, payload?: any) => {
         setActionStatus('processing');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/magic-links/${token}/execute`, {
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
+            const res = await fetch(`${baseUrl}/magic-links/${token}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload || {})
