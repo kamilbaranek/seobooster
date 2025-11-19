@@ -12,7 +12,7 @@
     "dev:api": "npm run dev --workspace @seobooster/api",
     "dev:web": "npm run dev --workspace @seobooster/web",
     "dev:worker": "npm run dev --workspace @seobooster/worker",
-    "build": "npm run build --workspace @seobooster/ai-prompts && npm run build --workspace @seobooster/api && npm run build --workspace @seobooster/web && npm run build --workspace @seobooster/worker",
+    "build": "npm run build --workspace @seobooster/shared-types && npm run build --workspace @seobooster/queue-types && npm run build --workspace @seobooster/ai-types && npm run build --workspace @seobooster/ai-providers && npm run build --workspace @seobooster/storage && npm run build --workspace @seobooster/article-renderer && npm run build --workspace @seobooster/wp-client && npm run build --workspace @seobooster/ai-prompts && npm run build --workspace @seobooster/api && npm run build --workspace @seobooster/web && npm run build --workspace @seobooster/worker",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
