@@ -33,7 +33,7 @@ const bootstrap = async () => {
       process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
     );
     app.use(
-      '/assets',
+      '/api/assets',
       (req: express.Request, res: express.Response, next: express.NextFunction) => {
         res.header('Access-Control-Allow-Origin', '*');
         res.header('Access-Control-Allow-Methods', 'GET');
