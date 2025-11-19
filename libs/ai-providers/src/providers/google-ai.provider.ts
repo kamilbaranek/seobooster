@@ -300,24 +300,50 @@ export class GoogleAiProvider implements AiProvider {
       }
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`,
-      {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
+
+    // Log request for debugging
+    console.log('[GoogleAiProvider] Imagen request:', {
+      url,
+      model,
+      promptLength: prompt.length,
+      hasApiKey: !!apiKey
+    });
+
+    let response: Awaited<ReturnType<typeof fetch>>;
+    try {
+      response = await fetch(url, {
         method: 'POST',
         headers: {
           'x-goog-api-key': apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
-      }
-    );
+      });
+    } catch (fetchError) {
+      console.error('[GoogleAiProvider] Imagen fetch failed:', fetchError);
+      throw new Error(`Imagen API fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+    }
+
+    console.log('[GoogleAiProvider] Imagen response status:', response.status);
 
     if (!response.ok) {
       const text = await response.text();
+      console.error('[GoogleAiProvider] Imagen API error response:', text);
       throw new Error(`Imagen API failed ${response.status}: ${text}`);
     }
 
-    const result = (await response.json()) as ImagenPredictResponse;
+    const responseText = await response.text();
+    console.log('[GoogleAiProvider] Imagen raw response (first 500 chars):', responseText.substring(0, 500));
+
+    let result: ImagenPredictResponse;
+    try {
+      result = JSON.parse(responseText) as ImagenPredictResponse;
+    } catch (parseError) {
+      console.error('[GoogleAiProvider] Failed to parse Imagen response:', parseError);
+      throw new Error(`Failed to parse Imagen response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+    }
+
     this.lastRawResponse = result;
 
     if (result.error) {
@@ -326,11 +352,18 @@ export class GoogleAiProvider implements AiProvider {
 
     const prediction = result.predictions?.[0];
     if (!prediction?.bytesBase64Encoded) {
-      throw new Error('No image data in Imagen response');
+      console.error('[GoogleAiProvider] Imagen response structure:', JSON.stringify(result, null, 2));
+      throw new Error('No image data in Imagen response. Check logs for full response structure.');
     }
 
     const buffer = Buffer.from(prediction.bytesBase64Encoded, 'base64');
     const mimeType = prediction.mimeType ?? 'image/png';
+
+    console.log('[GoogleAiProvider] Successfully generated image:', {
+      model,
+      mimeType,
+      sizeBytes: buffer.length
+    });
 
     return {
       data: buffer,
