@@ -456,8 +456,8 @@ const getImageExtensionFromMime = (mimeType?: string | null) => {
   return 'png';
 };
 
-const buildArticleImagePath = (articleId: string, extension: string) =>
-  `article-images/${articleId}/featured-${Date.now()}.${extension}`;
+const buildArticleImagePath = (webId: string, articleId: string, imageId: string) =>
+  `webs/${webId}/articles/${articleId}/images/${imageId}.jpg`;
 
 const getMimeTypeFromExtension = (extension?: string) => {
   const normalized = (extension ?? '').toLowerCase();
@@ -1201,7 +1201,10 @@ const bootstrap = async () => {
         web: {
           include: {
             analysis: true,
-            user: true
+            user: true,
+            subscription: {
+              select: { imageGenerationLimit: true }
+            }
           }
         },
         plan: {
@@ -1227,10 +1230,19 @@ const bootstrap = async () => {
       return;
     }
 
-    if (article.featuredImageUrl && !job.data.force) {
+    // Check subscription limit
+    const imageGenerationLimit = article.web.subscription?.imageGenerationLimit ?? 1;
+    const existingImagesCount = await prisma.articleImage.count({
+      where: {
+        articleId: article.id,
+        status: { in: ['PENDING', 'SUCCESS'] }
+      }
+    });
+
+    if (existingImagesCount >= imageGenerationLimit && !job.data.force) {
       logger.info(
-        { jobId: job.id, articleId: article.id },
-        'Article already has featured image; skipping generation'
+        { jobId: job.id, articleId: article.id, limit: imageGenerationLimit, existing: existingImagesCount },
+        'Image generation limit reached'
       );
       return;
     }
@@ -1273,6 +1285,28 @@ const bootstrap = async () => {
     const providerForCall = providerSelection.provider;
     const providerName = providerForCall.name;
     const modelName = providerSelection.model;
+
+    // Create ArticleImage record with PENDING status
+    const position = await prisma.articleImage.count({
+      where: { articleId: article.id }
+    });
+
+    const articleImage = await prisma.articleImage.create({
+      data: {
+        articleId: article.id,
+        status: 'PENDING',
+        prompt: renderedPrompts.userPrompt,
+        provider: providerName,
+        model: modelName,
+        position,
+        isFeatured: existingImagesCount === 0 // First image is featured
+      }
+    });
+
+    logger.info(
+      { jobId: job.id, articleId: article.id, imageId: articleImage.id, isFeatured: articleImage.isFeatured },
+      'ArticleImage record created with PENDING status'
+    );
 
     let imageResult;
     try {
@@ -1322,6 +1356,21 @@ const bootstrap = async () => {
         status: 'ERROR',
         errorMessage: error instanceof Error ? error.message : 'Unknown error'
       });
+
+      // Update ArticleImage to FAILED status
+      await prisma.articleImage.update({
+        where: { id: articleImage.id },
+        data: {
+          status: 'FAILED',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+
+      logger.error(
+        { jobId: job.id, articleId: article.id, imageId: articleImage.id, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Article image generation failed'
+      );
+
       throw error;
     }
 

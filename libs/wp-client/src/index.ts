@@ -190,6 +190,15 @@ const toBuffer = (binary: MediaBinary) => {
   return Buffer.from(binary.buffer, binary.byteOffset, binary.byteLength);
 };
 
+const sanitizeHeader = (str: string) => {
+  // Normalize to decompose combined graphemes (e.g. "č" -> "c" + "ˇ")
+  // then remove diacritics and keep only ASCII characters.
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7F]/g, '');
+};
+
 export const uploadMedia = (
   credentials: WordpressCredentials,
   binary: MediaBinary,
@@ -198,17 +207,19 @@ export const uploadMedia = (
   const url = new URL('/wp-json/wp/v2/media', credentials.baseUrl);
   const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
   const body = toBuffer(binary);
+  const safeFilename = sanitizeHeader(options.filename);
+
   const headers: Record<string, string> = {
     Authorization: buildAuthHeader(credentials),
     'Content-Type': options.mimeType,
     'Content-Length': String(body.byteLength),
-    'Content-Disposition': `attachment; filename="${options.filename}"`
+    'Content-Disposition': `attachment; filename="${safeFilename}"`
   };
   if (options.title) {
-    headers['X-WP-Title'] = options.title;
+    headers['X-WP-Title'] = sanitizeHeader(options.title);
   }
   if (options.altText) {
-    headers['X-WP-Alt-Text'] = options.altText;
+    headers['X-WP-Alt-Text'] = sanitizeHeader(options.altText);
   }
 
   return new Promise<WordpressMediaResponse>((resolve, reject) => {
