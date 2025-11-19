@@ -3,7 +3,7 @@ import { createDecipheriv } from 'crypto';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
 
-const projectRoot = resolve(__dirname, '../../..');
+const projectRoot = process.env.PROJECT_ROOT ?? resolve(__dirname, '../../..');
 process.env.PROJECT_ROOT = projectRoot;
 
 ['.env', '.env.local'].forEach((envFile, index) => {
@@ -38,8 +38,11 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
-import { renderArticleMarkdown } from '../../../libs/article-renderer/dist';
-import {
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { renderArticleMarkdown } = require(resolve(projectRoot, 'libs/article-renderer/dist'));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const {
   createPost,
   updatePost,
   WordpressClientError,
@@ -48,7 +51,7 @@ import {
   WordpressPostPayload,
   fetchTags,
   createTag
-} from '../../../libs/wp-client/dist';
+} = require(resolve(projectRoot, 'libs/wp-client/dist'));
 
 const logger = createLogger('worker');
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';

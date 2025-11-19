@@ -32,10 +32,12 @@ module.exports = {
       script: 'npm',
       args: 'run start:worker',
       env: {
-        NODE_ENV: 'development'
+        NODE_ENV: 'development',
+        PROJECT_ROOT: '/var/www/seobooster'
       },
       env_production: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PROJECT_ROOT: '/var/www/seobooster'
       },
       max_memory_restart: '512M'
     }
