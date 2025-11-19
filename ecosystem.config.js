@@ -9,7 +9,8 @@ module.exports = {
         NODE_ENV: 'development'
       },
       env_production: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PROJECT_ROOT: '/var/www/seobooster'
       },
       max_memory_restart: '512M'
     },
@@ -22,7 +23,8 @@ module.exports = {
         NODE_ENV: 'development'
       },
       env_production: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PROJECT_ROOT: '/var/www/seobooster'
       },
       max_memory_restart: '512M'
     },
