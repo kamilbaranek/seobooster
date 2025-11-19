@@ -307,6 +307,11 @@ const ArticleDetailPage = () => {
             </header>
             {loading && <p className="placeholder">Načítám článek…</p>}
             {!article && !loading && <p className="placeholder">Článek nebyl nalezen.</p>}
+            {article?.featuredImageUrl && (
+              <div className="preview-image">
+                <img src={article.featuredImageUrl} alt="Featured" />
+              </div>
+            )}
             {article && previewMode === 'html' && (
               <div className="article-html" dangerouslySetInnerHTML={{ __html: article.html }} />
             )}
@@ -447,6 +452,19 @@ const ArticleDetailPage = () => {
           border-radius: 0.8rem;
           flex: 1;
           overflow: auto;
+        }
+        .preview-image {
+          margin-bottom: 1.5rem;
+          border-radius: 0.8rem;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .preview-image img {
+          display: block;
+          width: 100%;
+          height: auto;
+          max-height: 400px;
+          object-fit: cover;
         }
         img {
           width: 100%;
