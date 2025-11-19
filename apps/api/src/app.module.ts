@@ -15,6 +15,7 @@ import { AdminPromptsModule } from './admin/prompts/admin-prompts.module';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
 import { AssetStorageModule } from './storage/asset-storage.module';
+import { ArticlesModule } from './articles/articles.module';
 
 @Module({
   imports: [
@@ -52,7 +53,8 @@ import { AssetStorageModule } from './storage/asset-storage.module';
     MeModule,
     AdminPromptsModule,
     AdminAiLogsModule,
-    AssetStorageModule
+    AssetStorageModule,
+    ArticlesModule
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard]
