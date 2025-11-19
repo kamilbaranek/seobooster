@@ -33,5 +33,9 @@
     "tsconfig-paths": "latest",
     "typescript": "latest",
     "typescript-eslint": "^8.46.4"
+  },
+  "dependencies": {
+    "form-data": "^4.0.5",
+    "mailgun.js": "^12.1.1"
   }
 }

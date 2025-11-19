@@ -108,6 +108,7 @@ model Web {
   articlePlans  ArticlePlan[]
   aiCallLogs    AiCallLog[]
   seoStrategies SeoStrategy[]
+  magicLinks    MagicLink[]
 
   faviconUrl                    String?
   faviconSourceUrl              String?
@@ -205,6 +206,9 @@ model Article {
   approvalTokens ArticleApprovalToken[]
   plan           ArticlePlan?           @relation("ArticlePlanArticle")
   images         ArticleImage[]
+  magicLinks     MagicLink[]
+  feedbackRating  Int?
+  feedbackComment String?
 
   @@index([wordpressCategoryId])
   @@index([wordpressAuthorId])
@@ -346,4 +350,19 @@ model ArticleImage {
   @@index([articleId])
   @@index([articleId, isFeatured])
   @@index([articleId, position])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  webId     String
+  web       Web      @relation(fields: [webId], references: [id], onDelete: Cascade)
+  articleId String?
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  type      String   // "PUBLISH" | "FEEDBACK"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
 }

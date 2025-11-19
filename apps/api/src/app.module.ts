@@ -16,6 +16,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
 import { AssetStorageModule } from './storage/asset-storage.module';
 import { ArticlesModule } from './articles/articles.module';
+import { MagicLinksModule } from './magic-links/magic-links.module';
 
 @Module({
   imports: [
@@ -54,9 +55,11 @@ import { ArticlesModule } from './articles/articles.module';
     AdminPromptsModule,
     AdminAiLogsModule,
     AssetStorageModule,
-    ArticlesModule
+    AssetStorageModule,
+    ArticlesModule,
+    MagicLinksModule
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard]
 })
-export class AppModule {}
+export class AppModule { }

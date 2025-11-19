@@ -83,6 +83,8 @@ import type {
   WordpressPostPayload,
   WordpressPostResponse
 } from '@seobooster/wp-client';
+import { EmailService, getArticleGeneratedEmail } from '@seobooster/email';
+import { randomBytes } from 'crypto';
 const logger = createLogger('worker');
 const formatUnknownError = (error: unknown) =>
   error instanceof Error
@@ -239,6 +241,13 @@ const publishQueue = new Queue(PUBLISH_ARTICLE_QUEUE, { connection: redisConnect
 const faviconQueue = new Queue(FETCH_FAVICON_QUEUE, { connection: redisConnection });
 const screenshotQueue = new Queue(GENERATE_SCREENSHOT_QUEUE, { connection: redisConnection });
 const articleImageQueue = new Queue(GENERATE_ARTICLE_IMAGE_QUEUE, { connection: redisConnection });
+
+const emailService = new EmailService({
+  apiKey: process.env.MAILGUN_API_KEY ?? '',
+  domain: process.env.MAILGUN_DOMAIN ?? '',
+  host: process.env.MAILGUN_HOST,
+  fromEmail: process.env.MAILGUN_FROM_EMAIL ?? `noreply@${process.env.MAILGUN_DOMAIN ?? 'example.com'}`
+});
 
 let redisLimitExceeded = false;
 
@@ -1192,6 +1201,57 @@ const bootstrap = async () => {
     }
 
     logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
+
+    // Generate Magic Links and Send Email
+    try {
+      const publishToken = randomBytes(32).toString('hex');
+      const feedbackToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
+
+      await (prisma as any).magicLink.createMany({
+        data: [
+          {
+            token: publishToken,
+            webId: plan.webId,
+            articleId: article.id,
+            type: 'PUBLISH',
+            expiresAt
+          },
+          {
+            token: feedbackToken,
+            webId: plan.webId,
+            articleId: article.id,
+            type: 'FEEDBACK',
+            expiresAt
+          }
+        ]
+      });
+
+      const frontendUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+      const publishLink = `${frontendUrl}/action/${publishToken}`;
+      const feedbackLink = `${frontendUrl}/action/${feedbackToken}`;
+
+      const emailContent = getArticleGeneratedEmail(article.title, publishLink, feedbackLink);
+
+      // Send to user email (or configured notification email)
+      const recipientEmail = plan.web.user.email;
+
+      if (process.env.MAILGUN_API_KEY && recipientEmail) {
+        await emailService.sendEmail({
+          to: recipientEmail,
+          subject: emailContent.subject,
+          html: emailContent.html
+        });
+        logger.info({ jobId: job.id, articleId: article.id, recipient: recipientEmail }, 'Notification email sent');
+      } else {
+        logger.warn({ jobId: job.id, articleId: article.id }, 'Skipping email: Missing API key or recipient');
+      }
+
+    } catch (emailError) {
+      logger.error({ jobId: job.id, articleId: article.id, error: formatUnknownError(emailError) }, 'Failed to send notification email');
+      // Don't fail the job just because email failed
+    }
   });
 
   createWorker<GenerateArticleImageJob>(GENERATE_ARTICLE_IMAGE_QUEUE, async (job) => {
