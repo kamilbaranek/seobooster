@@ -103,7 +103,7 @@ const resolveAssetStorage = () => {
 
   if (driver === 'local') {
     const rootPath = process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets';
-    const publicUrl = process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/assets';
+    const publicUrl = process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/api/assets';
     return createAssetStorage({
       driver,
       local: {
@@ -131,7 +131,7 @@ const resolveAssetStorage = () => {
 };
 
 const assetStorage = resolveAssetStorage();
-const assetPublicBaseUrl = (process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/assets').replace(
+const assetPublicBaseUrl = (process.env.ASSET_PUBLIC_BASE_URL ?? 'http://localhost:3333/api/assets').replace(
   /\/$/,
   ''
 );
@@ -767,7 +767,7 @@ const bootstrap = async () => {
       const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
       rawScanText =
         typeof (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent ===
-        'function'
+          'function'
           ? (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent?.()
           : undefined;
       await recordAiCall({
@@ -1395,8 +1395,8 @@ const bootstrap = async () => {
         renderedHtml.trim().length > 0
           ? renderedHtml
           : article.html?.trim().length
-          ? article.html
-          : article.markdown;
+            ? article.html
+            : article.markdown;
       // Resolve WordPress category (article override -> web default)
       const categoryRemoteId =
         article.wordpressCategory?.remoteId ?? article.web.defaultWordpressCategory?.remoteId ?? null;
