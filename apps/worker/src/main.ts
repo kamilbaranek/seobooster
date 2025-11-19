@@ -525,6 +525,12 @@ const downloadFeaturedImageBinary = async (
   }
 };
 
+const buildArticleImageJobOptions = (articleId: string, force?: boolean) => ({
+  jobId: force ? `article-image-${articleId}-${Date.now()}` : `article-image-${articleId}`,
+  removeOnComplete: true,
+  removeOnFail: true
+});
+
 const persistSeoStrategyArtifacts = async (
   webId: string,
   strategy: SeoStrategy,
@@ -1169,9 +1175,21 @@ const bootstrap = async () => {
       }
     }
 
-    await articleImageQueue.add('GenerateArticleImage', {
-      articleId: article.id
-    });
+    if (plan.web.articleImageGenerationEnabled !== false) {
+      await articleImageQueue.add(
+        'GenerateArticleImage',
+        {
+          articleId: article.id,
+          force: false
+        },
+        buildArticleImageJobOptions(article.id)
+      );
+    } else {
+      logger.info(
+        { jobId: job.id, articleId: article.id, webId: plan.webId },
+        'Skipping article image generation because it is disabled for this web'
+      );
+    }
 
     logger.info({ jobId: job.id, articleId: article.id, planId: plan.id }, 'Article draft stored');
   });
@@ -1198,6 +1216,14 @@ const bootstrap = async () => {
 
     if (!article) {
       logger.warn({ jobId: job.id, articleId: job.data.articleId }, 'Article not found for image generation');
+      return;
+    }
+
+    if (article.web.articleImageGenerationEnabled === false && !job.data.force) {
+      logger.info(
+        { jobId: job.id, articleId: article.id, webId: article.webId },
+        'Article image generation disabled; skipping job'
+      );
       return;
     }
 

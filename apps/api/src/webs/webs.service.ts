@@ -73,7 +73,9 @@ export class WebsService {
         url: dto.url ?? web.url,
         nickname: dto.nickname ?? web.nickname,
         status: dto.status ?? web.status,
-        integrationType: dto.integrationType ?? web.integrationType
+        integrationType: dto.integrationType ?? web.integrationType,
+        articleImageGenerationEnabled:
+          dto.articleImageGenerationEnabled ?? web.articleImageGenerationEnabled
       }
     });
 
@@ -284,7 +286,8 @@ export class WebsService {
         screenshotHeight: web.screenshotHeight,
         integrationType: web.integrationType,
         hasWordpressCredentials: Boolean(web.credentials),
-        autoPublishMode: this.resolveAutoPublishMode(web.credentials ?? null)
+        autoPublishMode: this.resolveAutoPublishMode(web.credentials ?? null),
+        articleImageGenerationEnabled: web.articleImageGenerationEnabled
       },
       analysis: {
         lastScanAt: analysis?.lastScanAt ?? null,

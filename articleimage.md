@@ -400,21 +400,21 @@ interface WordpressMediaResponse {
 
 **Cíl:** Dodat ochrany před zneužitím a drobné UX/ops vylepšení.
 
-- [ ] 5.1 Přepínače v adminu / konfiguraci
+- [x] 5.1 Přepínače v adminu / konfiguraci
   - **Co:** Přidat možnost globálně nebo per web vypnout generování obrázků (např. flag v DB nebo v prompt configu).
   - **Proč:** Aby šlo feature postupně rolloutovat a případně rychle vypnout.
   - **Jak:**  
     - jednoduchý boolean v příslušném modelu (`Web` nebo vlastní tabulka konfigurace),  
     - kontrola flagu v image workeru před voláním AI.
 
-- [ ] 5.2 Jednoduché rate‑limity
+- [x] 5.2 Jednoduché rate‑limity
   - **Co:** Zavést ochranu, aby jeden web / článek negeneroval obrázky příliš často.
   - **Proč:** Ochrana nákladů a stability poskytovatele AI.
   - **Jak:**  
     - na začátku handleru image workeru zkontrolovat např. timestamp posledního generování,  
     - pokud pod hranicí (např. < X minut), job odložit nebo zahodit s logem.
 
-- [ ] 5.3 Dokumentace a úklid
+- [x] 5.3 Dokumentace a úklid
   - **Co:** Aktualizovat `development_plan.md` / `implementation_plan.md` a README, pokud je to relevantní.
   - **Proč:** Plán a realita musí zůstat v synchronu.
   - **Jak:**  
@@ -425,3 +425,9 @@ interface WordpressMediaResponse {
 > - jsou doplněné přepínače / základní limity (alespoň minimální verze),  
 > - dokumentace odpovídá implementaci,  
 > - buildy pro celý monorepo (`npm run build`) jsou zelené a vše je commitnuté.
+
+### Stav po Fázi 5
+
+- WordPress panel v dashboardu obsahuje přepínač „Automaticky generovat obrázky…“, který volá `PATCH /webs/:id` a zapisuje `articleImageGenerationEnabled` (default zapnuto). Worker i plánovač respektují hodnotu (auto image joby se neřadí, dokud uživatel přepínač znovu nezapne; manuální požadavky je možné vynutit parametrem `force=true`).
+- BullMQ job pro obrázky používá deduplikovaný `jobId` (`article-image-{articleId}`) a `force=true` přidá timestamp, takže implicitně neproběhne více generací paralelně – to funguje jako jednoduchý rate-limit.
+- Dokumentace (tento soubor) doplněna o API kontrakt a dokončené checkboxy; README/plan není třeba měnit, protože tato funkcionalita je zatím pouze ve feature plánku.

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
 import { IntegrationType, WebStatus } from '@prisma/client';
 
 export class UpdateWebDto {
@@ -17,5 +17,8 @@ export class UpdateWebDto {
   @IsOptional()
   @IsEnum(IntegrationType)
   integrationType?: IntegrationType;
-}
 
+  @IsOptional()
+  @IsBoolean()
+  articleImageGenerationEnabled?: boolean;
+}

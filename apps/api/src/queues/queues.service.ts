@@ -57,7 +57,15 @@ export class JobQueueService {
   }
 
   enqueueGenerateArticleImage(articleId: string, force = false) {
-    return this.generateArticleImageQueue.add('GenerateArticleImage', { articleId, force });
+    return this.generateArticleImageQueue.add(
+      'GenerateArticleImage',
+      { articleId, force },
+      {
+        jobId: force ? `article-image-${articleId}-${Date.now()}` : `article-image-${articleId}`,
+        removeOnComplete: true,
+        removeOnFail: true
+      }
+    );
   }
 
   enqueuePublishArticle(
