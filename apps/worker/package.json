@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "@seobooster/article-renderer": "0.1.0",
     "@seobooster/ai-prompts": "0.1.0",
     "@seobooster/ai-providers": "0.1.0",
     "@seobooster/queue-types": "0.1.0",

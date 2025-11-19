@@ -1,9 +1,36 @@
 import { config as loadEnv } from 'dotenv';
 import { createDecipheriv } from 'crypto';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
-const projectRoot = process.env.PROJECT_ROOT ?? resolve(__dirname, '../../..');
+const resolveProjectRoot = () => {
+  const candidates = [
+    process.env.PROJECT_ROOT,
+    resolve(__dirname, '../../..'),
+    resolve(__dirname, '../../../../..'),
+    resolve(process.cwd(), '..', '..'),
+    process.cwd()
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    const pkgPath = resolve(candidate, 'package.json');
+    if (!existsSync(pkgPath)) {
+      continue;
+    }
+    try {
+      const pkgJson = JSON.parse(readFileSync(pkgPath, 'utf8')) as { workspaces?: unknown };
+      if (pkgJson?.workspaces) {
+        return candidate;
+      }
+    } catch {
+      // ignore malformed package.json candidates
+    }
+  }
+
+  return candidates[0] ?? process.cwd();
+};
+
+const projectRoot = resolveProjectRoot();
 process.env.PROJECT_ROOT = projectRoot;
 
 ['.env', '.env.local'].forEach((envFile, index) => {
@@ -38,6 +65,7 @@ import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
 import { fetchAndStoreFavicon } from './services/favicon';
 import { captureScreenshot, shutdownRenderer } from './services/rendering-service';
+import { renderArticleMarkdown } from '@seobooster/article-renderer';
 import {
   createPost,
   updatePost,
@@ -51,9 +79,6 @@ import type {
   WordpressPostPayload,
   WordpressPostResponse
 } from '@seobooster/wp-client';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { renderArticleMarkdown } = require(resolve(projectRoot, 'libs/article-renderer/dist'));
-
 const logger = createLogger('worker');
 const formatUnknownError = (error: unknown) =>
   error instanceof Error

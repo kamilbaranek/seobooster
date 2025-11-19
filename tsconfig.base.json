@@ -26,6 +26,9 @@
       "@seobooster/ai-prompts": [
         "libs/ai-prompts/src"
       ],
+      "@seobooster/article-renderer": [
+        "libs/article-renderer/src"
+      ],
       "@seobooster/storage": [
         "libs/storage/src"
       ],
