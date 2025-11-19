@@ -264,7 +264,7 @@ interface WordpressMediaResponse {
 
 **Cíl:** Mít frontu a worker, který umí pro daný článek vygenerovat obrázek a uložit ho do storage + DB jako `featuredImageUrl`. Nic zatím nepřipojuje k WordPress publish kroku.
 
-- [ ] 2.1 Definuj nový job typ a frontu
+- [x] 2.1 Definuj nový job typ a frontu
   - **Co:** V `libs/queue-types` přidat:
     - konstantu `GENERATE_ARTICLE_IMAGE_QUEUE`,
     - typ `GenerateArticleImageJob` (obsahuje např. `articleId`, později i `forceRegenerate`).
@@ -273,7 +273,7 @@ interface WordpressMediaResponse {
     - postupuj podle existujících jobů (např. `GENERATE_ARTICLE_QUEUE`),
     - build: `npm run build --workspace @seobooster/queue-types`.
 
-- [ ] 2.2 Přidej worker do `apps/worker`
+- [x] 2.2 Přidej worker do `apps/worker`
   - **Co:** V `apps/worker/src/main.ts` (nebo separátní službě) definuj `createWorker<GenerateArticleImageJob>(GENERATE_ARTICLE_IMAGE_QUEUE, ...)`.
   - **Proč:** Worker bude centrální místo, kde se obrázek generuje a ukládá.
   - **Jak:**
@@ -281,7 +281,7 @@ interface WordpressMediaResponse {
     - handler prozatím může jen zalogovat, že job dorazil (v první iteraci),
     - build: `npm run build --workspace @seobooster/worker`.
 
-- [ ] 2.3 Napoj handler na AI orchestrátor
+- [x] 2.3 Napoj handler na AI orchestrátor
   - **Co:** V handleru článkového image workeru:
     - načti potřebná data z DB (článek, web, SEO data),
     - připrav objekt proměnných pro task `article_image`,
@@ -292,7 +292,7 @@ interface WordpressMediaResponse {
     - použij stejný pattern pro logging, error handling,
     - zatím ukládej výsledek jen do logu nebo do dočasné konstanty (bez storage).
 
-- [ ] 2.4 Ulož image do storage a do DB
+- [x] 2.4 Ulož image do storage a do DB
   - **Co:** Propojit výsledek generování s `@seobooster/storage`:
     - uložit soubor přes storage driver,
     - vzít `publicUrl` a zapsat ho do `Article.featuredImageUrl`.

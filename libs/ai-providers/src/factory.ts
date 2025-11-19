@@ -15,7 +15,8 @@ const buildModelMap = (overrides?: Partial<AiModelMap>): AiModelMap => ({
   scan: overrides?.scan ?? process.env.AI_MODEL_SCAN ?? 'openrouter/auto',
   analyze: overrides?.analyze ?? process.env.AI_MODEL_ANALYZE ?? 'openrouter/auto',
   strategy: overrides?.strategy ?? process.env.AI_MODEL_STRATEGY ?? 'openrouter/auto',
-  article: overrides?.article ?? process.env.AI_MODEL_ARTICLE ?? 'openrouter/auto'
+  article: overrides?.article ?? process.env.AI_MODEL_ARTICLE ?? 'openrouter/auto',
+  article_image: overrides?.article_image ?? process.env.AI_MODEL_ARTICLE_IMAGE ?? 'pollinations/image'
 });
 
 export const buildAiProviderFromEnv = (

@@ -1,6 +1,6 @@
 export type ProviderName = 'openrouter' | 'openai' | 'anthropic' | 'perplexity';
 
-export type AiTaskType = 'scan' | 'analyze' | 'strategy' | 'article';
+export type AiTaskType = 'scan' | 'analyze' | 'strategy' | 'article' | 'article_image';
 
 export type AiModelMap = Record<AiTaskType, string>;
 
@@ -77,12 +77,31 @@ export interface AiProvider {
     options: GenerateArticleOptions,
     overrides?: PromptOverrides<'article'>
   ): Promise<ArticleDraft>;
+  generateImage(
+    request: GenerateImageRequest,
+    overrides?: PromptOverrides<'article_image'>
+  ): Promise<GeneratedImageResult>;
   getLastRawResponse?(): unknown;
 }
 
 export interface GenerateArticleOptions {
   clusterName: string;
   targetTone?: string;
+}
+
+export type GenerateImageSize = 'square' | 'landscape' | 'portrait';
+
+export interface GenerateImageRequest {
+  prompt: string;
+  size?: GenerateImageSize;
+  suggestedFileName?: string;
+}
+
+export interface GeneratedImageResult {
+  data: ArrayBuffer | Uint8Array | Buffer;
+  mimeType: string;
+  source?: string;
+  suggestedFileName?: string;
 }
 
 export type PromptOverrides<TTask extends AiTaskType> = {
