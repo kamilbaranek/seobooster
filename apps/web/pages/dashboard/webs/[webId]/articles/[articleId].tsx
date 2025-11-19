@@ -104,18 +104,18 @@ const ArticleDetailPage = () => {
   }, [webId]);
 
   const fetchImages = useCallback(async () => {
-    if (!articleId) {
+    if (!webId || !articleId) {
       return;
     }
     try {
-      const payload = await apiFetch<ArticleImagesResponse>(`/articles/${articleId}/images`);
+      const payload = await apiFetch<ArticleImagesResponse>(`/webs/${webId}/articles/${articleId}/images`);
       setImages(payload.images);
       setImagesLimit(payload.limit);
       setImagesGenerated(payload.generated);
     } catch (err) {
       // Silently fail on polling
     }
-  }, [articleId]);
+  }, [webId, articleId]);
 
   useEffect(() => {
     fetchArticle();
@@ -223,13 +223,13 @@ const ArticleDetailPage = () => {
   };
 
   const handleGenerateImage = async (force = false) => {
-    if (!articleId) {
+    if (!webId || !articleId) {
       return;
     }
     setImageGenerating(true);
     setActionStatus('Spouštím generování obrázku…');
     try {
-      await apiFetch(`/articles/${articleId}/images/generate`, {
+      await apiFetch(`/webs/${webId}/articles/${articleId}/images/generate`, {
         method: 'POST',
         body: JSON.stringify({ force })
       });
@@ -243,11 +243,11 @@ const ArticleDetailPage = () => {
   };
 
   const handleSetFeatured = async (imageId: string) => {
-    if (!articleId) {
+    if (!webId || !articleId) {
       return;
     }
     try {
-      await apiFetch(`/articles/${articleId}/images/${imageId}/featured`, { method: 'PATCH' });
+      await apiFetch(`/webs/${webId}/articles/${articleId}/images/${imageId}/featured`, { method: 'PATCH' });
       setActionStatus('Obrázek nastaven jako hlavní.');
       await fetchImages();
     } catch (err) {
@@ -256,11 +256,11 @@ const ArticleDetailPage = () => {
   };
 
   const handleDeleteImage = async (imageId: string) => {
-    if (!articleId || !confirm('Smazat tento obrázek?')) {
+    if (!webId || !articleId || !confirm('Smazat tento obrázek?')) {
       return;
     }
     try {
-      await apiFetch(`/articles/${articleId}/images/${imageId}`, { method: 'DELETE' });
+      await apiFetch(`/webs/${webId}/articles/${articleId}/images/${imageId}`, { method: 'DELETE' });
       setActionStatus('Obrázek smazán.');
       await fetchImages();
     } catch (err) {

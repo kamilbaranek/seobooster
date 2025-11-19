@@ -17,7 +17,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { GENERATE_ARTICLE_IMAGE_QUEUE, GenerateArticleImageJob } from '@seobooster/queue-types';
 
-@Controller('articles/:articleId/images')
+@Controller('webs/:webId/articles/:articleId/images')
 @UseGuards(JwtAuthGuard)
 export class ArticlesImagesController {
   constructor(
