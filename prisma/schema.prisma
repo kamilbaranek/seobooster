@@ -57,6 +57,11 @@ enum AssetStatus {
   FAILED
 }
 
+enum WordpressTagsMode {
+  AUTO_FROM_KEYWORDS
+  MANUAL_ONLY
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -103,15 +108,56 @@ model Web {
   aiCallLogs    AiCallLog[]
   seoStrategies SeoStrategy[]
 
-  faviconUrl                String?
-  faviconSourceUrl          String?
-  faviconStatus             AssetStatus @default(PENDING)
-  faviconLastFetchedAt      DateTime?
-  screenshotUrl             String?
-  screenshotStatus          AssetStatus @default(PENDING)
-  screenshotLastGeneratedAt DateTime?
-  screenshotWidth           Int?
-  screenshotHeight          Int?
+  faviconUrl                 String?
+  faviconSourceUrl           String?
+  faviconStatus              AssetStatus            @default(PENDING)
+  faviconLastFetchedAt       DateTime?
+  screenshotUrl              String?
+  screenshotStatus           AssetStatus            @default(PENDING)
+  screenshotLastGeneratedAt  DateTime?
+  screenshotWidth            Int?
+  screenshotHeight           Int?
+  wordpressTagsMode          WordpressTagsMode      @default(AUTO_FROM_KEYWORDS)
+  defaultWordpressCategory   WebWordpressCategory?  @relation("WebDefaultCategory", fields: [defaultWordpressCategoryId], references: [id])
+  defaultWordpressCategoryId String?                @unique
+  defaultWordpressAuthor     WebWordpressAuthor?    @relation("WebDefaultAuthor", fields: [defaultWordpressAuthorId], references: [id])
+  defaultWordpressAuthorId   String?                @unique
+  wordpressCategories        WebWordpressCategory[]
+  wordpressAuthors           WebWordpressAuthor[]
+}
+
+model WebWordpressCategory {
+  id        String   @id @default(cuid())
+  web       Web      @relation(fields: [webId], references: [id], onDelete: Cascade)
+  webId     String
+  name      String
+  slug      String?
+  remoteId  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  articles      Article[]
+  defaultForWeb Web?      @relation("WebDefaultCategory")
+
+  @@unique([webId, remoteId])
+  @@index([webId])
+}
+
+model WebWordpressAuthor {
+  id        String   @id @default(cuid())
+  web       Web      @relation(fields: [webId], references: [id], onDelete: Cascade)
+  webId     String
+  name      String
+  slug      String?
+  remoteId  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  articles      Article[]
+  defaultForWeb Web?      @relation("WebDefaultAuthor")
+
+  @@unique([webId, remoteId])
+  @@index([webId])
 }
 
 model WebCredentials {
@@ -136,20 +182,29 @@ model WebAnalysis {
 }
 
 model Article {
-  id              String        @id @default(cuid())
-  web             Web           @relation(fields: [webId], references: [id])
-  webId           String
-  title           String
-  status          ArticleStatus @default(DRAFT)
-  markdown        String
-  html            String
-  wordpressPostId String?
-  publishedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                  String                @id @default(cuid())
+  web                 Web                   @relation(fields: [webId], references: [id])
+  webId               String
+  title               String
+  status              ArticleStatus         @default(DRAFT)
+  markdown            String
+  html                String
+  wordpressPostId     String?
+  tags                Json?
+  featuredImageUrl    String?
+  wordpressCategory   WebWordpressCategory? @relation(fields: [wordpressCategoryId], references: [id])
+  wordpressCategoryId String?
+  wordpressAuthor     WebWordpressAuthor?   @relation(fields: [wordpressAuthorId], references: [id])
+  wordpressAuthorId   String?
+  publishedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   approvalTokens ArticleApprovalToken[]
   plan           ArticlePlan?           @relation("ArticlePlanArticle")
+
+  @@index([wordpressCategoryId])
+  @@index([wordpressAuthorId])
 }
 
 model ArticleApprovalToken {
