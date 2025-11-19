@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { apiFetch } from '../../lib/api-client';
 import { getToken } from '../../lib/auth-storage';
 
-type TaskKey = 'scan' | 'analyze' | 'strategy' | 'article';
+type TaskKey = 'scan' | 'analyze' | 'strategy' | 'article' | 'article_image';
 
 interface MeResponse {
   user: {
@@ -71,6 +71,11 @@ const TASKS: Array<{ key: TaskKey; title: string; description: string }> = [
     key: 'article',
     title: 'Denní článek',
     description: 'Z konkrétního clusteru se generuje článek pro WordPress.'
+  },
+  {
+    key: 'article_image',
+    title: 'Obrázek článku',
+    description: 'Generuje text-to-image prompt pro featured obrázek k článku.'
   }
 ];
 
@@ -145,6 +150,35 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
     {
       name: '{{webOwner.email}}',
       description: 'E‑mail vlastníka webu (uživatele).'
+    }
+  ],
+  article_image: [
+    {
+      name: '{{business}}',
+      description: 'Shrnutí firmy (name, description, targetAudience) použité pro kontext obrázku.'
+    },
+    { name: '{{business.name}}', description: 'Název firmy / projektu.' },
+    {
+      name: '{{business.targetAudience}}',
+      description: 'Primární cílové publikum (string nebo seznam hodnot spojených čárkami).'
+    },
+    { name: '{{article.title}}', description: 'Titulek článku, ke kterému se generuje obrázek.' },
+    {
+      name: '{{article.summary}}',
+      description: 'Zkrácený popis obsahu článku (shrnutí, ne celý text).'
+    },
+    {
+      name: '{{article.keywords}}',
+      description: 'Klíčová slova článku / clustru (pole stringů).'
+    },
+    {
+      name: '{{web}}',
+      description: 'Základní informace o webu – např. brandové barvy, tone of voice apod.'
+    },
+    { name: '{{web.url}}', description: 'URL webu.' },
+    {
+      name: '{{web.nickname}}',
+      description: 'Interní název / přezdívka webu (pokud je nastavená).'
     }
   ]
 };

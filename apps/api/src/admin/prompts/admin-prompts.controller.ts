@@ -23,7 +23,8 @@ export enum PromptTask {
   Scan = 'scan',
   Analyze = 'analyze',
   Strategy = 'strategy',
-  Article = 'article'
+  Article = 'article',
+  ArticleImage = 'article_image'
 }
 
 const FALLBACK_SCAN_RESULT: ScanResult = {
@@ -89,7 +90,7 @@ export class AdminPromptsController {
       orderBy: { task: 'asc' }
     });
     return prompts.map((prompt) => {
-      const defaults = DEFAULT_PROMPTS[prompt.task as PromptTask];
+      const defaults = DEFAULT_PROMPTS[prompt.task as keyof typeof DEFAULT_PROMPTS];
       const isCustom =
         prompt.systemPrompt !== defaults.systemPrompt ||
         prompt.userPrompt !== defaults.userPrompt ||
