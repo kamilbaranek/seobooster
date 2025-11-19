@@ -86,7 +86,7 @@ export class OpenRouterProvider implements AiProvider {
   private lastRawResponse: unknown;
   private lastMessageContent?: string;
 
-  constructor(private readonly config: OpenRouterProviderConfig) {}
+  constructor(private readonly config: OpenRouterProviderConfig) { }
 
   getLastRawResponse() {
     return this.lastRawResponse;
@@ -265,8 +265,8 @@ export class OpenRouterProvider implements AiProvider {
         target_audience: Array.isArray(profile.audience)
           ? profile.audience.join(', ')
           : profile.audience
-          ? String(profile.audience)
-          : 'Unknown audience'
+            ? String(profile.audience)
+            : 'Unknown audience'
       },
       topic_clusters: [],
       total_clusters: 0
@@ -304,8 +304,7 @@ export class OpenRouterProvider implements AiProvider {
     const tone = options.targetTone ?? 'Professional';
     const userPrompt =
       overrides?.userPrompt ??
-      `SEO Strategy: ${JSON.stringify(strategy)}\nSelected cluster: ${
-        options.clusterName
+      `SEO Strategy: ${JSON.stringify(strategy)}\nSelected cluster: ${options.clusterName
       }\nTone: ${tone}\nProduce a detailed outline, markdown body, keywords, and CTA.`;
 
     const forceJsonResponse = overrides?.forceJsonResponse !== false;
@@ -321,6 +320,112 @@ export class OpenRouterProvider implements AiProvider {
       throw new Error('Image prompt is empty');
     }
 
+    const model = this.config.modelMap.article_image;
+    if (!model) {
+      throw new Error('No model configured for article_image task');
+    }
+
+    // Check if model supports image generation (has 'image' in output_modalities)
+    // For now, we'll try to use it and fall back to Pollinations if it fails
+    const supportsImageGeneration = model.includes('image') || model.includes('gemini');
+
+    if (!supportsImageGeneration) {
+      // Fallback to Pollinations AI for models that don't support image generation
+      return this.generateImageWithPollinations(request, prompt);
+    }
+
+    // Use OpenRouter chat completions API with modalities for image generation
+    const payload = {
+      model,
+      messages: [
+        {
+          role: 'user' as const,
+          content: prompt
+        }
+      ],
+      modalities: ['image', 'text'],
+      max_tokens: 1000
+    };
+
+    this.lastRawResponse = undefined;
+    this.lastMessageContent = prompt;
+
+    const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+        'HTTP-Referer': this.config.siteUrl,
+        'X-Title': this.config.appName
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`OpenRouter image generation failed ${response.status}: ${text}`);
+    }
+
+    const result = (await response.json()) as {
+      choices: Array<{
+        message: {
+          content: string | Array<{ type: string; image_url?: { url: string }; text?: string }>;
+        };
+      }>;
+    };
+
+    this.lastRawResponse = result;
+
+    // Extract image from response
+    const choice = result.choices?.[0];
+    if (!choice?.message?.content) {
+      throw new Error('No content in OpenRouter image generation response');
+    }
+
+    let imageDataUrl: string | null = null;
+
+    // Content can be string or array of content parts
+    if (typeof choice.message.content === 'string') {
+      // Some models return base64 data URL directly as string
+      if (choice.message.content.startsWith('data:image/')) {
+        imageDataUrl = choice.message.content;
+      }
+    } else if (Array.isArray(choice.message.content)) {
+      // Look for image_url in content parts
+      for (const part of choice.message.content) {
+        if (part.type === 'image_url' && part.image_url?.url) {
+          imageDataUrl = part.image_url.url;
+          break;
+        }
+      }
+    }
+
+    if (!imageDataUrl) {
+      throw new Error('No image data URL found in OpenRouter response');
+    }
+
+    // Parse base64 data URL
+    const match = imageDataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
+    if (!match) {
+      throw new Error('Invalid image data URL format from OpenRouter');
+    }
+
+    const [, format, base64Data] = match;
+    const mimeType = `image/${format}`;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    return {
+      data: buffer,
+      mimeType,
+      source: `openrouter:${model}`,
+      suggestedFileName: request.suggestedFileName ?? 'article-image'
+    };
+  }
+
+  private async generateImageWithPollinations(
+    request: GenerateImageRequest,
+    prompt: string
+  ): Promise<GeneratedImageResult> {
     const dimensions = this.resolveImageDimensions(request.size);
     const baseEndpoint = process.env.IMAGE_GENERATOR_BASE_URL ?? 'https://image.pollinations.ai/prompt/';
     const normalizedBase = baseEndpoint.endsWith('/') ? baseEndpoint : `${baseEndpoint}/`;
