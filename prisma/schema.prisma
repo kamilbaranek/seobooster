@@ -76,14 +76,15 @@ model User {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  user                 User               @relation(fields: [userId], references: [id])
-  userId               String
-  stripeSubscriptionId String             @unique
-  status               SubscriptionStatus
-  currentPeriodEnd     DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                    String             @id @default(cuid())
+  user                  User               @relation(fields: [userId], references: [id])
+  userId                String
+  stripeSubscriptionId  String             @unique
+  status                SubscriptionStatus
+  currentPeriodEnd      DateTime?
+  imageGenerationLimit  Int                @default(1)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   webs Web[]
 }
@@ -203,6 +204,7 @@ model Article {
 
   approvalTokens ArticleApprovalToken[]
   plan           ArticlePlan?           @relation("ArticlePlanArticle")
+  images         ArticleImage[]
 
   @@index([wordpressCategoryId])
   @@index([wordpressAuthorId])
@@ -324,4 +326,24 @@ model ArticlePlan {
   @@index([webId, plannedPublishAt])
   @@index([strategyId])
   @@index([status, plannedPublishAt])
+}
+
+model ArticleImage {
+  id           String      @id @default(cuid())
+  article      Article     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId    String
+  status       AssetStatus @default(PENDING)
+  imageUrl     String?
+  prompt       String
+  isFeatured   Boolean     @default(false)
+  position     Int         @default(0)
+  provider     String?
+  model        String?
+  errorMessage String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([articleId])
+  @@index([articleId, isFeatured])
+  @@index([articleId, position])
 }
