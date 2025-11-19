@@ -186,12 +186,19 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
 const PROVIDER_OPTIONS = [
   { value: 'default', label: 'Výchozí (globální nastavení)' },
   { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'google', label: 'Google AI (Gemini)' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' }
 ];
 
 const MODEL_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
   openrouter: [],
+  google: [
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental (image generation)' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+    { value: 'gemini-2.0-flash-thinking-exp-1219', label: 'Gemini 2.0 Flash Thinking' }
+  ],
   openai: [
     { value: 'openai/gpt-4o-mini', label: 'gpt-4o-mini' },
     { value: 'openai/gpt-4.1-mini', label: 'gpt-4.1-mini' }

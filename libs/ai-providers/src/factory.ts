@@ -12,19 +12,27 @@ export interface ProviderFactoryOptions {
   providerOverride?: ProviderName;
 }
 
-const buildModelMap = (overrides?: Partial<AiModelMap>): AiModelMap => ({
-  scan: overrides?.scan ?? process.env.AI_MODEL_SCAN ?? 'openrouter/auto',
-  analyze: overrides?.analyze ?? process.env.AI_MODEL_ANALYZE ?? 'openrouter/auto',
-  strategy: overrides?.strategy ?? process.env.AI_MODEL_STRATEGY ?? 'openrouter/auto',
-  article: overrides?.article ?? process.env.AI_MODEL_ARTICLE ?? 'openrouter/auto',
-  article_image: overrides?.article_image ?? process.env.AI_MODEL_ARTICLE_IMAGE ?? 'pollinations/image'
-});
+const buildModelMap = (overrides?: Partial<AiModelMap>, providerName?: ProviderName): AiModelMap => {
+  // Determine default image model based on provider
+  let defaultImageModel = 'pollinations/image'; // OpenRouter default
+  if (providerName === 'google') {
+    defaultImageModel = 'gemini-2.0-flash-exp';
+  }
+
+  return {
+    scan: overrides?.scan ?? process.env.AI_MODEL_SCAN ?? 'openrouter/auto',
+    analyze: overrides?.analyze ?? process.env.AI_MODEL_ANALYZE ?? 'openrouter/auto',
+    strategy: overrides?.strategy ?? process.env.AI_MODEL_STRATEGY ?? 'openrouter/auto',
+    article: overrides?.article ?? process.env.AI_MODEL_ARTICLE ?? 'openrouter/auto',
+    article_image: overrides?.article_image ?? process.env.AI_MODEL_ARTICLE_IMAGE ?? defaultImageModel
+  };
+};
 
 export const buildAiProviderFromEnv = (
   options?: ProviderFactoryOptions
 ): { provider: AiProvider; modelMap: AiModelMap } => {
-  const modelMap = buildModelMap(options?.modelOverrides);
   const providerName = options?.providerOverride ?? ((process.env.AI_PROVIDER as ProviderName) ?? 'openrouter');
+  const modelMap = buildModelMap(options?.modelOverrides, providerName);
 
   if (providerName === 'openrouter') {
     return {
