@@ -10,3 +10,6 @@ apps/web/node_modules/
 apps/api/node_modules/
 /storage/
 **/tsconfig.tsbuildinfo
+
+# Ignore generated JS files in libs src
+libs/*/src/**/*.js
