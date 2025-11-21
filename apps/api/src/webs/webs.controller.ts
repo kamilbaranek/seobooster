@@ -22,7 +22,7 @@ import { PublishBatchDto } from './dto/publish-batch.dto';
 @Controller('webs')
 @UseGuards(JwtAuthGuard)
 export class WebsController {
-  constructor(private readonly websService: WebsService) {}
+  constructor(private readonly websService: WebsService) { }
 
   @Get()
   list(@CurrentUser() user: AuthenticatedUserPayload) {
@@ -37,6 +37,11 @@ export class WebsController {
   @Get(':id/overview')
   overview(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.getOverview(user.userId, id);
+  }
+
+  @Get(':id/article-plans')
+  getArticlePlans(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.getArticlePlans(user.userId, id);
   }
 
   @Post()

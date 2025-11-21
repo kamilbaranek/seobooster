@@ -43,7 +43,30 @@ import { MagicLinksModule } from './magic-links/magic-links.module';
         }
 
         return {
-          connection: redisOptions
+          connection: {
+            ...redisOptions,
+            maxRetriesPerRequest: null,
+            enableReadyCheck: false,
+            retryStrategy: (times: number) => {
+              // Exponential backoff with a cap of 10 seconds
+              const delay = Math.min(times * 50, 10000);
+              return delay;
+            },
+            reconnectOnError: (err) => {
+              const targetError = 'READONLY';
+              if (err.message.includes(targetError)) {
+                // Only reconnect when the error starts with "READONLY"
+                return true;
+              }
+              if (err.message.includes('max requests limit exceeded')) {
+                // If we hit the rate limit, we should probably wait a bit longer, 
+                // but returning true triggers a reconnect.
+                // The retryStrategy will determine the delay.
+                return true;
+              }
+              return false;
+            }
+          }
         };
       }
     }),
