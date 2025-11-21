@@ -21,6 +21,8 @@ interface ArticlePlan {
     clusterName: string;
     clusterIntent: string;
     featuredImageUrl?: string | null;
+    articleHtml?: string | null;
+    articleMarkdown?: string | null;
 }
 
 interface ProjectDetailContentProps {

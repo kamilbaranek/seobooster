@@ -420,7 +420,9 @@ export class WebsService {
         article: {
           select: {
             id: true,
-            featuredImageUrl: true
+            featuredImageUrl: true,
+            html: true,
+            markdown: true
           }
         }
       }
@@ -436,7 +438,9 @@ export class WebsService {
       articleFunnelStage: plan.supportingArticle.funnelStage || plan.cluster.funnelStage,
       clusterName: plan.cluster.pillarPage,
       clusterIntent: plan.cluster.clusterIntent,
-      featuredImageUrl: plan.article?.featuredImageUrl ?? null
+      featuredImageUrl: plan.article?.featuredImageUrl ?? null,
+      articleHtml: plan.article?.html ?? null,
+      articleMarkdown: plan.article?.markdown ?? null
     }));
   }
 
