@@ -1,19 +1,8 @@
 import React from 'react';
+import { apiFetch } from '../../../lib/api-client';
 
-interface ArticlePlan {
-    id: string;
-    status: string;
-    plannedPublishAt: string;
-    articleTitle: string;
-    articleKeywords: any;
-    articleIntent: string;
-    articleFunnelStage: string;
-    clusterName: string;
-    clusterIntent: string;
-    featuredImageUrl?: string | null;
-    articleHtml?: string | null;
-    articleMarkdown?: string | null;
-}
+import { ArticlePlan } from './InboxTab';
+import Swal from 'sweetalert2';
 
 interface InboxDetailProps {
     article: ArticlePlan;
@@ -21,6 +10,67 @@ interface InboxDetailProps {
 }
 
 const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
+    const handleNewPicture = async (e: React.MouseEvent) => {
+        e.preventDefault();
+
+        if (!article.webId || !article.articleId) {
+            Swal.fire({
+                text: "Missing article information to generate image.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+            return;
+        }
+
+        try {
+            // Fetch image usage stats
+            const imagesData = await apiFetch<{ limit: number; generated: number; remaining: number }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
+            const attemptsLeft = imagesData.remaining;
+
+            Swal.fire({
+                title: "Generate New Picture",
+                html: `You have <b>${attemptsLeft}</b> attempts left out of <b>${imagesData.limit}</b>.<br/><br/>Are you sure you want to generate a new picture?`,
+                icon: "question",
+                showCancelButton: true,
+                buttonsStyling: false,
+                confirmButtonText: "Yes, generate it!",
+                cancelButtonText: "No, return",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                    cancelButton: "btn btn-active-light"
+                }
+            }).then(function (result) {
+                if (result.value) {
+                    Swal.fire({
+                        text: "New picture generation started!",
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok, got it!",
+                        customClass: {
+                            confirmButton: "btn btn-primary",
+                        }
+                    });
+                } else if (result.dismiss === Swal.DismissReason.cancel) {
+                    // Do nothing on cancel
+                }
+            });
+        } catch (error) {
+            console.error("Failed to fetch image stats:", error);
+            Swal.fire({
+                text: "Failed to check image generation limits.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+        }
+    };
     return (
         <div className="flex-lg-row-fluid ms-lg-7 ms-xl-10">
             {/*begin::Card*/}
@@ -33,31 +83,33 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                             <i className="ki-outline ki-arrow-left fs-1 m-0"></i>
                         </a>
                         {/*end::Back*/}
-                        {/*begin::Archive*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Archive">
-                            <i className="ki-outline ki-sms fs-2 m-0"></i>
+                        {/*begin::Rewrite*/}
+                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Rewrite">
+                            <i className="ki-outline ki-subtitle fs-2 m-0"></i>
                         </a>
-                        {/*end::Archive*/}
-                        {/*begin::Spam*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Spam">
-                            <i className="ki-outline ki-information fs-2 m-0"></i>
-                        </a>
-                        {/*end::Spam*/}
+                        {/*end::Rewrite*/}
+                        {/*begin::New picture*/}
+                        {article.articleId && (
+                            <a href="#" onClick={handleNewPicture} className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="New picture">
+                                <i className="ki-outline ki-picture fs-2 m-0"></i>
+                            </a>
+                        )}
+                        {/*end::New picture*/}
                         {/*begin::Delete*/}
                         <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete">
                             <i className="ki-outline ki-trash fs-2 m-0"></i>
                         </a>
                         {/*end::Delete*/}
-                        {/*begin::Mark as read*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Mark as read">
+                        {/*begin::Copy*/}
+                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy">
                             <i className="ki-outline ki-copy fs-2 m-0"></i>
                         </a>
-                        {/*end::Mark as read*/}
-                        {/*begin::Move*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Move">
-                            <i className="ki-outline ki-entrance-left fs-2 m-0"></i>
+                        {/*end::Copy*/}
+                        {/*begin::Send*/}
+                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Send">
+                            <i className="ki-outline ki-send fs-2 m-0"></i>
                         </a>
-                        {/*end::Move*/}
+                        {/*end::Send*/}
                     </div>
                     {/*end::Actions*/}
                     {/*begin::Pagination*/}

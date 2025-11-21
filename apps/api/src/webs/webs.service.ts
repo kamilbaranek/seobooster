@@ -430,6 +430,8 @@ export class WebsService {
 
     return articlePlans.map((plan) => ({
       id: plan.id,
+      webId: plan.webId,
+      articleId: plan.articleId,
       status: plan.status,
       plannedPublishAt: plan.plannedPublishAt,
       articleTitle: plan.supportingArticle.title,

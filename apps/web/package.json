@@ -14,7 +14,8 @@
     "next": "latest",
     "react": "latest",
     "react-apexcharts": "^1.8.0",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "sweetalert2": "^11.26.3"
   },
   "devDependencies": {
     "@types/node": "latest",

@@ -12,6 +12,8 @@ const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 interface ArticlePlan {
     id: string;
+    webId: string;
+    articleId?: string | null;
     status: string;
     plannedPublishAt: string;
     articleTitle: string;

@@ -1,8 +1,10 @@
 import React from 'react';
 import InboxDetail from './InboxDetail';
 
-interface ArticlePlan {
+export interface ArticlePlan {
     id: string;
+    webId: string;
+    articleId?: string | null;
     status: string;
     plannedPublishAt: string;
     articleTitle: string;
