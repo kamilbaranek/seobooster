@@ -10,6 +10,7 @@ export interface DashboardWeb {
   url?: string;
   faviconUrl?: string;
   faviconStatus?: string;
+  screenshotUrl?: string;
 }
 
 interface DashboardLayoutProps {

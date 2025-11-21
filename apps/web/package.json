@@ -10,9 +10,10 @@
   },
   "dependencies": {
     "@seobooster/shared-types": "0.1.0",
-    "apexcharts": "^3.54.1",
+    "apexcharts": "^5.3.6",
     "next": "latest",
     "react": "latest",
+    "react-apexcharts": "^1.8.0",
     "react-dom": "latest"
   },
   "devDependencies": {

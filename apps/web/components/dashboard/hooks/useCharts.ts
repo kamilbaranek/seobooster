@@ -124,11 +124,10 @@ const buildWidget47Options = (
     },
     yaxis: { labels: { show: false } },
     states: {
-      normal: { filter: { type: "none", value: 0 } },
-      hover: { filter: { type: "none", value: 0 } },
+      hover: { filter: { type: "none" } },
       active: {
         allowMultipleDataPointsSelection: false,
-        filter: { type: "none", value: 0 },
+        filter: { type: "none" },
       },
     },
     tooltip: { enabled: false },
@@ -177,11 +176,10 @@ const buildWidget48Options = (
     },
     yaxis: { labels: { show: false } },
     states: {
-      normal: { filter: { type: "none", value: 0 } },
-      hover: { filter: { type: "none", value: 0 } },
+      hover: { filter: { type: "none" } },
       active: {
         allowMultipleDataPointsSelection: false,
-        filter: { type: "none", value: 0 },
+        filter: { type: "none" },
       },
     },
     tooltip: { enabled: false },
@@ -230,11 +228,10 @@ const buildTableOptions = (
     },
     yaxis: { min: 0, max: 60, labels: { show: false } },
     states: {
-      normal: { filter: { type: "none", value: 0 } },
-      hover: { filter: { type: "none", value: 0 } },
+      hover: { filter: { type: "none" } },
       active: {
         allowMultipleDataPointsSelection: false,
-        filter: { type: "none", value: 0 },
+        filter: { type: "none" },
       },
     },
     tooltip: { enabled: false },

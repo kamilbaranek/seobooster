@@ -13,7 +13,7 @@ export class WebsService {
     private readonly prisma: PrismaService,
     private readonly jobQueueService: JobQueueService,
     private readonly encryptionService: EncryptionService
-  ) {}
+  ) { }
 
   async create(userId: string, dto: CreateWebDto) {
     const existing = await this.prisma.web.findUnique({ where: { url: dto.url } });
@@ -303,6 +303,54 @@ export class WebsService {
         nextPlannedAt: upcomingPlans[0]?.plannedPublishAt ?? null
       }
     };
+  }
+
+  async getArticlePlans(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    const articlePlans = await this.prisma.articlePlan.findMany({
+      where: {
+        webId: id,
+        status: {
+          in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED, ArticlePlanStatus.GENERATED]
+        }
+      },
+      orderBy: { plannedPublishAt: 'asc' },
+      include: {
+        supportingArticle: {
+          select: {
+            id: true,
+            title: true,
+            keywords: true,
+            intent: true
+          }
+        },
+        cluster: {
+          select: {
+            id: true,
+            pillarPage: true,
+            clusterIntent: true
+          }
+        }
+      }
+    });
+
+    return articlePlans.map((plan) => ({
+      id: plan.id,
+      status: plan.status,
+      plannedPublishAt: plan.plannedPublishAt,
+      articleTitle: plan.supportingArticle.title,
+      articleKeywords: plan.supportingArticle.keywords,
+      articleIntent: plan.supportingArticle.intent,
+      clusterName: plan.cluster.pillarPage,
+      clusterIntent: plan.cluster.clusterIntent
+    }));
   }
 
   async refreshFavicon(userId: string, id: string) {

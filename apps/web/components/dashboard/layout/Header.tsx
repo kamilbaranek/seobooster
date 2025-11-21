@@ -1,6 +1,13 @@
 import React from 'react';
+import Link from 'next/link';
+import { useProjects } from '../hooks/useProjects';
+
+const formatUrl = (url: string) => {
+    return url.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
+};
 
 const Header = () => {
+    const { projects } = useProjects();
     return (
         <div id="kt_app_header" className="app-header d-flex">
             {/*begin::Header container*/}
@@ -24,7 +31,7 @@ const Header = () => {
                         {/*begin::Page title*/}
                         <div className="d-flex flex-column justify-content-center">
                             {/*begin::Title*/}
-                            <h1 className="text-gray-900 fw-bold fs-6 mb-2">Chartmix - Finance Team</h1>
+                            <h1 className="text-gray-900 fw-bold fs-6 mb-2">Budliki Budliki</h1>
                             {/*end::Title*/}
                             {/*begin::Breadcrumb*/}
                             <ul className="breadcrumb breadcrumb-separatorless fw-semibold fs-base">
@@ -45,33 +52,27 @@ const Header = () => {
                         {/*end::Page title*/}
                         <div className="d-none d-md-block h-40px border-start border-gray-200 mx-10"></div>
                         <div className="d-flex gap-3 gap-lg-8 flex-wrap">
-                            <div className="d-flex align-items-center gap-2">
-                                <div className="rounded d-flex flex-center w-40px h-40px flex-shrink-0 bg-warning">
-                                    <i className="ki-outline ki-abstract-13 fs-2 text-inverse-warning"></i>
-                                </div>
-                                <div className="d-flex flex-column">
-                                    <span className="fw-bold fs-base text-gray-900">Target A</span>
-                                    <span className="fw-semibold fs-7 text-gray-500">Uplift: 64%</span>
-                                </div>
-                            </div>
-                            <div className="d-flex align-items-center gap-2">
-                                <div className="rounded d-flex flex-center w-40px h-40px flex-shrink-0 bg-danger">
-                                    <i className="ki-outline ki-abstract-24 fs-2 text-inverse-danger"></i>
-                                </div>
-                                <div className="d-flex flex-column">
-                                    <span className="fw-bold fs-base text-gray-900">Target A</span>
-                                    <span className="fw-semibold fs-7 text-gray-500">Uplift: 64%</span>
-                                </div>
-                            </div>
-                            <div className="d-flex align-items-center gap-2">
-                                <div className="rounded d-flex flex-center w-40px h-40px flex-shrink-0 bg-primary">
-                                    <i className="ki-outline ki-abstract-25 fs-2 text-inverse-primary"></i>
-                                </div>
-                                <div className="d-flex flex-column">
-                                    <span className="fw-bold fs-base text-gray-900">Target A</span>
-                                    <span className="fw-semibold fs-7 text-gray-500">Uplift: 64%</span>
-                                </div>
-                            </div>
+                            {projects.map((project, index) => {
+                                const colors = ['warning', 'danger', 'primary', 'success', 'info'];
+                                const color = colors[index % colors.length];
+                                const iconClass = `ki-outline ki-abstract-${(index % 20) + 10} fs-2 text-inverse-${color}`;
+
+                                return (
+                                    <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="d-flex align-items-center gap-2">
+                                        <div className={`rounded d-flex flex-center w-40px h-40px flex-shrink-0 bg-${color} overflow-hidden`}>
+                                            {project.faviconUrl ? (
+                                                <img src={project.faviconUrl} alt={project.nickname || project.url} className="w-100 h-100 object-fit-cover" />
+                                            ) : (
+                                                <i className={iconClass}></i>
+                                            )}
+                                        </div>
+                                        <div className="d-flex flex-column">
+                                            <span className="fw-bold fs-base text-gray-900">{project.nickname || project.url}</span>
+                                            <span className="fw-semibold fs-7 text-gray-500">{formatUrl(project.url || '')}</span>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
                             <a href="#" className="btn btn-icon border border-200 bg-gray-100 btn-color-gray-600 btn-active-primary ms-2 ms-lg-6">
                                 <i className="ki-outline ki-plus fs-3"></i>
                             </a>
