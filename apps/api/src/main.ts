@@ -13,8 +13,12 @@ const resolveProjectRoot = () => {
   if (process.env.PROJECT_ROOT) {
     return process.env.PROJECT_ROOT;
   }
-  // Fallback: assume we are in dist/apps/api/src/main.js
-  return resolve(__dirname, '../../../..');
+  // If we are in dist/apps/api/src/main.js (production build)
+  if (__dirname.includes('dist')) {
+    return resolve(__dirname, '../../../..');
+  }
+  // If we are in apps/api/src/main.ts (development with ts-node)
+  return resolve(__dirname, '../../..');
 };
 
 const projectRoot = resolveProjectRoot();

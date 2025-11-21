@@ -1,4 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../../../lib/api-client';
+
+interface UserProfile {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+}
+
+interface MeResponse {
+    user: UserProfile;
+    webs: any[];
+}
 import Link from 'next/link';
 import { useProjects } from '../hooks/useProjects';
 
@@ -8,6 +21,13 @@ const formatUrl = (url: string) => {
 
 const Header = () => {
     const { projects } = useProjects();
+    const [user, setUser] = useState<UserProfile | null>(null);
+
+    useEffect(() => {
+        apiFetch<MeResponse>('/me')
+            .then(data => setUser(data.user))
+            .catch(err => console.error('Failed to fetch user profile', err));
+    }, []);
     return (
         <div id="kt_app_header" className="app-header d-flex">
             {/*begin::Header container*/}
@@ -817,7 +837,7 @@ const Header = () => {
                                         <div className="d-flex flex-column">
                                             <div className="fw-bold d-flex align-items-center fs-5">Ana Fox
                                                 <span className="badge badge-light-success fw-bold fs-8 px-2 py-1 ms-2">Pro</span></div>
-                                            <a href="#" className="fw-semibold text-muted text-hover-primary fs-7">ana@kt.com</a>
+                                            <a href="#" className="fw-semibold text-muted text-hover-primary fs-7">{user?.email || 'Loading...'}</a>
                                         </div>
                                         {/*end::Username*/}
                                     </div>

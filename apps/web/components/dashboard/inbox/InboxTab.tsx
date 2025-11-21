@@ -1,6 +1,38 @@
 import React from 'react';
 
-const InboxTab: React.FC = () => {
+interface ArticlePlan {
+    id: string;
+    status: string;
+    plannedPublishAt: string;
+    articleTitle: string;
+    articleKeywords: any;
+    articleIntent: string;
+    articleFunnelStage: string;
+    clusterName: string;
+    clusterIntent: string;
+    featuredImageUrl?: string | null;
+}
+
+const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+        case 'PLANNED': return 'badge-light-info';
+        case 'QUEUED': return 'badge-light-warning';
+        case 'GENERATED': return 'badge-light-success';
+        case 'PUBLISHED': return 'badge-light-primary';
+        case 'SKIPPED': return 'badge-light-danger';
+        default: return 'badge-light-secondary';
+    }
+};
+
+const formatStatus = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+};
+
+interface InboxTabProps {
+    plans?: ArticlePlan[];
+}
+
+const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
     return (
         <div className="d-flex flex-column flex-lg-row">
             {/*begin::Sidebar*/}
@@ -22,7 +54,7 @@ const InboxTab: React.FC = () => {
                                         <i className="ki-outline ki-sms fs-2 me-3"></i>
                                     </span>
                                     <span className="menu-title fw-bold">Inbox</span>
-                                    <span className="badge badge-light-success">3</span>
+                                    <span className="badge badge-light-success">{plans.length}</span>
                                 </span>
                                 {/*end::Inbox*/}
                             </div>
@@ -257,147 +289,77 @@ const InboxTab: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td className="ps-9">
-                                        <div className="form-check form-check-sm form-check-custom form-check-solid mt-3">
-                                            <input className="form-check-input" type="checkbox" value="1" />
-                                        </div>
-                                    </td>
-                                    <td className="min-w-80px">
-                                        {/*begin::Star*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Star">
-                                            <i className="ki-outline ki-star fs-3"></i>
-                                        </a>
-                                        {/*end::Star*/}
-                                        {/*begin::Important*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Mark as important">
-                                            <i className="ki-outline ki-save-2 fs-4 mt-1"></i>
-                                        </a>
-                                        {/*end::Important*/}
-                                    </td>
-                                    <td className="w-150px w-md-175px">
-                                        <a href="#" className="d-flex align-items-center text-gray-900">
-                                            {/*begin::Avatar*/}
-                                            <div className="symbol symbol-35px me-3">
-                                                <div className="symbol-label bg-light-danger">
-                                                    <span className="text-danger">M</span>
+                                {plans.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="text-center text-muted py-10">
+                                            No article plans found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    plans.map((plan) => (
+                                        <tr key={plan.id}>
+                                            <td className="ps-9">
+                                                <div className="form-check form-check-sm form-check-custom form-check-solid mt-3">
+                                                    <input className="form-check-input" type="checkbox" value="1" />
                                                 </div>
-                                            </div>
-                                            {/*end::Avatar*/}
-                                            {/*begin::Name*/}
-                                            <span className="fw-semibold">Melody Macy</span>
-                                            {/*end::Name*/}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div className="text-gray-900 gap-1 pt-2">
-                                            {/*begin::Heading*/}
-                                            <a href="#" className="text-gray-900">
-                                                <span className="fw-bold">Digital PPV Customer Confirmation</span>
-                                                <span className="fw-bold d-none d-md-inine">-</span>
-                                                <span className="d-none d-md-inine text-muted">Thank you for ordering UFC 240 Holloway vs Edgar Alternate camera angles...</span>
-                                            </a>
-                                            {/*end::Heading*/}
-                                        </div>
-                                        {/*begin::Badges*/}
-                                        <div className="badge badge-light-primary">inbox</div>
-                                        <div className="badge badge-light-warning">task</div>
-                                        {/*end::Badges*/}
-                                    </td>
-                                    <td className="w-100px text-end fs-7 pe-9">
-                                        <span className="fw-semibold">8:30 PM</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td className="ps-9">
-                                        <div className="form-check form-check-sm form-check-custom form-check-solid mt-3">
-                                            <input className="form-check-input" type="checkbox" value="1" />
-                                        </div>
-                                    </td>
-                                    <td className="min-w-80px">
-                                        {/*begin::Star*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Star">
-                                            <i className="ki-outline ki-star fs-3"></i>
-                                        </a>
-                                        {/*end::Star*/}
-                                        {/*begin::Important*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Mark as important">
-                                            <i className="ki-outline ki-save-2 fs-4 mt-1"></i>
-                                        </a>
-                                        {/*end::Important*/}
-                                    </td>
-                                    <td className="w-150px w-md-175px">
-                                        <a href="#" className="d-flex align-items-center text-gray-900">
-                                            {/*begin::Avatar*/}
-                                            <div className="symbol symbol-35px me-3">
-                                                <span className="symbol-label" style={{ backgroundImage: 'url(/assets/media/avatars/300-1.jpg)' }}></span>
-                                            </div>
-                                            {/*end::Avatar*/}
-                                            {/*begin::Name*/}
-                                            <span className="fw-semibold">Max Smith</span>
-                                            {/*end::Name*/}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div className="text-gray-900 gap-1 pt-2">
-                                            {/*begin::Heading*/}
-                                            <a href="#" className="text-gray-900">
-                                                <span className="fw-bold">Your iBuy.com grocery shopping confirmation</span>
-                                                <span className="fw-bold d-none d-md-inine">-</span>
-                                                <span className="d-none d-md-inine text-muted">Please make sure that you have one of the following cards with you when we deliver your order...</span>
-                                            </a>
-                                            {/*end::Heading*/}
-                                        </div>
-                                    </td>
-                                    <td className="w-100px text-end fs-7 pe-9">
-                                        <span className="fw-semibold">day ago</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td className="ps-9">
-                                        <div className="form-check form-check-sm form-check-custom form-check-solid mt-3">
-                                            <input className="form-check-input" type="checkbox" value="1" />
-                                        </div>
-                                    </td>
-                                    <td className="min-w-80px">
-                                        {/*begin::Star*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Star">
-                                            <i className="ki-outline ki-star fs-3"></i>
-                                        </a>
-                                        {/*end::Star*/}
-                                        {/*begin::Important*/}
-                                        <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Mark as important">
-                                            <i className="ki-outline ki-save-2 fs-4 mt-1"></i>
-                                        </a>
-                                        {/*end::Important*/}
-                                    </td>
-                                    <td className="w-150px w-md-175px">
-                                        <a href="#" className="d-flex align-items-center text-gray-900">
-                                            {/*begin::Avatar*/}
-                                            <div className="symbol symbol-35px me-3">
-                                                <span className="symbol-label" style={{ backgroundImage: 'url(/assets/media/avatars/300-5.jpg)' }}></span>
-                                            </div>
-                                            {/*end::Avatar*/}
-                                            {/*begin::Name*/}
-                                            <span className="fw-semibold">Sean Bean</span>
-                                            {/*end::Name*/}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div className="text-gray-900 gap-1 pt-2">
-                                            {/*begin::Heading*/}
-                                            <a href="#" className="text-gray-900">
-                                                <span className="fw-bold">Your Order #224820998666029 has been Confirmed</span>
-                                                <span className="fw-bold d-none d-md-inine">-</span>
-                                                <span className="d-none d-md-inine text-muted">Your Order #224820998666029 has been placed on Saturday, 29 June</span>
-                                            </a>
-                                            {/*end::Heading*/}
-                                        </div>
-                                    </td>
-                                    <td className="w-100px text-end fs-7 pe-9">
-                                        <span className="fw-semibold text-muted">11:20 PM</span>
-                                    </td>
-                                </tr>
+                                            </td>
+                                            <td className="min-w-80px">
+                                                {/*begin::Star*/}
+                                                <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Star">
+                                                    <i className="ki-outline ki-star fs-3"></i>
+                                                </a>
+                                                {/*end::Star*/}
+                                                {/*begin::Important*/}
+                                                <a href="#" className="btn btn-icon btn-color-gray-500 btn-active-color-primary w-35px h-35px" data-bs-toggle="tooltip" data-bs-placement="right" title="Mark as important">
+                                                    <i className="ki-outline ki-save-2 fs-4 mt-1"></i>
+                                                </a>
+                                                {/*end::Important*/}
+                                            </td>
+                                            <td className="w-150px w-md-175px">
+                                                <a href="#" className="d-flex align-items-center text-gray-900">
+                                                    {/*begin::Avatar*/}
+                                                    <div className="symbol symbol-35px me-3">
+                                                        {plan.featuredImageUrl ? (
+                                                            <span className="symbol-label" style={{ backgroundImage: `url(${plan.featuredImageUrl})` }}></span>
+                                                        ) : (
+                                                            <div className="symbol-label bg-light-danger">
+                                                                <span className="text-danger">{plan.articleTitle.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/*end::Avatar*/}
+                                                    {/*begin::Name*/}
+                                                    <span className="fw-semibold">{plan.articleFunnelStage || 'No Stage'}</span>
+                                                    {/*end::Name*/}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <div className="text-gray-900 gap-1 pt-2">
+                                                    {/*begin::Heading*/}
+                                                    <a href="#" className="text-gray-900">
+                                                        <span className="fw-bold">{plan.articleTitle}</span>
+                                                    </a>
+                                                    {/*end::Heading*/}
+                                                </div>
+                                                {/*begin::Badges*/}
+                                                {plan.clusterName && (
+                                                    <div className="badge badge-light me-1">Pillar: {plan.clusterName}</div>
+                                                )}
+                                                {Array.isArray(plan.articleKeywords) && plan.articleKeywords.map((keyword: string, index: number) => (
+                                                    <div key={index} className="badge badge-light-primary me-1">{keyword}</div>
+                                                ))}
+                                                {/*end::Badges*/}
+                                            </td>
+                                            <td className="w-100px text-end fs-7 pe-9">
+                                                <div className="fw-semibold">{new Date(plan.plannedPublishAt).toLocaleDateString()}</div>
+                                                <div className="text-muted fs-8">{new Date(plan.plannedPublishAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                <div className="mt-1">
+                                                    <span className={`badge ${getStatusBadgeClass(plan.status)}`}>{formatStatus(plan.status)}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                         {/*end::Table*/}

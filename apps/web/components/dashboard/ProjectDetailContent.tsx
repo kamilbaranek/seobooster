@@ -17,8 +17,10 @@ interface ArticlePlan {
     articleTitle: string;
     articleKeywords: any;
     articleIntent: string;
+    articleFunnelStage: string;
     clusterName: string;
     clusterIntent: string;
+    featuredImageUrl?: string | null;
 }
 
 interface ProjectDetailContentProps {
@@ -453,7 +455,12 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                         {/*end::Nav item*/}
                         {/*begin::Nav item*/}
                         <li className="nav-item">
-                            <a className={`nav-link text-active-primary py-5 me-6 ${activeTab === 'inbox' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('inbox'); }}>Inbox</a>
+                            <a className={`nav-link text-active-primary py-5 me-6 ${activeTab === 'inbox' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('inbox'); }}>
+                                Inbox
+                                {articlePlans.length > 0 && (
+                                    <span className="badge badge-circle badge-light-danger ms-2">{articlePlans.length}</span>
+                                )}
+                            </a>
                         </li>
                         {/*end::Nav item*/}
                         {/*begin::Nav item*/}
@@ -1148,18 +1155,19 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                             {/*end::Col*/}
                         </div>
                     </>
-                ) : activeTab === 'inbox' ? (
-                    <InboxTab />
-                ) : activeTab === 'activity' ? (
-                    <ActivityTab />
-                ) : activeTab === 'settings' ? (
-                    <SettingsTab />
                 ) : (
-                    <div className="card card-flush h-lg-100">
-                        <div className="card-body p-9">
-                            <div className="fs-2 fw-bold text-gray-800">Content for {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} tab is coming soon...</div>
-                        </div>
-                    </div>
+                    <>
+                        {activeTab === 'inbox' && <InboxTab plans={articlePlans} />}
+                        {activeTab === 'activity' && <ActivityTab />}
+                        {activeTab === 'settings' && <SettingsTab />}
+                        {activeTab !== 'inbox' && activeTab !== 'activity' && activeTab !== 'settings' && (
+                            <div className="card card-flush h-lg-100">
+                                <div className="card-body p-9">
+                                    <div className="fs-2 fw-bold text-gray-800">Content for {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} tab is coming soon...</div>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )
             }
         </>

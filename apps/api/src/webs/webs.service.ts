@@ -405,14 +405,22 @@ export class WebsService {
             id: true,
             title: true,
             keywords: true,
-            intent: true
+            intent: true,
+            funnelStage: true
           }
         },
         cluster: {
           select: {
             id: true,
             pillarPage: true,
-            clusterIntent: true
+            clusterIntent: true,
+            funnelStage: true
+          }
+        },
+        article: {
+          select: {
+            id: true,
+            featuredImageUrl: true
           }
         }
       }
@@ -425,8 +433,10 @@ export class WebsService {
       articleTitle: plan.supportingArticle.title,
       articleKeywords: plan.supportingArticle.keywords,
       articleIntent: plan.supportingArticle.intent,
+      articleFunnelStage: plan.supportingArticle.funnelStage || plan.cluster.funnelStage,
       clusterName: plan.cluster.pillarPage,
-      clusterIntent: plan.cluster.clusterIntent
+      clusterIntent: plan.cluster.clusterIntent,
+      featuredImageUrl: plan.article?.featuredImageUrl ?? null
     }));
   }
 
