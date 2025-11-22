@@ -59,7 +59,7 @@ Goal: dokončit plnou multi-step exekuci promptů v workeru (scan → analyze �
      - [x] Uložení `stepOutputs`, posun `previousStepOutput`.
      - [x] Log přes `recordAiCall` s `__stepIndex`, `responseRaw/Parsed`, `status`.
 - [x] Spustit `npm run build --workspace @seobooster/worker`.
-- [ ] Commit (`feat: add multi step runner`) a označit fázi.
+- [x] Commit (`feat: add multi step runner`) a označit fázi.
 
 ### Fáze 3 – Napojení jobů
 - [x] Scan job: použít runner; `baseVariables={url}`; finální output → `ScanResult`; uložit `rawScanOutput`.
@@ -68,17 +68,17 @@ Goal: dokončit plnou multi-step exekuci promptů v workeru (scan → analyze �
 - [x] Article job: zachovat dnešní variables; výstup `ArticleDraft` (title + bodyMarkdown povinné).
 - [x] Article_image job: intermediate kroky přes runner; finální krok `generateImage` s doplněnými step outputs.
 - [x] Spustit `npm run build --workspace @seobooster/worker`.
-- [ ] Commit (`feat: wire jobs to multistep`) a označit fázi.
+- [x] Commit (`feat: wire jobs to multistep`) a označit fázi.
 
 ### Fáze 4 – Logging režim
 - [x] Upravit `recordAiCall`, aby se volal i bez `AI_DEBUG_LOG_PROMPTS` (alespoň finální krok; ideálně všechny).
 - [x] Status, errorMessage, variables, system/user prompt, responseRaw/Parsed, step index.
 - [x] Spustit `npm run build --workspace @seobooster/worker`.
-- [ ] Commit (`chore: enable ai call logging by default`) a označit fázi.
+- [x] Commit (`chore: enable ai call logging by default`) a označit fázi.
 
 ### Fáze 5 – Prisma client
-- [ ] Spustit `npm run db:generate`.
-- [ ] Spustit `npm run build --workspace @seobooster/worker` (nebo full `npm run build`).
+- [x] Spustit `npm run db:generate`.
+- [x] Spustit `npm run build --workspace @seobooster/worker` (nebo full `npm run build`).
 - [ ] Commit (`chore: regenerate prisma client`) a označit fázi.
 
 ### Fáze 6 – Testy a ověření
