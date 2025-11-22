@@ -750,9 +750,11 @@ const bootstrap = async () => {
       return;
     }
 
-    const prompts = await prisma.aiPromptConfig.findUnique({
-      where: { task: 'scan' }
+    const promptsArray = await prisma.aiPromptConfig.findMany({
+      where: { task: 'scan' },
+      orderBy: { orderIndex: 'asc' }
     });
+    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const variables = { url: web.url };
     const renderedPrompts = renderPromptsForTask('scan', prompts, variables);
     const providerSelection = resolveProviderForTask('scan', prompts);
@@ -849,9 +851,11 @@ const bootstrap = async () => {
 
     const scan = analysis.scanResult as unknown as ScanResult;
 
-    const prompts = await prisma.aiPromptConfig.findUnique({
-      where: { task: 'analyze' }
+    const promptsArray = await prisma.aiPromptConfig.findMany({
+      where: { task: 'analyze' },
+      orderBy: { orderIndex: 'asc' }
     });
+    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const variables = { url: scan.url, scanResult: scan };
     const renderedPrompts = renderPromptsForTask('analyze', prompts, {
       ...variables,
@@ -936,9 +940,11 @@ const bootstrap = async () => {
 
     const businessProfile = analysis.businessProfile as unknown as BusinessProfile;
 
-    const prompts = await prisma.aiPromptConfig.findUnique({
-      where: { task: 'strategy' }
+    const promptsArray = await prisma.aiPromptConfig.findMany({
+      where: { task: 'strategy' },
+      orderBy: { orderIndex: 'asc' }
     });
+    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const variables = { businessProfile };
     const renderedPrompts = renderPromptsForTask('strategy', prompts, variables);
     const providerSelection = resolveProviderForTask('strategy', prompts);
@@ -1079,9 +1085,11 @@ const bootstrap = async () => {
       }
     };
 
-    const prompts = await prisma.aiPromptConfig.findUnique({
-      where: { task: 'article' }
+    const promptsArray = await prisma.aiPromptConfig.findMany({
+      where: { task: 'article' },
+      orderBy: { orderIndex: 'asc' }
     });
+    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const renderedPrompts = renderPromptsForTask('article', prompts, promptVariables);
     const providerSelection = resolveProviderForTask('article', prompts);
     const providerForCall = providerSelection.provider;
