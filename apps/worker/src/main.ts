@@ -1308,6 +1308,11 @@ const bootstrap = async () => {
     const modelName = providerSelection.model;
 
     // Get or update ArticleImage record
+    if (!job.data.imageId) {
+      logger.error({ jobId: job.id, articleId: article.id, data: job.data }, 'Missing imageId in job data');
+      return;
+    }
+
     let articleImage = await prisma.articleImage.findUnique({
       where: { id: job.data.imageId }
     });

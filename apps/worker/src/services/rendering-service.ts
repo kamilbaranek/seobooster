@@ -31,8 +31,8 @@ export const captureScreenshot = async (url: string, options: ScreenshotOptions 
   const page = await context.newPage();
   try {
     await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: options.timeoutMs ?? 25000
+      waitUntil: 'domcontentloaded',
+      timeout: options.timeoutMs ?? 60000
     });
     if ((options.waitAfterLoadMs ?? 3000) > 0) {
       await page.waitForTimeout(options.waitAfterLoadMs ?? 3000);
