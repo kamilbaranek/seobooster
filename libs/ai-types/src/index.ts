@@ -58,6 +58,37 @@ export interface ArticleDraft {
   callToAction?: string;
 }
 
+/**
+ * Message for chat-based text generation
+ */
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Options for chat-based text generation
+ */
+export interface ChatOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: 'text' | 'json_object';
+}
+
+/**
+ * Result from chat-based text generation
+ */
+export interface ChatResult {
+  content: string;
+  finishReason?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export interface AiProvider {
   name: ProviderName;
   scanWebsite(
@@ -81,6 +112,10 @@ export interface AiProvider {
     request: GenerateImageRequest,
     overrides?: PromptOverrides<'article_image'>
   ): Promise<GeneratedImageResult>;
+  /**
+   * Generic chat-based text generation for multi-step prompts
+   */
+  chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResult>;
   getLastRawResponse?(): unknown;
 }
 

@@ -446,4 +446,67 @@ export class GoogleAiProvider implements AiProvider {
       suggestedFileName: request.suggestedFileName ?? 'article-image'
     };
   }
+
+  async chat(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options?: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      responseFormat?: 'text' | 'json_object';
+    }
+  ): Promise<{ content: string; finishReason?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+    const systemMsg = messages.find(m => m.role === 'system')?.content ?? '';
+    const userMsg = messages.find(m => m.role === 'user')?.content ?? '';
+    const combinedPrompt = systemMsg ? `${systemMsg}\n\n${userMsg}` : userMsg;
+
+    const apiKey = this.config.apiKey;
+    const model = options?.model ?? this.config.model;
+
+    if (!apiKey) {
+      throw new Error('Missing API key for Google AI');
+    }
+
+    const requestBody: GoogleGenerateContentRequest = {
+      contents: [{ parts: [{ text: combinedPrompt }] }],
+      generationConfig: {
+        temperature: options?.temperature ?? 0.7,
+        maxOutputTokens: options?.maxTokens
+      }
+    };
+
+    if (options?.responseFormat === 'json_object') {
+      requestBody.generationConfig!.responseMimeType = 'application/json';
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Google AI API error: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json() as GoogleGenerateContentResponse;
+    this.lastRawResponse = result;
+
+    if (result.error) {
+      throw new Error(`Google AI error: ${result.error.message}`);
+    }
+
+    const content = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    this.lastMessageContent = content;
+
+    return {
+      content,
+      finishReason: result.candidates?.[0]?.finishReason,
+      usage: undefined
+    };
+  }
 }

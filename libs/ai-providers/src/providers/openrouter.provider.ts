@@ -361,6 +361,75 @@ export class OpenRouterProvider implements AiProvider {
     };
   }
 
+  async chat(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options?: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      responseFormat?: 'text' | 'json_object';
+    }
+  ): Promise<{ content: string; finishReason?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+    const apiKey = this.config.apiKey;
+    const model = options?.model ?? this.config.model;
+
+    if (!apiKey) {
+      throw new Error('Missing API key for OpenRouter');
+    }
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: options?.temperature,
+      max_tokens: options?.maxTokens
+    };
+
+    if (options?.responseFormat === 'json_object') {
+      body.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': this.config.siteUrl,
+        'X-Title': this.config.appName
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json() as {
+      choices: Array<{
+        message: { content: string };
+        finish_reason?: string;
+      }>;
+      usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+      };
+    };
+
+    this.lastRawResponse = data;
+    this.lastMessageContent = data.choices[0]?.message?.content;
+
+    return {
+      content: data.choices[0]?.message?.content ?? '',
+      finishReason: data.choices[0]?.finish_reason,
+      usage: data.usage ? {
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens
+      } : undefined
+    };
+  }
+
   private resolveImageDimensions(size?: GenerateImageSize): { width: number; height: number } {
     switch (size) {
       case 'landscape':

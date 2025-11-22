@@ -19,7 +19,7 @@ export class MockAiProvider implements AiProvider {
   constructor(
     private readonly config: AiProviderConfig,
     private readonly models: AiModelMap
-  ) {}
+  ) { }
 
   async scanWebsite(url: string, _overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
     return {
@@ -49,8 +49,8 @@ export class MockAiProvider implements AiProvider {
         target_audience: Array.isArray(profile.audience)
           ? profile.audience.join(', ')
           : profile.audience
-          ? String(profile.audience)
-          : 'Mock audience'
+            ? String(profile.audience)
+            : 'Mock audience'
       },
       topic_clusters: [
         {
@@ -116,6 +116,31 @@ export class MockAiProvider implements AiProvider {
       mimeType: 'image/png',
       source: `mock://${encodeURIComponent(prompt.slice(0, 32))}`,
       suggestedFileName: request.suggestedFileName ?? 'mock-image'
+    };
+  }
+
+  async chat(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options?: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      responseFormat?: 'text' | 'json_object';
+    }
+  ): Promise<{ content: string; finishReason?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+    const userMessage = messages.find(m => m.role === 'user')?.content ?? 'No input';
+    const response = options?.responseFormat === 'json_object'
+      ? JSON.stringify({ result: `Mock response to: ${userMessage}` })
+      : `Mock text response to: ${userMessage}`;
+
+    return {
+      content: response,
+      finishReason: 'stop',
+      usage: {
+        promptTokens: 10,
+        completionTokens: 20,
+        totalTokens: 30
+      }
     };
   }
 }
