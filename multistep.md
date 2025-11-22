@@ -82,7 +82,7 @@ Goal: dokončit plnou multi-step exekuci promptů v workeru (scan → analyze �
 - [ ] Commit (`chore: regenerate prisma client`) a označit fázi.
 
 ### Fáze 6 – Testy a ověření
-- [ ] Build: `npm run build --workspace @seobooster/worker` (případně full build).
+- [x] Build: `npm run build --workspace @seobooster/worker` (případně full build).
 - [ ] Smoke test 1: 2‑krokový `article_image` (chat prompt → generateImage) – ověř logy a uložený obrázek.
 - [ ] Smoke test 2: multi-step `scan` + `analyze` s JSON on – ověř uložení do DB a AiCallLog.
 - [ ] Ověřit retry (simulovat error, sledovat backoff v logu).
