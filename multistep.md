@@ -48,32 +48,32 @@ Goal: dokončit plnou multi-step exekuci promptů v workeru (scan → analyze �
 - [x] Odstranit mrtvou proměnnou `provider` v `apps/worker/src/main.ts`.
 - [x] Kontrola: projdi `resolveProviderForTask`, že využívá nový init.
 - [x] Spustit `npm run build --workspace @seobooster/worker`.
-- [ ] Commit (např. `chore: fix ai provider bootstrap`) a označit fázi jako splněnou.
+- [x] Commit (např. `chore: fix ai provider bootstrap`) a označit fázi jako splněnou.
 
 ### Fáze 2 – Obecný multi-step runner
-- [ ] Přidat helper `runPromptSteps` (nebo podobně pojmenovaný) do `apps/worker/src/main.ts`:
-     - [ ] Sestavení `variables` s `previousStepOutput` a `stepXOutput`.
-     - [ ] Render promptů (`renderPromptsForTask`), výběr provider/model per krok (`resolveProviderForTask`).
-     - [ ] Volání `executeWithRetry` na `provider.chat`.
-     - [ ] Parse JSON při `forceJsonResponse`; strip code fences; při chybě throw.
-     - [ ] Uložení `stepOutputs`, posun `previousStepOutput`.
-     - [ ] Log přes `recordAiCall` s `__stepIndex`, `responseRaw/Parsed`, `status`.
-- [ ] Spustit `npm run build --workspace @seobooster/worker`.
+- [x] Přidat helper `runPromptSteps` (nebo podobně pojmenovaný) do `apps/worker/src/main.ts`:
+     - [x] Sestavení `variables` s `previousStepOutput` a `stepXOutput`.
+     - [x] Render promptů (`renderPromptsForTask`), výběr provider/model per krok (`resolveProviderForTask`).
+     - [x] Volání `executeWithRetry` na `provider.chat`.
+     - [x] Parse JSON při `forceJsonResponse`; strip code fences; při chybě throw.
+     - [x] Uložení `stepOutputs`, posun `previousStepOutput`.
+     - [x] Log přes `recordAiCall` s `__stepIndex`, `responseRaw/Parsed`, `status`.
+- [x] Spustit `npm run build --workspace @seobooster/worker`.
 - [ ] Commit (`feat: add multi step runner`) a označit fázi.
 
 ### Fáze 3 – Napojení jobů
-- [ ] Scan job: použít runner; `baseVariables={url}`; finální output → `ScanResult`; uložit `rawScanOutput`.
-- [ ] Analyze job: `variables={url, scanResult, rawScanOutput}`; výstup `BusinessProfile` (povinná pole).
-- [ ] Strategy job: `variables={businessProfile}`; výstup `SeoStrategy`.
-- [ ] Article job: zachovat dnešní variables; výstup `ArticleDraft` (title + bodyMarkdown povinné).
-- [ ] Article_image job: intermediate kroky přes runner; finální krok `generateImage` s doplněnými step outputs.
-- [ ] Spustit `npm run build --workspace @seobooster/worker`.
+- [x] Scan job: použít runner; `baseVariables={url}`; finální output → `ScanResult`; uložit `rawScanOutput`.
+- [x] Analyze job: `variables={url, scanResult, rawScanOutput}`; výstup `BusinessProfile` (povinná pole).
+- [x] Strategy job: `variables={businessProfile}`; výstup `SeoStrategy`.
+- [x] Article job: zachovat dnešní variables; výstup `ArticleDraft` (title + bodyMarkdown povinné).
+- [x] Article_image job: intermediate kroky přes runner; finální krok `generateImage` s doplněnými step outputs.
+- [x] Spustit `npm run build --workspace @seobooster/worker`.
 - [ ] Commit (`feat: wire jobs to multistep`) a označit fázi.
 
 ### Fáze 4 – Logging režim
-- [ ] Upravit `recordAiCall`, aby se volal i bez `AI_DEBUG_LOG_PROMPTS` (alespoň finální krok; ideálně všechny).
-- [ ] Status, errorMessage, variables, system/user prompt, responseRaw/Parsed, step index.
-- [ ] Spustit `npm run build --workspace @seobooster/worker`.
+- [x] Upravit `recordAiCall`, aby se volal i bez `AI_DEBUG_LOG_PROMPTS` (alespoň finální krok; ideálně všechny).
+- [x] Status, errorMessage, variables, system/user prompt, responseRaw/Parsed, step index.
+- [x] Spustit `npm run build --workspace @seobooster/worker`.
 - [ ] Commit (`chore: enable ai call logging by default`) a označit fázi.
 
 ### Fáze 5 – Prisma client

@@ -62,7 +62,7 @@ import {
 } from '@seobooster/queue-types';
 import { createLogger } from './logger';
 import { aiProvider, aiModelMap } from './services/ai-orchestrator';
-import type { AiTaskType, BusinessProfile, ProviderName, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import type { AiTaskType, ArticleDraft, BusinessProfile, ProviderName, ScanResult, SeoStrategy } from '@seobooster/ai-types';
 import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
 import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
@@ -383,6 +383,7 @@ type PromptConfig = {
   userPrompt: string | null;
   provider?: string | null;
   model?: string | null;
+  forceJsonResponse?: boolean | null;
 } | null;
 
 const renderPromptsForTask = (
@@ -400,6 +401,145 @@ const renderPromptsForTask = (
   };
 };
 
+const parseJsonContent = (content: string) => {
+  const cleanFence = (() => {
+    const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch?.[1]) {
+      return fenceMatch[1].trim();
+    }
+    return content.trim();
+  })();
+
+  const parsed = JSON.parse(cleanFence);
+  if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
+    // Support { success, data } envelope
+    const maybe = parsed as { success: unknown; data: unknown };
+    if (maybe.success === true && maybe.data !== undefined) {
+      return maybe.data;
+    }
+  }
+  return parsed;
+};
+
+type RunPromptStepsResult<T> = {
+  finalOutput: T;
+  finalText: string;
+  stepOutputs: Record<number, unknown>;
+};
+
+type PromptStep = NonNullable<PromptConfig>;
+
+const ensurePromptSteps = (task: AiTaskType, promptSteps: PromptStep[]): PromptStep[] => {
+  if (promptSteps.length > 0) {
+    return promptSteps;
+  }
+  const defaults = DEFAULT_PROMPTS[task];
+  return [
+    {
+      systemPrompt: defaults.systemPrompt,
+      userPrompt: defaults.userPrompt,
+      forceJsonResponse: true,
+      provider: null,
+      model: null
+    }
+  ];
+};
+
+const runPromptSteps = async <TOutput = unknown>(
+  task: AiTaskType,
+  promptSteps: PromptStep[],
+  baseVariables: Record<string, unknown>,
+  parseFinal?: (value: unknown, finalText: string) => TOutput,
+  logContext?: { webId?: string }
+): Promise<RunPromptStepsResult<TOutput>> => {
+  const steps = ensurePromptSteps(task, promptSteps);
+  const stepOutputs: Record<number, unknown> = {};
+  let previousStepOutput: unknown = null;
+  let finalText = '';
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const variables = {
+      ...baseVariables,
+      previousStepOutput,
+      ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v]))
+    };
+
+    const rendered = renderPromptsForTask(task, step, variables);
+    const providerSelection = resolveProviderForTask(task, step);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
+    const forceJson = step.forceJsonResponse !== false;
+
+    try {
+      const chatResult = await executeWithRetry(() =>
+        providerForCall.chat(
+          [
+            { role: 'system', content: rendered.systemPrompt ?? '' },
+            { role: 'user', content: rendered.userPrompt ?? '' }
+          ],
+          {
+            model: modelName,
+            responseFormat: forceJson ? 'json_object' : 'text'
+          }
+        )
+      );
+
+      finalText = chatResult.content ?? '';
+
+      const parsed = forceJson ? parseJsonContent(finalText) : finalText;
+      const output = parsed ?? finalText;
+      stepOutputs[i] = output;
+      previousStepOutput = output;
+
+      const rawResponse =
+        typeof providerForCall.getLastRawResponse === 'function'
+          ? providerForCall.getLastRawResponse()
+          : undefined;
+
+      await recordAiCall({
+        webId: logContext?.webId,
+        task,
+        provider: providerName,
+        model: modelName,
+        variables,
+        systemPrompt: rendered.systemPrompt ?? '',
+        userPrompt: rendered.userPrompt ?? '',
+        responseRaw: rawResponse ?? finalText,
+        responseParsed: output,
+        status: 'SUCCESS'
+      });
+    } catch (error) {
+      const rawResponse =
+        typeof providerSelection.provider.getLastRawResponse === 'function'
+          ? providerSelection.provider.getLastRawResponse()
+          : undefined;
+
+      await recordAiCall({
+        webId: logContext?.webId,
+        task,
+        provider: providerSelection.provider.name,
+        model: providerSelection.model,
+        variables,
+        systemPrompt: step.systemPrompt ?? '',
+        userPrompt: step.userPrompt ?? '',
+        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : undefined),
+        status: 'ERROR',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      throw error;
+    }
+  }
+
+  const finalOutputRaw = stepOutputs[steps.length - 1];
+  const finalOutput =
+    parseFinal?.(finalOutputRaw, finalText) ?? (finalOutputRaw as TOutput);
+
+  return { finalOutput, finalText, stepOutputs };
+};
+
 type AiCallLogInput = {
   webId?: string;
   task: AiTaskType;
@@ -415,10 +555,6 @@ type AiCallLogInput = {
 };
 
 const recordAiCall = async (payload: AiCallLogInput) => {
-  if (!AI_DEBUG_LOG_PROMPTS) {
-    return;
-  }
-
   try {
     await prisma.aiCallLog.create({
       data: {
@@ -774,70 +910,23 @@ const bootstrap = async () => {
       where: { task: 'scan' },
       orderBy: { orderIndex: 'asc' }
     });
-    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const variables = { url: web.url };
-    const renderedPrompts = renderPromptsForTask('scan', prompts, variables);
-    const providerSelection = resolveProviderForTask('scan', prompts);
-    const providerForCall = providerSelection.provider;
-    const providerName = providerForCall.name;
-    const modelName = providerSelection.model;
-    const forceJsonResponse = prompts?.forceJsonResponse !== false;
-
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: web.id, variables, renderedPrompts }, 'AI debug: scan request');
-    }
-
-    const isDebug = Boolean(job.data.debug);
-
-    let scanResult: ScanResult;
-    let rawScanText: string | undefined;
-    try {
-      scanResult = (await providerForCall.scanWebsite(web.url, {
-        task: 'scan',
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        variables,
-        forceJsonResponse
-      })) as ScanResult;
-
-      if (AI_DEBUG_LOG_PROMPTS) {
-        logger.info({ webId: web.id, result: scanResult }, 'AI debug: scan response');
-      }
-
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      rawScanText =
-        typeof (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent ===
-          'function'
-          ? (providerForCall as { getLastMessageContent?: () => string | undefined }).getLastMessageContent?.()
-          : undefined;
-      await recordAiCall({
-        webId: web.id,
-        task: 'scan',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? rawScanText ?? scanResult,
-        responseParsed: scanResult,
-        status: 'SUCCESS'
-      });
-    } catch (error) {
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: web.id,
-        task: 'scan',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
-        status: 'ERROR',
-        errorMessage: error instanceof Error ? error.message : undefined
-      });
-      throw error;
-    }
+    const { finalOutput: scanResult, finalText: rawScanText } = await runPromptSteps<ScanResult>(
+      'scan',
+      promptsArray as PromptStep[],
+      variables,
+      (val) => {
+        if (!val || typeof val !== 'object') {
+          throw new Error('Scan result is not an object');
+        }
+        const casted = val as ScanResult;
+        if (!casted.url || !casted.title) {
+          throw new Error('Scan result missing url or title');
+        }
+        return casted;
+      },
+      { webId: web.id }
+    );
 
     await prisma.webAnalysis.upsert({
       where: { webId: web.id },
@@ -852,7 +941,7 @@ const bootstrap = async () => {
       }
     });
 
-    if (!isDebug) {
+    if (!Boolean(job.data.debug)) {
       await analyzeQueue.add('AnalyzeBusiness', {
         webId: web.id,
         rawScanOutput: rawScanText ?? null
@@ -875,76 +964,31 @@ const bootstrap = async () => {
       where: { task: 'analyze' },
       orderBy: { orderIndex: 'asc' }
     });
-    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
-    const variables = { url: scan.url, scanResult: scan };
-    const renderedPrompts = renderPromptsForTask('analyze', prompts, {
-      ...variables,
-      rawScanOutput: job.data.rawScanOutput ?? null
-    });
-    const providerSelection = resolveProviderForTask('analyze', prompts);
-    const providerForCall = providerSelection.provider;
-    const providerName = providerForCall.name;
-    const modelName = providerSelection.model;
-    const forceJsonResponse = prompts?.forceJsonResponse !== false;
+    const variables = { url: scan.url, scanResult: scan, rawScanOutput: job.data.rawScanOutput ?? null };
 
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: analyze request');
-    }
+    const { finalOutput: profile } = await runPromptSteps<BusinessProfile>(
+      'analyze',
+      promptsArray as PromptStep[],
+      variables,
+      (val) => {
+        if (!val || typeof val !== 'object') {
+          throw new Error('Business profile is not an object');
+        }
+        const casted = val as BusinessProfile;
+        if (!casted.name || !Array.isArray(casted.audience)) {
+          throw new Error('Business profile missing required fields');
+        }
+        return casted;
+      },
+      { webId: job.data.webId }
+    );
 
-    const isDebug = Boolean(job.data.debug);
-
-    let profile: BusinessProfile;
-    try {
-      profile = (await providerForCall.analyzeBusiness(scan, {
-        task: 'analyze',
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        variables: {
-          ...variables,
-          rawScanOutput: job.data.rawScanOutput ?? null
-        },
-        forceJsonResponse
-      })) as BusinessProfile;
-
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: job.data.webId,
-        task: 'analyze',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? profile,
-        responseParsed: profile,
-        status: 'SUCCESS'
-      });
-    } catch (error) {
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: job.data.webId,
-        task: 'analyze',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
-        status: 'ERROR',
-        errorMessage: error instanceof Error ? error.message : undefined
-      });
-      throw error;
-    }
-
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, result: profile }, 'AI debug: analyze response');
-    }
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
       data: { businessProfile: profile as unknown as Prisma.InputJsonValue }
     });
 
-    if (!isDebug) {
+    if (!Boolean(job.data.debug)) {
       await strategyQueue.add('CreateSeoStrategy', { webId: job.data.webId });
     }
   });
@@ -964,68 +1008,31 @@ const bootstrap = async () => {
       where: { task: 'strategy' },
       orderBy: { orderIndex: 'asc' }
     });
-    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
     const variables = { businessProfile };
-    const renderedPrompts = renderPromptsForTask('strategy', prompts, variables);
-    const providerSelection = resolveProviderForTask('strategy', prompts);
-    const providerForCall = providerSelection.provider;
-    const providerName = providerForCall.name;
-    const modelName = providerSelection.model;
-    const forceJsonResponse = prompts?.forceJsonResponse !== false;
 
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, variables, renderedPrompts }, 'AI debug: strategy request');
-    }
-
-    let strategy: SeoStrategy;
-    try {
-      strategy = (await providerForCall.buildSeoStrategy(businessProfile, {
-        task: 'strategy',
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        variables,
-        forceJsonResponse
-      })) as SeoStrategy;
-
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: job.data.webId,
-        task: 'strategy',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? strategy,
-        responseParsed: strategy,
-        status: 'SUCCESS'
-      });
-    } catch (error) {
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: job.data.webId,
-        task: 'strategy',
-        provider: providerName,
-        model: modelName,
-        variables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
-        status: 'ERROR',
-        errorMessage: error instanceof Error ? error.message : undefined
-      });
-      throw error;
-    }
-
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info({ webId: job.data.webId, result: strategy }, 'AI debug: strategy response');
-    }
+    const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
+      'strategy',
+      promptsArray as PromptStep[],
+      variables,
+      (val) => {
+        if (!val || typeof val !== 'object') {
+          throw new Error('Strategy is not an object');
+        }
+        const casted = val as SeoStrategy;
+        if (!Array.isArray(casted.topic_clusters)) {
+          throw new Error('Strategy missing topic_clusters');
+        }
+        return casted;
+      },
+      { webId: job.data.webId }
+    );
 
     await prisma.webAnalysis.update({
       where: { webId: job.data.webId },
       data: { seoStrategy: strategy as unknown as Prisma.InputJsonValue }
     });
 
+    const modelName = aiModelMap.strategy;
     await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName);
 
   });
@@ -1109,71 +1116,22 @@ const bootstrap = async () => {
       where: { task: 'article' },
       orderBy: { orderIndex: 'asc' }
     });
-    const prompts = promptsArray[promptsArray.length - 1]; // Use last prompt
-    const renderedPrompts = renderPromptsForTask('article', prompts, promptVariables);
-    const providerSelection = resolveProviderForTask('article', prompts);
-    const providerForCall = providerSelection.provider;
-    const providerName = providerForCall.name;
-    const modelName = providerSelection.model;
-    const forceJsonResponse = prompts?.forceJsonResponse !== false;
-
-    if (AI_DEBUG_LOG_PROMPTS) {
-      logger.info(
-        { planId: plan.id, variables: promptVariables, renderedPrompts },
-        'AI debug: article request'
-      );
-    }
-
-    let draft;
-    try {
-      draft = await providerForCall.generateArticle(
-        seoStrategyPayload,
-        {
-          clusterName: plan.supportingArticle.title,
-          targetTone: 'Professional'
-        },
-        {
-          task: 'article',
-          systemPrompt: renderedPrompts.systemPrompt,
-          userPrompt: renderedPrompts.userPrompt,
-          variables: promptVariables,
-          forceJsonResponse
+    const { finalOutput: draft } = await runPromptSteps(
+      'article',
+      promptsArray as PromptStep[],
+      promptVariables,
+      (val) => {
+        if (!val || typeof val !== 'object') {
+          throw new Error('Article draft is not an object');
         }
-      );
-
-      if (AI_DEBUG_LOG_PROMPTS) {
-        logger.info({ planId: plan.id, result: draft }, 'AI debug: article response');
-      }
-
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: plan.webId,
-        task: 'article',
-        provider: providerName,
-        model: modelName,
-        variables: promptVariables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? draft,
-        responseParsed: draft,
-        status: 'SUCCESS'
-      });
-    } catch (error) {
-      const rawResponse = typeof providerForCall.getLastRawResponse === 'function' ? providerForCall.getLastRawResponse() : undefined;
-      await recordAiCall({
-        webId: plan.webId,
-        task: 'article',
-        provider: providerName,
-        model: modelName,
-        variables: promptVariables,
-        systemPrompt: renderedPrompts.systemPrompt,
-        userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : { error: 'Unknown error' }),
-        status: 'ERROR',
-        errorMessage: error instanceof Error ? error.message : undefined
-      });
-      throw error;
-    }
+        const candidate = val as ArticleDraft;
+        if (!candidate.bodyMarkdown || !candidate.title) {
+          throw new Error('Article draft missing title or bodyMarkdown');
+        }
+        return candidate;
+      },
+      { webId: plan.webId }
+    );
 
     if (typeof draft.bodyMarkdown !== 'string' || draft.bodyMarkdown.trim().length === 0) {
       throw new Error('Invalid ArticleDraft: missing bodyMarkdown');
@@ -1353,14 +1311,31 @@ const bootstrap = async () => {
       orderBy: { orderIndex: 'asc' }
     });
 
-    if (promptSteps.length === 0) {
-      throw new Error('No prompts configured for article_image task');
+    const effectiveSteps = ensurePromptSteps('article_image', promptSteps as PromptStep[]);
+    const preSteps = effectiveSteps.length > 1 ? effectiveSteps.slice(0, effectiveSteps.length - 1) : [];
+
+    let previousStepOutput: unknown = null;
+    let stepOutputs: Record<number, unknown> = {};
+
+    if (preSteps.length > 0) {
+      const preResult = await runPromptSteps(
+        'article_image',
+        preSteps,
+        promptVariables,
+        undefined,
+        { webId: article.webId }
+      );
+      stepOutputs = preResult.stepOutputs;
+      previousStepOutput = preResult.stepOutputs[preSteps.length - 1];
     }
 
-    // For now, use the last prompt step (typically the image generation step)
-    // In the future, we can add support for intermediate text generation steps
-    const finalPromptConfig = promptSteps[promptSteps.length - 1];
-    const renderedPrompts = renderPromptsForTask('article_image', finalPromptConfig, promptVariables);
+    const finalPromptConfig = effectiveSteps[effectiveSteps.length - 1];
+    const finalVariables = {
+      ...promptVariables,
+      previousStepOutput,
+      ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v]))
+    };
+    const renderedPrompts = renderPromptsForTask('article_image', finalPromptConfig, finalVariables);
 
     if (!renderedPrompts.userPrompt) {
       throw new Error('Article image prompt template produced an empty user prompt');
@@ -1410,7 +1385,7 @@ const bootstrap = async () => {
         task: 'article_image',
         provider: providerName,
         model: modelName,
-        variables: promptVariables,
+        variables: finalVariables,
         systemPrompt: renderedPrompts.systemPrompt ?? '',
         userPrompt: renderedPrompts.userPrompt,
         responseRaw: rawResponse ?? { source: imageResult.source },
@@ -1427,7 +1402,7 @@ const bootstrap = async () => {
         task: 'article_image',
         provider: providerName,
         model: modelName,
-        variables: promptVariables,
+        variables: finalVariables,
         systemPrompt: renderedPrompts.systemPrompt ?? '',
         userPrompt: renderedPrompts.userPrompt,
         responseRaw: rawResponse ?? (error instanceof Error ? { message: error.message } : undefined),
