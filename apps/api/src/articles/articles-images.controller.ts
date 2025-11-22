@@ -24,7 +24,7 @@ export class ArticlesImagesController {
     private readonly prisma: PrismaService,
     @InjectQueue(GENERATE_ARTICLE_IMAGE_QUEUE)
     private readonly imageQueue: Queue<GenerateArticleImageJob>
-  ) {}
+  ) { }
 
   // GET /api/webs/:webId/articles/:articleId/images
   @Get()
@@ -127,12 +127,13 @@ export class ArticlesImagesController {
     return { success: true, image: newImage };
   }
 
-  // PATCH /api/webs/:webId/articles/:articleId/images/:imageId/featured
-  @Patch(':imageId/featured')
-  async setFeatured(
+  // PATCH /api/webs/:webId/articles/:articleId/images/:imageId
+  @Patch(':imageId')
+  async updateImage(
     @Param('webId') webId: string,
     @Param('articleId') articleId: string,
     @Param('imageId') imageId: string,
+    @Body() body: { altText?: string; fileName?: string; isFeatured?: boolean },
     @Req() req: any
   ) {
     // Verify user owns the web
@@ -152,29 +153,48 @@ export class ArticlesImagesController {
       throw new HttpException('Image not found', HttpStatus.NOT_FOUND);
     }
 
-    if (image.status !== 'SUCCESS') {
-      throw new HttpException('Cannot set failed/pending image as featured', HttpStatus.BAD_REQUEST);
+    // If setting as featured, unset all other featured images
+    if (body.isFeatured === true) {
+      if (image.status !== 'SUCCESS') {
+        throw new HttpException('Cannot set failed/pending image as featured', HttpStatus.BAD_REQUEST);
+      }
+
+      await this.prisma.articleImage.updateMany({
+        where: { articleId, isFeatured: true },
+        data: { isFeatured: false }
+      });
     }
 
-    // Unset all other featured images for this article
-    await this.prisma.articleImage.updateMany({
-      where: { articleId, isFeatured: true },
-      data: { isFeatured: false }
-    });
-
-    // Set this image as featured
-    await this.prisma.articleImage.update({
+    // Update the image
+    const updated = await this.prisma.articleImage.update({
       where: { id: imageId },
-      data: { isFeatured: true }
+      data: {
+        altText: body.altText !== undefined ? body.altText : image.altText,
+        fileName: body.fileName !== undefined ? body.fileName : image.fileName,
+        isFeatured: body.isFeatured !== undefined ? body.isFeatured : image.isFeatured
+      }
     });
 
-    // Update Article.featuredImageUrl
-    await this.prisma.article.update({
-      where: { id: articleId },
-      data: { featuredImageUrl: image.imageUrl }
-    });
+    // Update Article.featuredImageUrl if this image is now featured
+    if (updated.isFeatured) {
+      await this.prisma.article.update({
+        where: { id: articleId },
+        data: { featuredImageUrl: updated.imageUrl }
+      });
+    }
 
-    return { success: true };
+    return { success: true, image: updated };
+  }
+
+  // PATCH /api/webs/:webId/articles/:articleId/images/:imageId/featured
+  @Patch(':imageId/featured')
+  async setFeatured(
+    @Param('webId') webId: string,
+    @Param('articleId') articleId: string,
+    @Param('imageId') imageId: string,
+    @Req() req: any
+  ) {
+    return this.updateImage(webId, articleId, imageId, { isFeatured: true }, req);
   }
 
   // DELETE /api/webs/:webId/articles/:articleId/images/:imageId

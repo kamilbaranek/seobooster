@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../../../lib/api-client';
+import ImageEditorModal from './ImageEditorModal';
 
 import { ArticlePlan } from './InboxTab';
 import Swal from 'sweetalert2';
@@ -17,10 +18,13 @@ interface ArticleImage {
     prompt?: string;
     position: number;
     isFeatured: boolean;
+    altText?: string;
+    fileName?: string;
 }
 
 const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
     const [images, setImages] = useState<ArticleImage[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const fetchImages = async () => {
         if (article.webId && article.articleId) {
@@ -228,7 +232,7 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                     <div className="d-flex align-items-center mb-9">
                         {/*begin::Avatar*/}
                         {images.map((img) => (
-                            <div key={img.id} className="symbol symbol-50px me-4" data-bs-toggle="tooltip" title={img.prompt || 'Generated Image'}>
+                            <div key={img.id} className="symbol symbol-50px me-4" data-bs-toggle="tooltip" title={img.prompt || 'Generated Image'} style={{ cursor: 'pointer' }} onClick={() => setIsModalOpen(true)}>
                                 <div className="symbol-label" style={{ backgroundImage: `url(${img.imageUrl || '/assets/media/svg/files/blank-image.svg'})`, position: 'relative' }}>
                                     {img.status === 'PENDING' && (
                                         <div className="d-flex align-items-center justify-content-center w-100 h-100 bg-body bg-opacity-50 rounded">
@@ -338,6 +342,18 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                 </div>
             </div>
             {/*end::Card*/}
+
+            {/* Image Editor Modal */}
+            {article.webId && article.articleId && (
+                <ImageEditorModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    images={images}
+                    webId={article.webId}
+                    articleId={article.articleId}
+                    onSave={fetchImages}
+                />
+            )}
         </div>
     );
 };

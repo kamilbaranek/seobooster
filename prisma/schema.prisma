@@ -344,6 +344,8 @@ model ArticleImage {
   provider     String?
   model        String?
   errorMessage String?
+  altText      String?
+  fileName     String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
