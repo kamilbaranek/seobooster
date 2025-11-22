@@ -1252,11 +1252,13 @@ const bootstrap = async () => {
     }
 
     // Check subscription limit
+    // Check subscription limit
     const imageGenerationLimit = article.web.subscription?.imageGenerationLimit ?? 1;
     const existingImagesCount = await prisma.articleImage.count({
       where: {
         articleId: article.id,
-        status: { in: ['PENDING', 'SUCCESS'] }
+        status: { in: ['PENDING', 'SUCCESS'] },
+        id: { not: job.data.imageId }
       }
     });
 
@@ -1265,6 +1267,15 @@ const bootstrap = async () => {
         { jobId: job.id, articleId: article.id, limit: imageGenerationLimit, existing: existingImagesCount },
         'Image generation limit reached'
       );
+
+      await prisma.articleImage.update({
+        where: { id: job.data.imageId },
+        data: {
+          status: 'FAILED',
+          errorMessage: 'Image generation limit reached'
+        }
+      });
+
       return;
     }
 
