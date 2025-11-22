@@ -35,7 +35,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
     useEffect(() => {
         if (isOpen) {
-            // Initialize image data from props
+            // Initialize image data from props only when modal first opens
             const initialData: Record<string, { altText: string; fileName: string; isFeatured: boolean }> = {};
             images.forEach((img) => {
                 initialData[img.id] = {
@@ -47,7 +47,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
             setImageData(initialData);
             setCurrentStep(0);
         }
-    }, [isOpen, images]);
+    }, [isOpen]); // Only reset when modal opens/closes, not when images change
 
     if (!isOpen) return null;
 
