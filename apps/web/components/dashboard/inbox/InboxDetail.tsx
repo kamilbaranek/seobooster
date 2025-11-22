@@ -22,15 +22,32 @@ interface ArticleImage {
 const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
     const [images, setImages] = useState<ArticleImage[]>([]);
 
-    useEffect(() => {
+    const fetchImages = async () => {
         if (article.webId && article.articleId) {
-            apiFetch<{ images: ArticleImage[] }>(`/webs/${article.webId}/articles/${article.articleId}/images`)
-                .then(data => {
-                    setImages(data.images || []);
-                })
-                .catch(err => console.error("Failed to load images", err));
+            try {
+                const data = await apiFetch<{ images: ArticleImage[] }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
+                setImages(data.images || []);
+            } catch (err) {
+                console.error("Failed to load images", err);
+            }
         }
+    };
+
+    useEffect(() => {
+        fetchImages();
     }, [article.webId, article.articleId]);
+
+    // Polling for pending images
+    useEffect(() => {
+        const hasPending = images.some(img => img.status === 'PENDING');
+        if (!hasPending) return;
+
+        const interval = setInterval(() => {
+            fetchImages();
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [images, article.webId, article.articleId]);
 
     const handleNewPicture = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -212,7 +229,13 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                         {/*begin::Avatar*/}
                         {images.map((img) => (
                             <div key={img.id} className="symbol symbol-50px me-4" data-bs-toggle="tooltip" title={img.prompt || 'Generated Image'}>
-                                <span className="symbol-label" style={{ backgroundImage: `url(${img.imageUrl || '/assets/media/svg/files/blank-image.svg'})` }}></span>
+                                <div className="symbol-label" style={{ backgroundImage: `url(${img.imageUrl || '/assets/media/svg/files/blank-image.svg'})`, position: 'relative' }}>
+                                    {img.status === 'PENDING' && (
+                                        <div className="d-flex align-items-center justify-content-center w-100 h-100 bg-body bg-opacity-50 rounded">
+                                            <span className="spinner-border spinner-border-sm text-primary" role="status"></span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {/*end::Avatar*/}
