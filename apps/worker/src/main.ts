@@ -91,6 +91,26 @@ const formatUnknownError = (error: unknown) =>
     ? { message: error.message, stack: error.stack }
     : { raw: typeof error === 'string' ? error : JSON.stringify(error) };
 const AI_DEBUG_LOG_PROMPTS = process.env.AI_DEBUG_LOG_PROMPTS === 'true';
+const DEFAULT_PROVIDER = process.env.OPENROUTER_API_KEY ? 'openrouter' : 'google';
+
+// Helper function for retry logic with exponential backoff
+async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      const delay = baseDelay * Math.pow(2, attempt);
+      logger.warn({ attempt, delay, error: error instanceof Error ? error.message : 'Unknown error' }, 'Retrying after error');
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Should not reach here');
+}
 
 const redisConnection = {
   host: process.env.REDIS_HOST ?? '127.0.0.1',
