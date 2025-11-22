@@ -31,6 +31,20 @@ interface ProjectDetailContentProps {
     projectId?: string;
 }
 
+const formatLastArticleDate = (value?: string | null) => {
+    if (!value) {
+        return null;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day} ${month}, ${year}`;
+};
+
 const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }) => {
     const { projects } = useProjects();
     const project = projects.find(p => p.id === projectId);
@@ -39,6 +53,8 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const colors = ['warning', 'danger', 'primary', 'success', 'info'];
     const color = projectIndex >= 0 ? colors[projectIndex % colors.length] : 'primary';
     const iconClass = `ki-outline ki-abstract-${(projectIndex >= 0 ? (projectIndex % 20) + 10 : 10)} fs-3x fs-lg-4x text-inverse-${color}`;
+    const lastArticleDate = project?.lastArticleCreatedAt ? formatLastArticleDate(project.lastArticleCreatedAt) : null;
+    const lastArticleDisplay = lastArticleDate ?? (project ? 'No articles yet' : '—');
 
     const [activeTab, setActiveTab] = useState('overview');
     const [activeScheduleDay, setActiveScheduleDay] = useState(0);
@@ -353,11 +369,11 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                     <div className="border border-gray-300 border-dashed rounded min-w-125px py-3 px-4 me-6 mb-3">
                                         {/*begin::Number*/}
                                         <div className="d-flex align-items-center">
-                                            <div className="fs-4 fw-bold">29 Jan, 2025</div>
+                                            <div className="fs-4 fw-bold">{lastArticleDisplay}</div>
                                         </div>
                                         {/*end::Number*/}
                                         {/*begin::Label*/}
-                                        <div className="fw-semibold fs-6 text-gray-500">Due Date</div>
+                                        <div className="fw-semibold fs-6 text-gray-500">Last Article</div>
                                         {/*end::Label*/}
                                     </div>
                                     {/*end::Stat*/}
@@ -1179,4 +1195,3 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
 };
 
 export default ProjectDetailContent;
-

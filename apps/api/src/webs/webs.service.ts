@@ -42,11 +42,30 @@ export class WebsService {
     return web;
   }
 
-  findAll(userId: string) {
-    return this.prisma.web.findMany({
+  async findAll(userId: string) {
+    const webs = await this.prisma.web.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' }
     });
+
+    if (!webs.length) {
+      return [];
+    }
+
+    const lastArticles = await Promise.all(
+      webs.map((web) =>
+        this.prisma.article.findFirst({
+          where: { webId: web.id },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true }
+        })
+      )
+    );
+
+    return webs.map((web, index) => ({
+      ...web,
+      lastArticleCreatedAt: lastArticles[index]?.createdAt ?? null
+    }));
   }
 
   async findOne(userId: string, id: string) {

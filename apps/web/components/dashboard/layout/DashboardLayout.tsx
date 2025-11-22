@@ -11,6 +11,7 @@ export interface DashboardWeb {
   faviconUrl?: string;
   faviconStatus?: string;
   screenshotUrl?: string;
+  lastArticleCreatedAt?: string | null;
 }
 
 interface DashboardLayoutProps {

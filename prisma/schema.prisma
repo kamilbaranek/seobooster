@@ -226,7 +226,8 @@ model ArticleApprovalToken {
 
 model AiPromptConfig {
   id                String   @id @default(cuid())
-  task              String   @unique
+  task              String
+  orderIndex        Int      @default(0)
   systemPrompt      String
   userPrompt        String
   provider          String?
@@ -234,6 +235,8 @@ model AiPromptConfig {
   forceJsonResponse Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  @@unique([task, orderIndex])
 }
 
 model AiCallLog {

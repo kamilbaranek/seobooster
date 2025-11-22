@@ -1306,18 +1306,6 @@ const bootstrap = async () => {
       seoCluster: article.plan?.cluster ?? null
     };
 
-    const prompts = await prisma.aiPromptConfig.findUnique({
-      where: { task: 'article_image' }
-    });
-    const renderedPrompts = renderPromptsForTask('article_image', prompts, promptVariables);
-    if (!renderedPrompts.userPrompt) {
-      throw new Error('Article image prompt template produced an empty user prompt');
-    }
-    const providerSelection = resolveProviderForTask('article_image', prompts);
-    const providerForCall = providerSelection.provider;
-    const providerName = providerForCall.name;
-    const modelName = providerSelection.model;
-
     // Get or update ArticleImage record
     if (!job.data.imageId) {
       logger.error({ jobId: job.id, articleId: article.id, data: job.data }, 'Missing imageId in job data');
@@ -1332,7 +1320,30 @@ const bootstrap = async () => {
       throw new Error(`ArticleImage not found: ${job.data.imageId}`);
     }
 
-    // Update with prompt, provider, model
+    const promptSteps = await prisma.aiPromptConfig.findMany({
+      where: { task: 'article_image' },
+      orderBy: { orderIndex: 'asc' }
+    });
+
+    if (promptSteps.length === 0) {
+      throw new Error('No prompts configured for article_image task');
+    }
+
+    // For now, use the last prompt step (typically the image generation step)
+    // In the future, we can add support for intermediate text generation steps
+    const finalPromptConfig = promptSteps[promptSteps.length - 1];
+    const renderedPrompts = renderPromptsForTask('article_image', finalPromptConfig, promptVariables);
+
+    if (!renderedPrompts.userPrompt) {
+      throw new Error('Article image prompt template produced an empty user prompt');
+    }
+
+    const providerSelection = resolveProviderForTask('article_image', finalPromptConfig);
+    const providerForCall = providerSelection.provider;
+    const providerName = providerForCall.name;
+    const modelName = providerSelection.model;
+
+    // Update ArticleImage with final prompt
     articleImage = await prisma.articleImage.update({
       where: { id: articleImage.id },
       data: {

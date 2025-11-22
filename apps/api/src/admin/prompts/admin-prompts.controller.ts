@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseArrayPipe,
   ParseEnumPipe,
   Post,
   Put,
@@ -82,7 +83,7 @@ const jsonArrayToStrings = (value: Prisma.JsonValue | null | undefined): string[
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPERADMIN)
 export class AdminPromptsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   @Get()
   async list() {
@@ -106,19 +107,27 @@ export class AdminPromptsController {
 
   @Get(':task')
   async getOne(@Param('task', new ParseEnumPipe(PromptTask)) task: PromptTask) {
-    const prompt = await this.prisma.aiPromptConfig.findUnique({ where: { task } });
-    if (prompt) {
-      return prompt;
+    const prompts = await this.prisma.aiPromptConfig.findMany({
+      where: { task },
+      orderBy: { orderIndex: 'asc' }
+    });
+
+    if (prompts.length > 0) {
+      return prompts;
     }
+
     const defaults = DEFAULT_PROMPTS[task];
-    return {
-      task,
-      systemPrompt: defaults.systemPrompt,
-      userPrompt: defaults.userPrompt,
-      provider: null,
-      model: null,
-      forceJsonResponse: true
-    };
+    return [
+      {
+        task,
+        orderIndex: 0,
+        systemPrompt: defaults.systemPrompt,
+        userPrompt: defaults.userPrompt,
+        provider: null,
+        model: null,
+        forceJsonResponse: true
+      }
+    ];
   }
 
   @Post(':task/preview')
@@ -126,50 +135,64 @@ export class AdminPromptsController {
     @Param('task', new ParseEnumPipe(PromptTask)) task: PromptTask,
     @Body() payload: PreviewPromptDto
   ) {
-    const overrides = await this.prisma.aiPromptConfig.findUnique({ where: { task } });
+    const prompts = await this.prisma.aiPromptConfig.findMany({
+      where: { task },
+      orderBy: { orderIndex: 'asc' }
+    });
+
     const defaults = DEFAULT_PROMPTS[task];
+    const effectivePrompts = prompts.length > 0 ? prompts : [{
+      systemPrompt: defaults.systemPrompt,
+      userPrompt: defaults.userPrompt
+    }];
 
     const variables = await this.resolvePreviewVariables(task, payload);
 
-    const templateSystem = overrides?.systemPrompt ?? defaults.systemPrompt;
-    const templateUser = overrides?.userPrompt ?? defaults.userPrompt;
+    return effectivePrompts.map(prompt => {
+      const templateSystem = prompt.systemPrompt;
+      const templateUser = prompt.userPrompt;
 
-    return {
-      variables,
-      systemPrompt: renderPromptTemplate(templateSystem, variables) ?? templateSystem,
-      userPrompt: renderPromptTemplate(templateUser, variables) ?? templateUser
-    };
+      return {
+        variables,
+        systemPrompt: renderPromptTemplate(templateSystem, variables) ?? templateSystem,
+        userPrompt: renderPromptTemplate(templateUser, variables) ?? templateUser
+      };
+    });
   }
 
   @Put(':task')
   async upsert(
     @Param('task', new ParseEnumPipe(PromptTask)) task: PromptTask,
-    @Body() payload: UpdatePromptDto
+    @Body(new ParseArrayPipe({ items: UpdatePromptDto })) payload: UpdatePromptDto[]
   ) {
-    return this.prisma.aiPromptConfig.upsert({
-      where: { task },
-      update: {
-        systemPrompt: payload.systemPrompt,
-        userPrompt: payload.userPrompt,
-        provider: payload.provider ?? null,
-        model: payload.model ?? null,
-        forceJsonResponse: payload.forceJsonResponse ?? true
-      },
-      create: {
-        task,
-        systemPrompt: payload.systemPrompt,
-        userPrompt: payload.userPrompt,
-        provider: payload.provider ?? null,
-        model: payload.model ?? null,
-        forceJsonResponse: payload.forceJsonResponse ?? true
-      }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.aiPromptConfig.deleteMany({
+        where: { task }
+      });
+
+      await tx.aiPromptConfig.createMany({
+        data: payload.map((item, index) => ({
+          task,
+          orderIndex: index,
+          systemPrompt: item.systemPrompt,
+          userPrompt: item.userPrompt,
+          provider: item.provider ?? null,
+          model: item.model ?? null,
+          forceJsonResponse: item.forceJsonResponse ?? true
+        }))
+      });
+
+      return tx.aiPromptConfig.findMany({
+        where: { task },
+        orderBy: { orderIndex: 'asc' }
+      });
     });
   }
 
   @Delete(':task')
   async remove(@Param('task', new ParseEnumPipe(PromptTask)) task: PromptTask) {
     try {
-      await this.prisma.aiPromptConfig.delete({
+      await this.prisma.aiPromptConfig.deleteMany({
         where: { task }
       });
     } catch {
