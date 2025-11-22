@@ -12,6 +12,8 @@ interface MeResponse {
     user: UserProfile;
     webs: any[];
 }
+import { useRouter } from 'next/router';
+import { clearToken } from '../../../lib/auth-storage';
 import Link from 'next/link';
 import { useProjects } from '../hooks/useProjects';
 
@@ -20,6 +22,7 @@ const formatUrl = (url: string) => {
 };
 
 const Header = () => {
+    const router = useRouter();
     const { projects } = useProjects();
     const [user, setUser] = useState<UserProfile | null>(null);
 
@@ -28,6 +31,12 @@ const Header = () => {
             .then(data => setUser(data.user))
             .catch(err => console.error('Failed to fetch user profile', err));
     }, []);
+
+    const handleSignOut = (e: React.MouseEvent) => {
+        e.preventDefault();
+        clearToken();
+        router.push('/login');
+    };
     return (
         <div id="kt_app_header" className="app-header d-flex">
             {/*begin::Header container*/}
@@ -977,7 +986,7 @@ const Header = () => {
                                 {/*end::Menu item*/}
                                 {/*begin::Menu item*/}
                                 <div className="menu-item px-5">
-                                    <a href="authentication/layouts/corporate/sign-in.html" className="menu-link px-5">Sign Out</a>
+                                    <a href="#" onClick={handleSignOut} className="menu-link px-5">Sign Out</a>
                                 </div>
                                 {/*end::Menu item*/}
                             </div>

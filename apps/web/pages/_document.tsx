@@ -8,7 +8,7 @@ class AppDocument extends Document {
 
   render() {
     return (
-      <Html lang="en" data-bs-theme="light">
+      <Html lang="en">
         <Head>
           <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
           <link href="/assets/plugins/custom/fullcalendar/fullcalendar.bundle.css" rel="stylesheet" />
@@ -58,6 +58,29 @@ class AppDocument extends Document {
 
                 #kt_app_sidebar_footer .menu-sub.menu-sub-dropdown.show {
                   inset: auto auto 100% auto;
+                }
+              `,
+            }}
+          />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                var defaultThemeMode = "system";
+                var themeMode;
+                if (document.documentElement) {
+                  if (document.documentElement.hasAttribute("data-bs-theme-mode")) {
+                    themeMode = document.documentElement.getAttribute("data-bs-theme-mode");
+                  } else {
+                    if (localStorage.getItem("data-bs-theme") !== null) {
+                      themeMode = localStorage.getItem("data-bs-theme");
+                    } else {
+                      themeMode = defaultThemeMode;
+                    }
+                  }
+                  if (themeMode === "system") {
+                    themeMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                  }
+                  document.documentElement.setAttribute("data-bs-theme", themeMode);
                 }
               `,
             }}

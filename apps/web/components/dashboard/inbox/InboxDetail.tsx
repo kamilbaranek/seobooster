@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../../../lib/api-client';
 
 import { ArticlePlan } from './InboxTab';
@@ -9,7 +9,29 @@ interface InboxDetailProps {
     onBack: () => void;
 }
 
+interface ArticleImage {
+    id: string;
+    articleId: string;
+    status: 'PENDING' | 'SUCCESS' | 'FAILED';
+    imageUrl?: string;
+    prompt?: string;
+    position: number;
+    isFeatured: boolean;
+}
+
 const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
+    const [images, setImages] = useState<ArticleImage[]>([]);
+
+    useEffect(() => {
+        if (article.webId && article.articleId) {
+            apiFetch<{ images: ArticleImage[] }>(`/webs/${article.webId}/articles/${article.articleId}/images`)
+                .then(data => {
+                    setImages(data.images || []);
+                })
+                .catch(err => console.error("Failed to load images", err));
+        }
+    }, [article.webId, article.articleId]);
+
     const handleNewPicture = async (e: React.MouseEvent) => {
         e.preventDefault();
 
@@ -43,17 +65,38 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                     confirmButton: "btn btn-primary",
                     cancelButton: "btn btn-active-light"
                 }
-            }).then(function (result) {
+            }).then(async function (result) {
                 if (result.value) {
-                    Swal.fire({
-                        text: "New picture generation started!",
-                        icon: "success",
-                        buttonsStyling: false,
-                        confirmButtonText: "Ok, got it!",
-                        customClass: {
-                            confirmButton: "btn btn-primary",
+                    try {
+                        const response = await apiFetch<{ success: boolean; image: ArticleImage }>(`/webs/${article.webId}/articles/${article.articleId}/images/generate`, {
+                            method: 'POST'
+                        });
+
+                        if (response.success && response.image) {
+                            setImages(prev => [...prev, response.image]);
                         }
-                    });
+
+                        Swal.fire({
+                            text: "New picture generation started!",
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok, got it!",
+                            customClass: {
+                                confirmButton: "btn btn-primary",
+                            }
+                        });
+                    } catch (error) {
+                        console.error("Failed to generate image:", error);
+                        Swal.fire({
+                            text: "Failed to start image generation.",
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary",
+                            }
+                        });
+                    }
                 } else if (result.dismiss === Swal.DismissReason.cancel) {
                     // Do nothing on cancel
                 }
@@ -163,6 +206,33 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                         </div>
                     </div>
                     {/*end::Title*/}
+
+                    {/*begin::Author*/}
+                    <div className="d-flex align-items-center mb-9">
+                        {/*begin::Avatar*/}
+                        {images.map((img) => (
+                            <div key={img.id} className="symbol symbol-50px me-4" data-bs-toggle="tooltip" title={img.prompt || 'Generated Image'}>
+                                <span className="symbol-label" style={{ backgroundImage: `url(${img.imageUrl || '/assets/media/svg/files/blank-image.svg'})` }}></span>
+                            </div>
+                        ))}
+                        {/*end::Avatar*/}
+                        <div className="pe-5">
+                            {/*begin::Author details*/}
+                            <div className="d-flex align-items-center flex-wrap gap-1">
+                                <a href="#" className="fw-bold text-gray-900 text-hover-primary">AI Generator</a>
+                                <i className="ki-outline ki-abstract-8 fs-7 text-success mx-3"></i>
+                                <span className="text-muted fw-bold">{new Date().toLocaleDateString()}</span>
+                            </div>
+                            {/*end::Author details*/}
+                            {/*begin::Message details*/}
+                            <div data-kt-inbox-message="details">
+                                <span className="text-muted fw-semibold">Generated images for this article</span>
+                            </div>
+                            {/*end::Message details*/}
+                        </div>
+                    </div>
+                    {/*end::Author*/}
+
                     {/*begin::Message accordion*/}
                     <div data-kt-inbox-message="message_wrapper">
                         {/*begin::Message header*/}

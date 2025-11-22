@@ -1,4 +1,4 @@
-import { getToken } from './auth-storage';
+import { getToken, clearToken } from './auth-storage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3333/api';
 
@@ -24,6 +24,15 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - redirect to login
+    if (response.status === 401) {
+      clearToken();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized - redirecting to login');
+    }
+
     const message = await safeJson(response);
     throw new Error(message?.error?.message ?? message?.message ?? 'API request failed');
   }
