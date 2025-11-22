@@ -136,7 +136,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                                                         src={currentImage.imageUrl}
                                                         alt={currentData.altText || `Image ${currentStep + 1}`}
                                                         className="mw-100 rounded"
-                                                        style={{ maxHeight: '300px' }}
+                                                        style={{ maxHeight: '600px', maxWidth: '100%' }}
                                                     />
                                                 </div>
                                             )}
