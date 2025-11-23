@@ -19,6 +19,7 @@
     "react": "latest",
     "react-apexcharts": "^1.8.0",
     "react-dom": "latest",
+    "react-select": "^5.10.2",
     "sweetalert2": "^11.26.3"
   },
   "devDependencies": {

@@ -26,6 +26,13 @@ export interface BusinessProfile {
   mission?: string;
   audience: string[];
   differentiators: string[];
+  main_products_or_services?: BusinessProduct[];
+}
+
+export interface BusinessProduct {
+  name: string;
+  url?: string;
+  price?: string;
 }
 
 export interface SeoStrategy {

@@ -48,7 +48,13 @@ export class WebsService {
   async findAll(userId: string) {
     const webs = await this.prisma.web.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        seoStrategies: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
     });
 
     if (!webs.length) {
@@ -73,7 +79,13 @@ export class WebsService {
 
   async findOne(userId: string, id: string) {
     const web = await this.prisma.web.findFirst({
-      where: { id, userId }
+      where: { id, userId },
+      include: {
+        seoStrategies: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
     });
     if (!web) {
       throw new NotFoundException('Website not found');
@@ -97,9 +109,41 @@ export class WebsService {
         status: dto.status ?? web.status,
         integrationType: dto.integrationType ?? web.integrationType,
         articleImageGenerationEnabled:
-          dto.articleImageGenerationEnabled ?? web.articleImageGenerationEnabled
+          dto.articleImageGenerationEnabled ?? web.articleImageGenerationEnabled,
+        publicationSchedule: dto.publicationSchedule ?? web.publicationSchedule,
+        timezone: dto.timezone ?? web.timezone,
+        language: dto.language ?? web.language,
+        country: dto.country ?? web.country
       }
     });
+
+    if (dto.businessDescription !== undefined) {
+      const activeStrategy = await this.prisma.seoStrategy.findFirst({
+        where: { webId: id, isActive: true },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (activeStrategy) {
+        await this.prisma.seoStrategy.update({
+          where: { id: activeStrategy.id },
+          data: { businessDescription: dto.businessDescription }
+        });
+      }
+    }
+
+    if (dto.businessTargetAudience !== undefined) {
+      const activeStrategy = await this.prisma.seoStrategy.findFirst({
+        where: { webId: id, isActive: true },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (activeStrategy) {
+        await this.prisma.seoStrategy.update({
+          where: { id: activeStrategy.id },
+          data: { businessTargetAudience: dto.businessTargetAudience }
+        });
+      }
+    }
 
     if (web.status !== WebStatus.ACTIVE && updated.status === WebStatus.ACTIVE) {
       await this.jobQueueService.enqueueScanWebsite(updated.id);

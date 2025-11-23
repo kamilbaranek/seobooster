@@ -17,7 +17,7 @@ export const DEFAULT_PROMPTS: PromptTemplates = {
   analyze: {
     systemPrompt:
       'You convert website scan data into a business profile. Return JSON { success, data } where data is BusinessProfile.',
-    userPrompt: 'Scan Result: {{scanResult}}\nCreate a concise business profile.'
+    userPrompt: 'Scan Result: {{scanResult}}\nCreate a concise business profile. Include main_products_or_services array with name, url (if found), and price (if found).'
   },
   strategy: {
     systemPrompt:

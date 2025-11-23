@@ -988,6 +988,26 @@ const bootstrap = async () => {
       data: { businessProfile: profile as unknown as Prisma.InputJsonValue }
     });
 
+    if (profile.main_products_or_services && Array.isArray(profile.main_products_or_services)) {
+      for (const product of profile.main_products_or_services) {
+        if (product.name) {
+          try {
+            await prisma.webProduct.create({
+              data: {
+                webId: job.data.webId,
+                name: product.name,
+                url: product.url ?? null,
+                price: product.price ?? null,
+                source: 'business_profile'
+              }
+            });
+          } catch (error) {
+            logger.warn({ error, productName: product.name, webId: job.data.webId }, 'Failed to save WebProduct');
+          }
+        }
+      }
+    }
+
     if (!Boolean(job.data.debug)) {
       await strategyQueue.add('CreateSeoStrategy', { webId: job.data.webId });
     }

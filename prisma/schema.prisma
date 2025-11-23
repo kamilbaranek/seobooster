@@ -102,13 +102,14 @@ model Web {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  credentials   WebCredentials?
-  analysis      WebAnalysis?
-  articles      Article[]
-  articlePlans  ArticlePlan[]
-  aiCallLogs    AiCallLog[]
-  seoStrategies SeoStrategy[]
-  magicLinks    MagicLink[]
+  credentials                   WebCredentials?
+  products                      WebProduct[]
+  analysis                      WebAnalysis?
+  articles                      Article[]
+  articlePlans                  ArticlePlan[]
+  aiCallLogs                    AiCallLog[]
+  seoStrategies                 SeoStrategy[]
+  magicLinks                    MagicLink[]
 
   faviconUrl                    String?
   faviconSourceUrl              String?
@@ -127,6 +128,10 @@ model Web {
   defaultWordpressAuthorId      String?                @unique
   wordpressCategories           WebWordpressCategory[]
   wordpressAuthors              WebWordpressAuthor[]
+  publicationSchedule           String[]               @default([])
+  timezone                      String                 @default("UTC")
+  language                      String                 @default("en")
+  country                       String                 @default("")
 }
 
 model WebWordpressCategory {
@@ -370,4 +375,18 @@ model MagicLink {
   createdAt DateTime @default(now())
 
   @@index([token])
+}
+
+model WebProduct {
+  id         String   @id @default(cuid())
+  web        Web      @relation(fields: [webId], references: [id], onDelete: Cascade)
+  webId      String
+  name       String
+  url        String?
+  price      String?
+  currency   String?
+  detectedAt DateTime @default(now())
+  source     String?  @default("business_profile")
+
+  @@index([webId])
 }
