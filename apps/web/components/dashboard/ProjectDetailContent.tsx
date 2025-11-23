@@ -82,6 +82,25 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const [articlePlans, setArticlePlans] = useState<ArticlePlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
+    const [isRegeneratingScreenshot, setIsRegeneratingScreenshot] = useState(false);
+
+    // Poll for project updates when regenerating screenshot
+    useEffect(() => {
+        if (!isRegeneratingScreenshot || !projectId) return;
+
+        const interval = setInterval(async () => {
+            await refetch();
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [isRegeneratingScreenshot, projectId, refetch]);
+
+    // Stop regenerating state when status is no longer PENDING
+    useEffect(() => {
+        if (isRegeneratingScreenshot && project?.screenshotStatus !== 'PENDING') {
+            setIsRegeneratingScreenshot(false);
+        }
+    }, [project?.screenshotStatus, isRegeneratingScreenshot]);
 
     // Fetch article plans when projectId changes
     useEffect(() => {
@@ -277,15 +296,23 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                     {/*begin::Details*/}
                     <div className="d-flex flex-wrap flex-sm-nowrap mb-6">
                         {/*begin::Image*/}
-                        <div className={`d-flex flex-center flex-shrink-0 bg-${(project?.screenshotUrl || project?.faviconUrl) ? 'light' : color} rounded ${project?.screenshotUrl ? 'w-200px w-lg-300px' : 'w-100px h-100px w-lg-150px h-lg-150px'} me-7 mb-4 overflow-hidden`}>
-                            {(project?.screenshotUrl || project?.faviconUrl) ? (
-                                <img
-                                    className={project?.screenshotUrl ? "w-100" : "mw-50px mw-lg-75px"}
-                                    src={project?.screenshotUrl || project?.faviconUrl}
-                                    alt={project?.nickname || 'Project'}
-                                />
+                        <div className={`d-flex flex-center flex-shrink-0 bg-${(project?.screenshotUrl || project?.faviconUrl) ? 'light' : color} rounded ${project?.screenshotUrl ? 'w-200px w-lg-300px' : 'w-100px h-100px w-lg-150px h-lg-150px'} me-7 mb-4 overflow-hidden position-relative`}>
+                            {isRegeneratingScreenshot ? (
+                                <div className="position-absolute top-50 start-50 translate-middle">
+                                    <div className="spinner-border text-primary" role="status">
+                                        <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
                             ) : (
-                                <i className={iconClass}></i>
+                                (project?.screenshotUrl || project?.faviconUrl) ? (
+                                    <img
+                                        className={project?.screenshotUrl ? "w-100" : "mw-50px mw-lg-75px"}
+                                        src={project?.screenshotUrl || project?.faviconUrl}
+                                        alt={project?.nickname || 'Project'}
+                                    />
+                                ) : (
+                                    <i className={iconClass}></i>
+                                )
                             )}
                         </div>
                         {/*end::Image*/}
@@ -341,6 +368,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
 
                                                     if (result.isConfirmed && projectId) {
                                                         try {
+                                                            setIsRegeneratingScreenshot(true);
                                                             await apiFetch(`/webs/${projectId}/refresh-screenshot`, { method: 'POST' });
                                                             Swal.fire({
                                                                 text: "Screenshot regeneration started!",
@@ -351,8 +379,10 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                                                     confirmButton: "btn btn-primary"
                                                                 }
                                                             });
+                                                            refetch(); // Trigger immediate update to see PENDING status
                                                         } catch (error) {
                                                             console.error(error);
+                                                            setIsRegeneratingScreenshot(false);
                                                             Swal.fire({
                                                                 text: "Failed to start regeneration.",
                                                                 icon: "error",
