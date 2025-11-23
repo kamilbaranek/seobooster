@@ -104,3 +104,88 @@ See `development_plan.md` and `implementation_plan.md` for the full product and 
    - Vidíš všechny pipeline kroky + status (default/custom).
    - Můžeš editovat `systemPrompt` / `userPrompt`, resetovat na výchozí hodnoty a zobrazit náhled s reálnými daty z DB.
    - Navíc lze pro každý krok zvolit poskytovatele (OpenRouter / OpenAI / Anthropic) a konkrétní model, případně zůstat u globálního nastavení.
+
+## Multi-Step Prompts & Raw Response Access
+
+Worker podporuje **multi-step prompts**, kde výstup z jednoho kroku může být vstupem pro další krok. Každý krok má přístup k **celému raw response objektu** z předchozích kroků, nejen k parsed contentu.
+
+### Struktura výstupu kroku
+
+Každý krok ukládá do `stepOutputs` objekt s následující strukturou:
+
+```typescript
+{
+  content: string,        // Raw text odpověď z AI modelu
+  rawResponse: object,    // Celý JSON response z API (včetně metadat)
+  parsed: any            // Parsed JSON (pokud forceJsonResponse = true) nebo text
+}
+```
+
+### Přístup k datům v promptech
+
+V `systemPrompt` a `userPrompt` můžete používat tyto proměnné:
+
+- `{{previousStepOutput}}` – celý objekt z předchozího kroku
+- `{{previousStepOutput.content}}` – raw text z předchozího kroku
+- `{{previousStepOutput.parsed}}` – parsed JSON/data z předchozího kroku
+- `{{previousStepOutput.rawResponse}}` – kompletní API response
+- `{{step0Output}}`, `{{step1Output}}` atd. – přístup ke konkrétním krokům
+
+### Přístup k metadatům z OpenRouter API
+
+Pro modely na OpenRouter (včetně Perplexity) máte přístup k:
+
+```handlebars
+{{!-- Citace ze scanu --}}
+{{#each previousStepOutput.rawResponse.citations}}
+- {{this.url}}: {{this.title}}
+{{/each}}
+
+{{!-- Usage statistics --}}
+Spotřebované tokeny: {{previousStepOutput.rawResponse.usage.total_tokens}}
+Prompt tokeny: {{previousStepOutput.rawResponse.usage.prompt_tokens}}
+Completion tokeny: {{previousStepOutput.rawResponse.usage.completion_tokens}}
+
+{{!-- Reasoning details (pro modely s extended thinking) --}}
+{{#if previousStepOutput.rawResponse.reasoning_details}}
+Reasoning: {{previousStepOutput.rawResponse.reasoning_details.0.text}}
+{{/if}}
+
+{{!-- Annotations --}}
+{{#each previousStepOutput.rawResponse.choices.0.message.annotations}}
+Type: {{this.type}}
+{{/each}}
+```
+
+### Příklad použití
+
+**Krok 1 - Scan website:**
+```
+Prompt: Prozkoumej web {{url}} a vrať strukturované informace.
+```
+
+**Krok 2 - Analyze with citations:**
+```handlebars
+Analyzuj byznys na základě těchto zdrojů:
+
+{{#each previousStepOutput.rawResponse.citations}}
+- [{{@index}}] {{this.title}} ({{this.url}})
+{{/each}}
+
+Raw scan output:
+{{previousStepOutput.content}}
+
+Celkové tokeny použité při scanu: {{previousStepOutput.rawResponse.usage.total_tokens}}
+```
+
+### Kompatibilita s modely
+
+- **Standard models** (např. `perplexity/llama-3.1-sonar-small-128k-online`): Vrací JSON se strukturovanými daty
+- **Deep research models** (např. `perplexity/sonar-deep-research`): Vracejí markdown reporty, **nejsou kompatibilní** s `forceJsonResponse = true`. Worker automaticky detekuje a odmítne tyto modely pro structured output tasks.
+
+### Best Practices
+
+1. **Využijte citace**: Perplexity modely vracejí `citations` – použijte je v dalším kroku pro relevantní zdroje
+2. **Monitoring tokenů**: Sledujte `usage.total_tokens` pro optimalizaci nákladů
+3. **Volba modelu**: Pro structured output používejte standard modely, deep-research jen pro finální reporty
+4. **Debugging**: V dev prostředí nastavte `AI_DEBUG_LOG_PROMPTS=true` pro logging všech proměnných a promptů
