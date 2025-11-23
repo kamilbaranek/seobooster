@@ -265,7 +265,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                     </div>
                                     {/*end::Status*/}
                                     {/*begin::Description*/}
-                                    <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">#1 Tool to get started with Web Apps any Kind & size</div>
+                                    <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">{project?.url || 'Project URL'}</div>
                                     {/*end::Description*/}
                                 </div>
                                 {/*end::Details*/}
