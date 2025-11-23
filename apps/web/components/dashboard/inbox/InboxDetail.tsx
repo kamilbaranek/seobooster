@@ -31,7 +31,7 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
         if (article.webId && article.articleId) {
             try {
                 const data = await apiFetch<{ images: ArticleImage[], remaining: number }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
-                setImages(data.images || []);
+                setImages((data.images || []).filter(img => img.status !== 'FAILED'));
                 setRemainingAttempts(data.remaining);
             } catch (err) {
                 console.error("Failed to load images", err);
