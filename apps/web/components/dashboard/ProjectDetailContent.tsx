@@ -150,13 +150,6 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
         fetchArticles();
     }, [projectId]);
 
-    const resolveImageUrl = (url?: string | null) => {
-        if (!url) return null;
-        if (url.startsWith('http://') || url.startsWith('https://')) return url;
-        const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '';
-        return `${apiBase}${url}`;
-    };
-
     const summaryChartOptions: ApexOptions = {
         chart: {
             fontFamily: 'inherit',
@@ -572,8 +565,8 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                                 data-bs-toggle="tooltip"
                                                 title={article.title}
                                             >
-                                                {resolveImageUrl(article.featuredImageUrl) ? (
-                                                    <img alt={article.title} src={resolveImageUrl(article.featuredImageUrl) ?? ''} />
+                                                {article.featuredImageUrl ? (
+                                                    <img alt={article.title} src={article.featuredImageUrl} />
                                                 ) : (
                                                     <span className={`symbol-label bg-${color} text-inverse-${color} fw-bold`}>{fallbackLetter}</span>
                                                 )}
