@@ -382,12 +382,12 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                     <div className="border border-gray-300 border-dashed rounded min-w-125px py-3 px-4 me-6 mb-3">
                                         {/*begin::Number*/}
                                         <div className="d-flex align-items-center">
-                                            <i className="ki-outline ki-arrow-down fs-3 text-danger me-2"></i>
-                                            <div className="fs-4 fw-bold" data-kt-countup="true" data-kt-countup-value="75">0</div>
+                                            <i className="ki-outline ki-document fs-3 text-primary me-2"></i>
+                                            <div className="fs-4 fw-bold">{project?.articleCount ?? 0}</div>
                                         </div>
                                         {/*end::Number*/}
                                         {/*begin::Label*/}
-                                        <div className="fw-semibold fs-6 text-gray-500">Open Tasks</div>
+                                        <div className="fw-semibold fs-6 text-gray-500">Generated articles</div>
                                         {/*end::Label*/}
                                     </div>
                                     {/*end::Stat*/}

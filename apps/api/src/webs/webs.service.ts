@@ -71,9 +71,18 @@ export class WebsService {
       )
     );
 
+    const articleCounts = await Promise.all(
+      webs.map((web) =>
+        this.prisma.article.count({
+          where: { webId: web.id }
+        })
+      )
+    );
+
     return webs.map((web, index) => ({
       ...web,
-      lastArticleCreatedAt: lastArticles[index]?.createdAt ?? null
+      lastArticleCreatedAt: lastArticles[index]?.createdAt ?? null,
+      articleCount: articleCounts[index] ?? 0
     }));
   }
 
