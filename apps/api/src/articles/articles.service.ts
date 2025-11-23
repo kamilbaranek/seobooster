@@ -19,6 +19,14 @@ type ArticleWithWordpressRelations = Prisma.ArticleGetPayload<{
   include: {
     wordpressCategory: true;
     wordpressAuthor: true;
+    images: {
+      orderBy: { position: 'asc' };
+      select: {
+        imageUrl: true;
+        isFeatured: true;
+        status: true;
+      };
+    };
   };
 }>;
 
@@ -276,9 +284,9 @@ export class ArticlesService {
 
   private mapArticleListItem(article: ArticleWithWordpressRelations) {
     const featuredFromImages = article.images
-      ?.find((img) => img.isFeatured && img.status === 'SUCCESS' && img.imageUrl)
+      ?.find((img: { isFeatured: boolean; status: string; imageUrl: string | null }) => img.isFeatured && img.status === 'SUCCESS' && img.imageUrl)
       ?.imageUrl;
-    const firstImage = article.images?.find((img) => img.status === 'SUCCESS' && img.imageUrl)?.imageUrl;
+    const firstImage = article.images?.find((img: { status: string; imageUrl: string | null }) => img.status === 'SUCCESS' && img.imageUrl)?.imageUrl;
     const resolvedFeatured = featuredFromImages || article.featuredImageUrl || firstImage || null;
 
     return {
