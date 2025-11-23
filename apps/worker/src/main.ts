@@ -488,15 +488,22 @@ const runPromptSteps = async <TOutput = unknown>(
 
       finalText = chatResult.content ?? '';
 
-      const parsed = forceJson ? parseJsonContent(finalText) : finalText;
-      const output = parsed ?? finalText;
-      stepOutputs[i] = output;
-      previousStepOutput = output;
-
       const rawResponse =
         typeof providerForCall.getLastRawResponse === 'function'
           ? providerForCall.getLastRawResponse()
           : undefined;
+
+      // Store the complete raw response for multi-step access
+      // This allows subsequent steps to access citations, reasoning, usage etc.
+      // via {{previousStepOutput.citations}} or {{step0Output.usage.total_tokens}}
+      const fullStepOutput = {
+        content: finalText,
+        rawResponse: rawResponse,
+        parsed: forceJson ? parseJsonContent(finalText) : finalText
+      };
+
+      stepOutputs[i] = fullStepOutput;
+      previousStepOutput = fullStepOutput;
 
       await recordAiCall({
         webId: logContext?.webId,
@@ -507,7 +514,7 @@ const runPromptSteps = async <TOutput = unknown>(
         systemPrompt: rendered.systemPrompt ?? '',
         userPrompt: rendered.userPrompt ?? '',
         responseRaw: rawResponse ?? finalText,
-        responseParsed: output,
+        responseParsed: fullStepOutput.parsed,
         status: 'SUCCESS'
       });
     } catch (error) {
@@ -533,9 +540,9 @@ const runPromptSteps = async <TOutput = unknown>(
     }
   }
 
-  const finalOutputRaw = stepOutputs[steps.length - 1];
+  const finalOutputRaw = stepOutputs[steps.length - 1] as { content: string; parsed: unknown } | undefined;
   const finalOutput =
-    parseFinal?.(finalOutputRaw, finalText) ?? (finalOutputRaw as TOutput);
+    parseFinal?.(finalOutputRaw?.parsed, finalText) ?? (finalOutputRaw?.parsed as TOutput);
 
   return { finalOutput, finalText, stepOutputs };
 };
