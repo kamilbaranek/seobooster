@@ -9,7 +9,9 @@ interface ApiOptions extends RequestInit {
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   if (!options.skipAuth) {
     const token = getToken();

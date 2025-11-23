@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { config as loadEnv } from 'dotenv';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
-import express from 'express';
+import express, { json, urlencoded } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -39,6 +39,11 @@ const bootstrap = async () => {
     origin: webOrigin,
     credentials: false
   });
+
+  // Increase body size limits
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
+
   const assetDriver = (process.env.ASSET_STORAGE_DRIVER ?? 'local').toLowerCase();
   if (assetDriver === 'local') {
     const assetPath = resolve(
