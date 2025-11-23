@@ -297,6 +297,27 @@ Details of the favicon pipeline, homepage screenshot generation (rendering servi
 
 # 12. Frontend (Next.js) Setup
 
+#### [MODIFY] [Sidebar.tsx](file:///Users/kamilbaranek/dev/seobooster/apps/web/components/dashboard/layout/Sidebar.tsx)
+- Import `apiFetch` from `../../../lib/api-client`.
+- Add state `isSuperAdmin` and `useEffect` to fetch user role from `/me`.
+- Locate the "Apps" menu item (around line 1535).
+- Conditionally render the menu item content:
+    - If `isSuperAdmin`:
+        - Change icon to `ki-setting-2` (optional, but good for Admin).
+        - Change section title to "Admin".
+        - Render only "Dashboard" (/dashboard/admin) and "Prompts" (/dashboard/admin/prompts) links.
+    - Else:
+        - Render the original "Apps" content.
+
+## Verification Plan
+
+### Automated Tests
+- Run `make build` to ensure no type errors.
+
+### Manual Verification
+- Log in as a `SUPERADMIN` and verify the sidebar shows "Admin" with "Dashboard" and "Prompts".
+- Verify that "Apps" and other items in that dropdown are NOT visible for `SUPERADMIN`.
+- Log in as a regular user (if possible) or mock the role to verify they still see "Apps".
 ## Task 12.1 — Initialize Next.js App
 - Setup `/apps/web`.
 - Configure shared types.

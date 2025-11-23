@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ArticlePlanStatus, AssetStatus, IntegrationType, WebCredentials, WebStatus } from '@prisma/client';
+import type { AssetStorage } from '@seobooster/storage';
+import { ASSET_STORAGE } from '../storage/storage.constants';
 import type { WordpressPublishMode } from '@seobooster/wp-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobQueueService } from '../queues/queues.service';
@@ -13,7 +15,8 @@ export class WebsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobQueueService: JobQueueService,
-    private readonly encryptionService: EncryptionService
+    private readonly encryptionService: EncryptionService,
+    @Inject(ASSET_STORAGE) private readonly storage: AssetStorage
   ) { }
 
   async create(userId: string, dto: CreateWebDto) {
@@ -465,6 +468,39 @@ export class WebsService {
     }));
   }
 
+  async updateArticlePlanDate(userId: string, webId: string, planId: string, payload: { plannedPublishAt: string }) {
+    const web = await this.prisma.web.findFirst({ where: { id: webId, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    const plan = await this.prisma.articlePlan.findFirst({
+      where: {
+        id: planId,
+        webId
+      }
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Article plan not found');
+    }
+
+    const parsedDate = new Date(payload.plannedPublishAt);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Invalid plannedPublishAt value');
+    }
+
+    const updated = await this.prisma.articlePlan.update({
+      where: { id: planId },
+      data: { plannedPublishAt: parsedDate }
+    });
+
+    return {
+      id: updated.id,
+      plannedPublishAt: updated.plannedPublishAt
+    };
+  }
+
   async refreshFavicon(userId: string, id: string) {
     const web = await this.prisma.web.findFirst({ where: { id, userId } });
     if (!web) {
@@ -476,6 +512,46 @@ export class WebsService {
     });
     await this.jobQueueService.enqueueFetchFavicon(id, 'manual');
     return { queued: true };
+  }
+
+  async uploadFavicon(userId: string, id: string, file: Express.Multer.File) {
+    const web = await this.prisma.web.findFirst({ where: { id, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    const extension = file.mimetype.split('/')[1] || 'png';
+    const path = `webs/${web.id}/favicon.${extension}`;
+
+    const url = await this.storage.saveFile(path, file.buffer, file.mimetype);
+
+    await this.prisma.web.update({
+      where: { id },
+      data: {
+        faviconUrl: url,
+        faviconStatus: AssetStatus.SUCCESS,
+        faviconLastFetchedAt: new Date()
+      }
+    });
+
+    return { url };
+  }
+
+  async deleteFavicon(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({ where: { id, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    await this.prisma.web.update({
+      where: { id },
+      data: {
+        faviconUrl: null,
+        faviconStatus: AssetStatus.PENDING
+      }
+    });
+
+    return { deleted: true };
   }
 
   async refreshScreenshot(userId: string, id: string) {

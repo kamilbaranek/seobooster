@@ -1,0 +1,203 @@
+# Multi-Step Text Generation Implementation
+
+## Goal
+Implement full multi-step prompt execution where intermediate steps can generate text that gets passed to subsequent steps via `{{previousStepOutput}}` and `{{stepXOutput}}` variables.
+
+## User Requirements
+- Each step uses its own provider/model settings from UI
+- Supports both JSON and text responses (controlled by `forceJsonResponse` toggle)
+- JSON responses accessible as objects: `{{previousStepOutput.objectA}}`
+- Text responses accessible as strings: `{{previousStepOutput}}`
+- Error handling: 3 retries with exponential backoff, then fail entire job
+- Log each step to [AiLog](file:///Users/kamilbaranek/dev/seobooster/apps/web/pages/dashboard/admin/prompts.tsx#40-48) table
+- Works for all tasks (scan, analyze, strategy, article, article_image), future-proof
+
+## Proposed Changes
+
+### Phase 1: Core Implementation
+
+#### packages/ai-types/src/index.ts
+Add `chat()` method to [AiProvider](file:///Users/kamilbaranek/dev/seobooster/libs/ai-types/src/index.ts#61-86) interface:
+```typescript
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: 'text' | 'json_object';
+}
+
+export interface ChatResult {
+  content: string;
+  finishReason?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+export interface AiProvider {
+  readonly name: string;
+  generateImage(params: GenerateImageParams, logContext?: AiLogContext): Promise<GenerateImageResult>;
+  chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResult>; // NEW
+  getLastRawResponse?(): unknown;
+}
+```
+
+---
+
+#### packages/ai-providers/src/providers/openrouter.ts
+Implement `chat()` method in [OpenRouterProvider](file:///Users/kamilbaranek/dev/seobooster/libs/ai-providers/src/providers/openrouter.provider.ts#84-376):
+```typescript
+async chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResult> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options?.model || this.defaultModel,
+      messages,
+      temperature: options?.temperature,
+      max_tokens: options?.maxTokens,
+      response_format: options?.responseFormat === 'json_object' 
+        ? { type: 'json_object' } 
+        : undefined
+    })
+  });
+  
+  const data = await response.json();
+  this.lastRawResponse = data;
+  
+  return {
+    content: data.choices[0].message.content,
+    finishReason: data.choices[0].finish_reason,
+    usage: {
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens
+    }
+  };
+}
+```
+
+---
+
+#### packages/ai-providers/src/providers/openai.ts & anthropic.ts
+Implement similar `chat()` methods using respective APIs.
+
+---
+
+#### apps/worker/src/main.ts
+Update `GenerateArticleImageJob` to execute steps sequentially:
+
+```typescript
+// 1. Fetch all prompt steps
+const promptSteps = await prisma.aiPromptConfig.findMany({
+  where: { task: 'article_image' },
+  orderBy: { orderIndex: 'asc' }
+});
+
+// 2. Execute steps sequentially
+const stepOutputs: Record<string, unknown> = {};
+let previousStepOutput: unknown = null;
+
+for (let i = 0; i < promptSteps.length - 1; i++) {
+  const step = promptSteps[i];
+  
+  // Add step outputs to variables
+  const stepVariables = {
+    ...promptVariables,
+    previousStepOutput,
+    ...Object.fromEntries(
+      Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v])
+    )
+  };
+  
+  // Render prompts
+  const rendered = renderPromptsForTask('article_image', step, stepVariables);
+  
+  // Execute with retry
+  const result = await executeWithRetry(async () => {
+    const provider = resolveProviderForTask('article_image', step);
+    return await provider.provider.chat(
+      [
+        { role: 'system', content: rendered.systemPrompt },
+        { role: 'user', content: rendered.userPrompt }
+      ],
+      {
+        model: provider.model,
+        responseFormat: step.forceJsonResponse ? 'json_object' : 'text'
+      }
+    );
+  }, 3);
+  
+  // Parse output
+  const output = step.forceJsonResponse 
+    ? JSON.parse(result.content) 
+    : result.content;
+  
+  stepOutputs[i] = output;
+  previousStepOutput = output;
+  
+  // Log to AiLog
+  await recordAiCall({...});
+}
+
+// 3. Execute final step (image generation) with all outputs available
+```
+
+Add retry helper:
+```typescript
+async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  baseDelay: number = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Should not reach here');
+}
+```
+
+---
+
+### Apply to All Tasks
+
+Update similar logic in:
+- `ScanWebJob` (lines ~750-800)
+- `AnalyzeWebJob` (lines ~850-900)
+- `CreateSEOStrategyJob` (lines ~940-1000)
+- `GenerateArticleJob` (lines ~1080-1150)
+
+## Verification Plan
+
+### Automated Tests
+1. Run `npm run build` - ensure all packages compile
+2. Test with 2-step article_image:
+   - Step 1: Generate image prompt (JSON response)
+   - Step 2: Generate image using `{{previousStepOutput.prompt}}`
+
+### Manual Verification
+1. Create multi-step prompt in UI
+2. Trigger article image generation
+3. Check [AiLog](file:///Users/kamilbaranek/dev/seobooster/apps/web/pages/dashboard/admin/prompts.tsx#40-48) table for both steps
+4. Verify `{{previousStepOutput}}` works in Step 2
+
+## Notes
+- Settings tab for retry configuration is Phase 2 (future enhancement)
+- Default: 3 retries with exponential backoff
+- Each step logs independently to [AiLog](file:///Users/kamilbaranek/dev/seobooster/apps/web/pages/dashboard/admin/prompts.tsx#40-48)

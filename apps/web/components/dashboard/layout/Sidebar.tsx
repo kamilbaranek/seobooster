@@ -1,6 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../../../lib/api-client';
 
 const Sidebar = () => {
+	const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
+
+	useEffect(() => {
+		let active = true;
+		const fetchRole = async () => {
+			try {
+				const me = await apiFetch<{ user: { role?: string } }>("/me");
+				if (!active) return;
+				setIsSuperAdmin(me.user.role === "SUPERADMIN");
+			} catch (error) {
+				console.error("Failed to fetch user role", error);
+				if (active) setIsSuperAdmin(false);
+			}
+		};
+		fetchRole();
+		return () => {
+			active = false;
+		};
+	}, []);
 	return (
 		<div id="kt_app_sidebar" className="app-sidebar" data-kt-drawer="true" data-kt-drawer-name="app-sidebar" data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="auto" data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
 			{/*begin::Primary menu*/}
@@ -1536,155 +1556,51 @@ const Sidebar = () => {
 						{/*begin:Menu link*/}
 						<span className="menu-link menu-center">
 							<span className="menu-icon me-0">
-								<i className="ki-outline ki-abstract-26 fs-1"></i>
+								<i className={`ki-outline ${isSuperAdmin === true ? 'ki-setting-2' : 'ki-abstract-26'} fs-1`}></i>
 							</span>
 						</span>
 						{/*end:Menu link*/}
 						{/*begin:Menu sub*/}
 						<div className="menu-sub menu-sub-dropdown menu-sub-indention px-2 py-4 w-250px mh-75 overflow-auto">
 							{/*begin:Menu item*/}
-							<div className="menu-item">
-								{/*begin:Menu content*/}
-								<div className="menu-content">
-									<span className="menu-section fs-5 fw-bolder ps-1 py-1">Apps</span>
-								</div>
-								{/*end:Menu content*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-rocket fs-2"></i>
-									</span>
-									<span className="menu-title">Projects</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
+							{isSuperAdmin === true ? (
+								<>
 									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/list.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">My Projects</span>
+										<div className="menu-content">
+											<span className="menu-section fs-5 fw-bolder ps-1 py-1">Admin</span>
+										</div>
+									</div>
+									<div className="menu-item">
+										<a className="menu-link" href="/dashboard/admin">
+											<span className="menu-bullet"><span className="bullet bullet-dot"></span></span>
+											<span className="menu-title">Dashboard</span>
 										</a>
-										{/*end:Menu link*/}
+									</div>
+									<div className="menu-item">
+										<a className="menu-link" href="/dashboard/admin/prompts">
+											<span className="menu-bullet"><span className="bullet bullet-dot"></span></span>
+											<span className="menu-title">Prompts</span>
+										</a>
+									</div>
+								</>
+							) : (
+								<>
+									<div className="menu-item">
+										{/*begin:Menu content*/}
+										<div className="menu-content">
+											<span className="menu-section fs-5 fw-bolder ps-1 py-1">Apps</span>
+										</div>
+										{/*end:Menu content*/}
 									</div>
 									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/project.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">View Project</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/targets.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Targets</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/budget.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Budget</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/users.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Users</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/files.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Files</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/activity.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Activity</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/projects/settings.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Settings</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-handcart fs-2"></i>
-									</span>
-									<span className="menu-title">eCommerce</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
 									{/*begin:Menu item*/}
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-rocket fs-2"></i>
 											</span>
-											<span className="menu-title">Catalog</span>
+											<span className="menu-title">Projects</span>
 											<span className="menu-arrow"></span>
 										</span>
 										{/*end:Menu link*/}
@@ -1693,11 +1609,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/products.html">
+												<a className="menu-link" href="apps/projects/list.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Products</span>
+													<span className="menu-title">My Projects</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1705,11 +1621,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/categories.html">
+												<a className="menu-link" href="apps/projects/project.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Categories</span>
+													<span className="menu-title">View Project</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1717,11 +1633,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/add-product.html">
+												<a className="menu-link" href="apps/projects/targets.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Add Product</span>
+													<span className="menu-title">Targets</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1729,11 +1645,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/edit-product.html">
+												<a className="menu-link" href="apps/projects/budget.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Edit Product</span>
+													<span className="menu-title">Budget</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1741,11 +1657,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/add-category.html">
+												<a className="menu-link" href="apps/projects/users.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Add Category</span>
+													<span className="menu-title">Users</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1753,11 +1669,35 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/catalog/edit-category.html">
+												<a className="menu-link" href="apps/projects/files.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Edit Category</span>
+													<span className="menu-title">Files</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/projects/activity.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Activity</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/projects/settings.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Settings</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1770,59 +1710,295 @@ const Sidebar = () => {
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-handcart fs-2"></i>
 											</span>
-											<span className="menu-title">Sales</span>
+											<span className="menu-title">eCommerce</span>
 											<span className="menu-arrow"></span>
 										</span>
 										{/*end:Menu link*/}
 										{/*begin:Menu sub*/}
 										<div className="menu-sub menu-sub-accordion">
 											{/*begin:Menu item*/}
-											<div className="menu-item">
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/sales/listing.html">
+												<span className="menu-link">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Orders Listing</span>
-												</a>
+													<span className="menu-title">Catalog</span>
+													<span className="menu-arrow"></span>
+												</span>
 												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/products.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Products</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/categories.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Categories</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/add-product.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Add Product</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/edit-product.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Edit Product</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/add-category.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Add Category</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/catalog/edit-category.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Edit Category</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Sales</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/sales/listing.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Orders Listing</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/sales/details.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Order Details</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/sales/add-order.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Add Order</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/sales/edit-order.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Edit Order</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Customers</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/customers/listing.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Customer Listing</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/customers/details.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Customer Details</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Reports</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/reports/view.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Products Viewed</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/reports/sales.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Sales</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/reports/returns.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Returns</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/reports/customer-orders.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Customer Orders</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/ecommerce/reports/shipping.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Shipping</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
 											</div>
 											{/*end:Menu item*/}
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/sales/details.html">
+												<a className="menu-link" href="apps/ecommerce/settings.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Order Details</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/sales/add-order.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Add Order</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/sales/edit-order.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Edit Order</span>
+													<span className="menu-title">Settings</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1835,8 +2011,331 @@ const Sidebar = () => {
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-phone fs-2"></i>
+											</span>
+											<span className="menu-title">Contacts</span>
+											<span className="menu-arrow"></span>
+										</span>
+										{/*end:Menu link*/}
+										{/*begin:Menu sub*/}
+										<div className="menu-sub menu-sub-accordion">
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/contacts/getting-started.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Getting Started</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/contacts/add-contact.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Add Contact</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/contacts/edit-contact.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Edit Contact</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/contacts/view-contact.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">View Contact</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+										</div>
+										{/*end:Menu sub*/}
+									</div>
+									{/*end:Menu item*/}
+									{/*begin:Menu item*/}
+									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+										{/*begin:Menu link*/}
+										<span className="menu-link">
+											<span className="menu-icon">
+												<i className="ki-outline ki-chart fs-2"></i>
+											</span>
+											<span className="menu-title">Support Center</span>
+											<span className="menu-arrow"></span>
+										</span>
+										{/*end:Menu link*/}
+										{/*begin:Menu sub*/}
+										<div className="menu-sub menu-sub-accordion">
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/support-center/overview.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Overview</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Tickets</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/support-center/tickets/list.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Tickets List</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/support-center/tickets/view.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">View Ticket</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Tutorials</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/support-center/tutorials/list.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Tutorials List</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/support-center/tutorials/post.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Tutorial Post</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/support-center/faq.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">FAQ</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/support-center/licenses.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Licenses</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/support-center/contact.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Contact Us</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+										</div>
+										{/*end:Menu sub*/}
+									</div>
+									{/*end:Menu item*/}
+									{/*begin:Menu item*/}
+									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+										{/*begin:Menu link*/}
+										<span className="menu-link">
+											<span className="menu-icon">
+												<i className="ki-outline ki-shield-tick fs-2"></i>
+											</span>
+											<span className="menu-title">User Management</span>
+											<span className="menu-arrow"></span>
+										</span>
+										{/*end:Menu link*/}
+										{/*begin:Menu sub*/}
+										<div className="menu-sub menu-sub-accordion">
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Users</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/user-management/users/list.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Users List</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/user-management/users/view.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">View User</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Roles</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/user-management/roles/list.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Roles List</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/user-management/roles/view.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">View Role</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/user-management/permissions.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Permissions</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+										</div>
+										{/*end:Menu sub*/}
+									</div>
+									{/*end:Menu item*/}
+									{/*begin:Menu item*/}
+									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+										{/*begin:Menu link*/}
+										<span className="menu-link">
+											<span className="menu-icon">
+												<i className="ki-outline ki-briefcase fs-2"></i>
 											</span>
 											<span className="menu-title">Customers</span>
 											<span className="menu-arrow"></span>
@@ -1847,7 +2346,19 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/customers/listing.html">
+												<a className="menu-link" href="apps/customers/getting-started.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Getting Started</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/customers/list.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
@@ -1859,7 +2370,7 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/customers/details.html">
+												<a className="menu-link" href="apps/customers/view.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
@@ -1876,10 +2387,10 @@ const Sidebar = () => {
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-map fs-2"></i>
 											</span>
-											<span className="menu-title">Reports</span>
+											<span className="menu-title">Subscription</span>
 											<span className="menu-arrow"></span>
 										</span>
 										{/*end:Menu link*/}
@@ -1888,11 +2399,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/reports/view.html">
+												<a className="menu-link" href="apps/subscriptions/getting-started.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Products Viewed</span>
+													<span className="menu-title">Getting Started</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1900,11 +2411,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/reports/sales.html">
+												<a className="menu-link" href="apps/subscriptions/list.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Sales</span>
+													<span className="menu-title">Subscription List</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1912,11 +2423,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/reports/returns.html">
+												<a className="menu-link" href="apps/subscriptions/add.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Returns</span>
+													<span className="menu-title">Add Subscription</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -1924,305 +2435,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/reports/customer-orders.html">
+												<a className="menu-link" href="apps/subscriptions/view.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Customer Orders</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/ecommerce/reports/shipping.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Shipping</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-										</div>
-										{/*end:Menu sub*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/ecommerce/settings.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Settings</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-phone fs-2"></i>
-									</span>
-									<span className="menu-title">Contacts</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/contacts/getting-started.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Getting Started</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/contacts/add-contact.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Add Contact</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/contacts/edit-contact.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Edit Contact</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/contacts/view-contact.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">View Contact</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-chart fs-2"></i>
-									</span>
-									<span className="menu-title">Support Center</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/support-center/overview.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Overview</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
-										{/*begin:Menu link*/}
-										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Tickets</span>
-											<span className="menu-arrow"></span>
-										</span>
-										{/*end:Menu link*/}
-										{/*begin:Menu sub*/}
-										<div className="menu-sub menu-sub-accordion">
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/support-center/tickets/list.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Tickets List</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/support-center/tickets/view.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">View Ticket</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-										</div>
-										{/*end:Menu sub*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
-										{/*begin:Menu link*/}
-										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Tutorials</span>
-											<span className="menu-arrow"></span>
-										</span>
-										{/*end:Menu link*/}
-										{/*begin:Menu sub*/}
-										<div className="menu-sub menu-sub-accordion">
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/support-center/tutorials/list.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Tutorials List</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/support-center/tutorials/post.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Tutorial Post</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-										</div>
-										{/*end:Menu sub*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/support-center/faq.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">FAQ</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/support-center/licenses.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Licenses</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/support-center/contact.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Contact Us</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-shield-tick fs-2"></i>
-									</span>
-									<span className="menu-title">User Management</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div data-kt-menu-trigger="click" className="menu-item menu-accordion mb-1">
-										{/*begin:Menu link*/}
-										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Users</span>
-											<span className="menu-arrow"></span>
-										</span>
-										{/*end:Menu link*/}
-										{/*begin:Menu sub*/}
-										<div className="menu-sub menu-sub-accordion">
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/user-management/users/list.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">Users List</span>
-												</a>
-												{/*end:Menu link*/}
-											</div>
-											{/*end:Menu item*/}
-											{/*begin:Menu item*/}
-											<div className="menu-item">
-												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/user-management/users/view.html">
-													<span className="menu-bullet">
-														<span className="bullet bullet-dot"></span>
-													</span>
-													<span className="menu-title">View User</span>
+													<span className="menu-title">View Subscription</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2235,10 +2452,92 @@ const Sidebar = () => {
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-credit-cart fs-2"></i>
 											</span>
-											<span className="menu-title">Roles</span>
+											<span className="menu-title">Invoice Manager</span>
+											<span className="menu-arrow"></span>
+										</span>
+										{/*end:Menu link*/}
+										{/*begin:Menu sub*/}
+										<div className="menu-sub menu-sub-accordion">
+											{/*begin:Menu item*/}
+											<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+												{/*begin:Menu link*/}
+												<span className="menu-link">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">View Invoices</span>
+													<span className="menu-arrow"></span>
+												</span>
+												{/*end:Menu link*/}
+												{/*begin:Menu sub*/}
+												<div className="menu-sub menu-sub-accordion menu-active-bg">
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/invoices/view/invoice-1.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Invoice 1</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/invoices/view/invoice-2.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Invoice 2</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+													{/*begin:Menu item*/}
+													<div className="menu-item">
+														{/*begin:Menu link*/}
+														<a className="menu-link" href="apps/invoices/view/invoice-3.html">
+															<span className="menu-bullet">
+																<span className="bullet bullet-dot"></span>
+															</span>
+															<span className="menu-title">Invoice 3</span>
+														</a>
+														{/*end:Menu link*/}
+													</div>
+													{/*end:Menu item*/}
+												</div>
+												{/*end:Menu sub*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/invoices/create.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Create Invoice</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+										</div>
+										{/*end:Menu sub*/}
+									</div>
+									{/*end:Menu item*/}
+									{/*begin:Menu item*/}
+									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+										{/*begin:Menu link*/}
+										<span className="menu-link">
+											<span className="menu-icon">
+												<i className="ki-outline ki-file-added fs-2"></i>
+											</span>
+											<span className="menu-title">File Manager</span>
 											<span className="menu-arrow"></span>
 										</span>
 										{/*end:Menu link*/}
@@ -2247,11 +2546,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/user-management/roles/list.html">
+												<a className="menu-link" href="apps/file-manager/folders.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Roles List</span>
+													<span className="menu-title">Folders</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2259,11 +2558,35 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/user-management/roles/view.html">
+												<a className="menu-link" href="apps/file-manager/files.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">View Role</span>
+													<span className="menu-title">Files</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/file-manager/blank.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Blank Directory</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/file-manager/settings.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Settings</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2272,174 +2595,30 @@ const Sidebar = () => {
 										{/*end:Menu sub*/}
 									</div>
 									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/user-management/permissions.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Permissions</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-briefcase fs-2"></i>
-									</span>
-									<span className="menu-title">Customers</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/customers/getting-started.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Getting Started</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/customers/list.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Customer Listing</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/customers/view.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Customer Details</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-map fs-2"></i>
-									</span>
-									<span className="menu-title">Subscription</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/subscriptions/getting-started.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Getting Started</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/subscriptions/list.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Subscription List</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/subscriptions/add.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Add Subscription</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/subscriptions/view.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">View Subscription</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-credit-cart fs-2"></i>
-									</span>
-									<span className="menu-title">Invoice Manager</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
 									{/*begin:Menu item*/}
 									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
 										{/*begin:Menu link*/}
 										<span className="menu-link">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+											<span className="menu-icon">
+												<i className="ki-outline ki-sms fs-2"></i>
 											</span>
-											<span className="menu-title">View Invoices</span>
+											<span className="menu-title">Inbox</span>
 											<span className="menu-arrow"></span>
 										</span>
 										{/*end:Menu link*/}
 										{/*begin:Menu sub*/}
-										<div className="menu-sub menu-sub-accordion menu-active-bg">
+										<div className="menu-sub menu-sub-accordion">
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/invoices/view/invoice-1.html">
+												<a className="menu-link" href="apps/inbox/listing.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Invoice 1</span>
+													<span className="menu-title">Messages</span>
+													<span className="menu-badge">
+														<span className="badge badge-success">3</span>
+													</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2447,11 +2626,11 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/invoices/view/invoice-2.html">
+												<a className="menu-link" href="apps/inbox/compose.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Invoice 2</span>
+													<span className="menu-title">Compose</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2459,11 +2638,64 @@ const Sidebar = () => {
 											{/*begin:Menu item*/}
 											<div className="menu-item">
 												{/*begin:Menu link*/}
-												<a className="menu-link" href="apps/invoices/view/invoice-3.html">
+												<a className="menu-link" href="apps/inbox/reply.html">
 													<span className="menu-bullet">
 														<span className="bullet bullet-dot"></span>
 													</span>
-													<span className="menu-title">Invoice 3</span>
+													<span className="menu-title">View & Reply</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+										</div>
+										{/*end:Menu sub*/}
+									</div>
+									{/*end:Menu item*/}
+									{/*begin:Menu item*/}
+									<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
+										{/*begin:Menu link*/}
+										<span className="menu-link">
+											<span className="menu-icon">
+												<i className="ki-outline ki-message-text-2 fs-2"></i>
+											</span>
+											<span className="menu-title">Chat</span>
+											<span className="menu-arrow"></span>
+										</span>
+										{/*end:Menu link*/}
+										{/*begin:Menu sub*/}
+										<div className="menu-sub menu-sub-accordion">
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/chat/private.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Private Chat</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/chat/group.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Group Chat</span>
+												</a>
+												{/*end:Menu link*/}
+											</div>
+											{/*end:Menu item*/}
+											{/*begin:Menu item*/}
+											<div className="menu-item">
+												{/*begin:Menu link*/}
+												<a className="menu-link" href="apps/chat/drawer.html">
+													<span className="menu-bullet">
+														<span className="bullet bullet-dot"></span>
+													</span>
+													<span className="menu-title">Drawer Chat</span>
 												</a>
 												{/*end:Menu link*/}
 											</div>
@@ -2475,205 +2707,17 @@ const Sidebar = () => {
 									{/*begin:Menu item*/}
 									<div className="menu-item">
 										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/invoices/create.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
+										<a className="menu-link" href="apps/calendar.html">
+											<span className="menu-icon">
+												<i className="ki-outline ki-calendar-8 fs-2"></i>
 											</span>
-											<span className="menu-title">Create Invoice</span>
+											<span className="menu-title">Calendar</span>
 										</a>
 										{/*end:Menu link*/}
 									</div>
 									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-file-added fs-2"></i>
-									</span>
-									<span className="menu-title">File Manager</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/file-manager/folders.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Folders</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/file-manager/files.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Files</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/file-manager/blank.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Blank Directory</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/file-manager/settings.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Settings</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-sms fs-2"></i>
-									</span>
-									<span className="menu-title">Inbox</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/inbox/listing.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Messages</span>
-											<span className="menu-badge">
-												<span className="badge badge-success">3</span>
-											</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/inbox/compose.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Compose</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/inbox/reply.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">View & Reply</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div data-kt-menu-trigger="click" className="menu-item menu-accordion">
-								{/*begin:Menu link*/}
-								<span className="menu-link">
-									<span className="menu-icon">
-										<i className="ki-outline ki-message-text-2 fs-2"></i>
-									</span>
-									<span className="menu-title">Chat</span>
-									<span className="menu-arrow"></span>
-								</span>
-								{/*end:Menu link*/}
-								{/*begin:Menu sub*/}
-								<div className="menu-sub menu-sub-accordion">
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/chat/private.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Private Chat</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/chat/group.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Group Chat</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-									{/*begin:Menu item*/}
-									<div className="menu-item">
-										{/*begin:Menu link*/}
-										<a className="menu-link" href="apps/chat/drawer.html">
-											<span className="menu-bullet">
-												<span className="bullet bullet-dot"></span>
-											</span>
-											<span className="menu-title">Drawer Chat</span>
-										</a>
-										{/*end:Menu link*/}
-									</div>
-									{/*end:Menu item*/}
-								</div>
-								{/*end:Menu sub*/}
-							</div>
-							{/*end:Menu item*/}
-							{/*begin:Menu item*/}
-							<div className="menu-item">
-								{/*begin:Menu link*/}
-								<a className="menu-link" href="apps/calendar.html">
-									<span className="menu-icon">
-										<i className="ki-outline ki-calendar-8 fs-2"></i>
-									</span>
-									<span className="menu-title">Calendar</span>
-								</a>
-								{/*end:Menu link*/}
-							</div>
-							{/*end:Menu item*/}
+								</>
+							)}
 						</div>
 						{/*end:Menu sub*/}
 					</div>

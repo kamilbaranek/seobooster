@@ -74,6 +74,19 @@ See `development_plan.md` and `implementation_plan.md` for the full product and 
 - Cron (`AssetRefreshService`) běží v API pomocí `@nestjs/schedule` a jednou denně znovu zařadí screenshoty starší než `SCREENSHOT_REFRESH_DAYS`.
 - Frontend dashboard ukazuje `faviconStatus`/`screenshotStatus`, náhledy a má tlačítka „Obnovit faviconu/screenshot“, která volají nové API endpointy.
 
+## ArticlePlan lifecycle & publikace
+
+- **Statusy**: `PLANNED` → `QUEUED` → `GENERATED` → `PUBLISHED`, případně `SKIPPED` (zneplatněno při nové strategii).
+- **Přechody**:
+  - `PLANNED → QUEUED`: worker scheduler, jakmile `plannedPublishAt <= now`; nebo ručně `POST /webs/:id/generate-article`.
+  - `QUEUED → GENERATED`: job `GenerateArticle` po uložení draftu článku.
+  - `GENERATED → PUBLISHED`: job `PublishArticle` po odeslání na WordPress s `targetStatus='publish'`.
+  - `PLANNED/QUEUED → SKIPPED`: při aktivaci nové SEO strategie (invalidace starých plánů).
+- **Auto‑publish vs. manuál**:
+  - WP credentials `autoPublishMode='auto_publish'` → po generování (a případném obrázku) se rovnou enqueueuje `PublishArticle`.
+  - `draft_only` / `manual_approval` → publish job se neenqueueuje; článek zůstává draftem.
+- **Datum publikace**: `plannedPublishAt` řídí pouze start generování. `PublishArticle` publikuje ihned po zařazení do fronty (žádné datum už nebere v úvahu).
+
 ## Superadmin Setup
 
 1. Do `.env.local` přidej:

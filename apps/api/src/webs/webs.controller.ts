@@ -8,8 +8,11 @@ import {
   Patch,
   Post,
   Put,
-  UseGuards
+  UseGuards,
+  UseInterceptors,
+  UploadedFile
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthenticatedUserPayload } from '../auth/types/auth-response';
@@ -17,6 +20,7 @@ import { WebsService } from './webs.service';
 import { CreateWebDto } from './dto/create-web.dto';
 import { UpdateWebDto } from './dto/update-web.dto';
 import { UpsertCredentialsDto } from './dto/upsert-credentials.dto';
+import { UpdateArticlePlanDto } from './dto/update-article-plan.dto';
 import { PublishBatchDto } from './dto/publish-batch.dto';
 
 @Controller('webs')
@@ -42,6 +46,16 @@ export class WebsController {
   @Get(':id/article-plans')
   getArticlePlans(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.getArticlePlans(user.userId, id);
+  }
+
+  @Patch(':id/article-plans/:planId')
+  updateArticlePlan(
+    @CurrentUser() user: AuthenticatedUserPayload,
+    @Param('id') id: string,
+    @Param('planId') planId: string,
+    @Body() payload: UpdateArticlePlanDto
+  ) {
+    return this.websService.updateArticlePlanDate(user.userId, id, planId, payload);
   }
 
   @Post()
@@ -90,6 +104,21 @@ export class WebsController {
   @Post(':id/refresh-favicon')
   refreshFavicon(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     return this.websService.refreshFavicon(user.userId, id);
+  }
+
+  @Post(':id/favicon')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadFavicon(
+    @CurrentUser() user: AuthenticatedUserPayload,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.websService.uploadFavicon(user.userId, id, file);
+  }
+
+  @Delete(':id/favicon')
+  deleteFavicon(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.deleteFavicon(user.userId, id);
   }
 
   @Post(':id/refresh-screenshot')

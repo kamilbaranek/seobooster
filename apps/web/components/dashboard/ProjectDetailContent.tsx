@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import InboxTab from './inbox/InboxTab';
 import ActivityTab from './activity/ActivityTab';
 import SettingsTab from './settings/SettingsTab';
+import CalendarTab from './calendar/CalendarTab';
 import { ApexOptions } from 'apexcharts';
 import { apiFetch } from '../../lib/api-client';
 
@@ -46,7 +47,7 @@ const formatLastArticleDate = (value?: string | null) => {
 };
 
 const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }) => {
-    const { projects } = useProjects();
+    const { projects, refetch } = useProjects();
     const project = projects.find(p => p.id === projectId);
     const projectIndex = projects.findIndex(p => p.id === projectId);
 
@@ -470,7 +471,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                         {/*end::Nav item*/}
                         {/*begin::Nav item*/}
                         <li className="nav-item">
-                            <a className={`nav-link text-active-primary py-5 me-6 ${activeTab === 'targets' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('targets'); }}>Targets</a>
+                            <a className={`nav-link text-active-primary py-5 me-6 ${activeTab === 'calendar' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('calendar'); }}>Calendar</a>
                         </li>
                         {/*end::Nav item*/}
                         {/*begin::Nav item*/}
@@ -793,108 +794,16 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                 <div className="card card-flush h-lg-100">
                                     {/*begin::Card header*/}
                                     <div className="card-header mt-6">
-                                        {/*begin::Card title*/}
                                         <div className="card-title flex-column">
                                             <h3 className="fw-bold mb-1">Latest Files</h3>
-                                            <div className="fs-6 text-gray-500">Total 382 fiels, 2,6GB space usage</div>
                                         </div>
-                                        {/*end::Card title*/}
-                                        {/*begin::Card toolbar*/}
-                                        <div className="card-toolbar">
-                                            <a href="#" className="btn btn-bg-light btn-active-color-primary btn-sm">View All</a>
-                                        </div>
-                                        {/*end::Card toolbar*/}
                                     </div>
                                     {/*end::Card header*/}
                                     {/*begin::Card body*/}
-                                    <div className="card-body p-9 pt-3">
-                                        {/*begin::Files*/}
-                                        <div className="d-flex flex-column mb-9">
-                                            {/*begin::File*/}
-                                            <div className="d-flex align-items-center mb-5">
-                                                {/*begin::Icon*/}
-                                                <div className="symbol symbol-30px me-5">
-                                                    <img alt="Icon" src="/assets/media/svg/files/pdf.svg" />
-                                                </div>
-                                                {/*end::Icon*/}
-                                                {/*begin::Details*/}
-                                                <div className="fw-semibold">
-                                                    <a className="fs-6 fw-bold text-gray-900 text-hover-primary" href="#">Project tech requirements</a>
-                                                    <div className="text-gray-500">2 days ago
-                                                        <a href="#">Karina Clark</a></div>
-                                                </div>
-                                                {/*end::Details*/}
-                                            </div>
-                                            {/*end::File*/}
-                                            {/*begin::File*/}
-                                            <div className="d-flex align-items-center mb-5">
-                                                {/*begin::Icon*/}
-                                                <div className="symbol symbol-30px me-5">
-                                                    <img alt="Icon" src="/assets/media/svg/files/doc.svg" />
-                                                </div>
-                                                {/*end::Icon*/}
-                                                {/*begin::Details*/}
-                                                <div className="fw-semibold">
-                                                    <a className="fs-6 fw-bold text-gray-900 text-hover-primary" href="#">Create FureStibe branding proposal</a>
-                                                    <div className="text-gray-500">Due in 1 day
-                                                        <a href="#">Marcus Blake</a></div>
-                                                </div>
-                                                {/*end::Details*/}
-                                            </div>
-                                            {/*end::File*/}
-                                            {/*begin::File*/}
-                                            <div className="d-flex align-items-center mb-5">
-                                                {/*begin::Icon*/}
-                                                <div className="symbol symbol-30px me-5">
-                                                    <img alt="Icon" src="/assets/media/svg/files/css.svg" />
-                                                </div>
-                                                {/*end::Icon*/}
-                                                {/*begin::Details*/}
-                                                <div className="fw-semibold">
-                                                    <a className="fs-6 fw-bold text-gray-900 text-hover-primary" href="#">Completed Project Stylings</a>
-                                                    <div className="text-gray-500">Due in 1 day
-                                                        <a href="#">Terry Barry</a></div>
-                                                </div>
-                                                {/*end::Details*/}
-                                            </div>
-                                            {/*end::File*/}
-                                            {/*begin::File*/}
-                                            <div className="d-flex align-items-center">
-                                                {/*begin::Icon*/}
-                                                <div className="symbol symbol-30px me-5">
-                                                    <img alt="Icon" src="/assets/media/svg/files/ai.svg" />
-                                                </div>
-                                                {/*end::Icon*/}
-                                                {/*begin::Details*/}
-                                                <div className="fw-semibold">
-                                                    <a className="fs-6 fw-bold text-gray-900 text-hover-primary" href="#">Create Project Wireframes</a>
-                                                    <div className="text-gray-500">Due in 3 days
-                                                        <a href="#">Roth Bloom</a></div>
-                                                </div>
-                                                {/*end::Details*/}
-                                            </div>
-                                            {/*end::File*/}
-                                        </div>
-                                        {/*end::Files*/}
-                                        {/*begin::Notice*/}
-                                        <div className="notice d-flex bg-light-primary rounded border-primary border border-dashed p-6">
-                                            {/*begin::Icon*/}
-                                            <i className="ki-outline ki-file-up fs-2tx text-primary me-4"></i>
-                                            {/*end::Icon*/}
-                                            {/*begin::Wrapper*/}
-                                            <div className="d-flex flex-stack flex-grow-1">
-                                                {/*begin::Content*/}
-                                                <div className="fw-semibold">
-                                                    <h4 className="text-gray-900 fw-bold">Quick file uploader</h4>
-                                                    <div className="fs-6 text-gray-700">Drag & Drop or choose files from computer</div>
-                                                </div>
-                                                {/*end::Content*/}
-                                            </div>
-                                            {/*end::Wrapper*/}
-                                        </div>
-                                        {/*end::Notice*/}
+                                    <div className="card-body p-9 pt-5">
+                                        <div className="text-muted">Content temporarily unavailable.</div>
                                     </div>
-                                    {/*end::Card body */}
+                                    {/*end::Card body*/}
                                 </div>
                                 {/*end::Card*/}
                             </div>
@@ -1175,19 +1084,20 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                             {/*end::Col*/}
                         </div>
                     </>
+                ) : activeTab === 'calendar' ? (
+                    <CalendarTab plans={articlePlans} webId={projectId} />
+                ) : activeTab === 'inbox' ? (
+                    <InboxTab plans={articlePlans} />
+                ) : activeTab === 'activity' ? (
+                    <ActivityTab />
+                ) : activeTab === 'settings' ? (
+                    <SettingsTab project={project} onUpdate={refetch} />
                 ) : (
-                    <>
-                        {activeTab === 'inbox' && <InboxTab plans={articlePlans} />}
-                        {activeTab === 'activity' && <ActivityTab />}
-                        {activeTab === 'settings' && <SettingsTab />}
-                        {activeTab !== 'inbox' && activeTab !== 'activity' && activeTab !== 'settings' && (
-                            <div className="card card-flush h-lg-100">
-                                <div className="card-body p-9">
-                                    <div className="fs-2 fw-bold text-gray-800">Content for {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} tab is coming soon...</div>
-                                </div>
-                            </div>
-                        )}
-                    </>
+                    <div className="card card-flush h-lg-100">
+                        <div className="card-body p-9">
+                            <div className="fs-2 fw-bold text-gray-800">Content for {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} tab is coming soon...</div>
+                        </div>
+                    </div>
                 )
             }
         </>

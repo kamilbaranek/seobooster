@@ -1,6 +1,136 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
+import Swal from 'sweetalert2';
+import { apiFetch } from '../../../lib/api-client';
 
-const SettingsTab: React.FC = () => {
+interface SettingsTabProps {
+    project: any;
+    onUpdate: () => void;
+}
+
+const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+            Swal.fire({
+                text: "Only PNG, JPG and JPEG files are allowed.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+            return;
+        }
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            await apiFetch(`/webs/${project.id}/favicon`, {
+                method: 'POST',
+                body: formData,
+            });
+            onUpdate();
+            Swal.fire({
+                text: "Logo has been updated!",
+                icon: "success",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+        } catch (error) {
+            console.error('Failed to upload logo:', error);
+            Swal.fire({
+                text: "Failed to upload logo.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleDeleteLogo = async () => {
+        Swal.fire({
+            text: "Are you sure you want to remove the project logo?",
+            icon: "warning",
+            showCancelButton: true,
+            buttonsStyling: false,
+            confirmButtonText: "Yes, delete!",
+            cancelButtonText: "No, return",
+            customClass: {
+                confirmButton: "btn btn-danger",
+                cancelButton: "btn btn-active-light"
+            }
+        }).then(async function (result) {
+            if (result.value) {
+                try {
+                    await apiFetch(`/webs/${project.id}/favicon`, {
+                        method: 'DELETE'
+                    });
+                    onUpdate();
+                    Swal.fire({
+                        text: "Logo has been removed!",
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary",
+                        }
+                    });
+                } catch (error) {
+                    console.error('Failed to delete logo:', error);
+                    Swal.fire({
+                        text: "Failed to delete logo.",
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary",
+                        }
+                    });
+                }
+            }
+        });
+    };
+
+    const logoUrl = project?.faviconUrl;
+    const placeholderUrl = '/assets/media/svg/avatars/blank.svg'; // Or use a colored box logic if preferred, but using blank svg as base for now per template
+
+    // Helper for placeholder if no image
+    const renderLogoPreview = () => {
+        if (logoUrl) {
+            return (
+                <div className="image-input-wrapper w-125px h-125px bgi-position-center" style={{ backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundImage: `url('${logoUrl}')` }}></div>
+            );
+        }
+        // Placeholder logic matching ProjectDetailContent
+        const colors = ['warning', 'danger', 'primary', 'success', 'info'];
+        const color = 'primary'; // Simplified for settings, or pass index
+        const iconClass = `ki-outline ki-abstract-10 fs-3x text-inverse-${color}`;
+
+        return (
+            <div className={`image-input-wrapper w-125px h-125px bgi-position-center d-flex flex-center bg-light-${color}`}>
+                <i className={iconClass}></i>
+            </div>
+        );
+    };
     return (
         <div className="card">
             {/*begin::Card header*/}
@@ -24,15 +154,22 @@ const SettingsTab: React.FC = () => {
                         {/*begin::Col*/}
                         <div className="col-lg-8">
                             {/*begin::Image input*/}
-                            <div className="image-input image-input-outline" data-kt-image-input="true" style={{ backgroundImage: "url('/assets/media/svg/avatars/blank.svg')" }}>
+                            <div className={`image-input image-input-outline ${!logoUrl ? 'image-input-empty' : ''}`} data-kt-image-input="true">
                                 {/*begin::Preview existing avatar*/}
-                                <div className="image-input-wrapper w-125px h-125px bgi-position-center" style={{ backgroundSize: '75%', backgroundImage: "url('/assets/media/svg/brand-logos/volicity-9.svg')" }}></div>
+                                {renderLogoPreview()}
                                 {/*end::Preview existing avatar*/}
                                 {/*begin::Label*/}
                                 <label className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="change" data-bs-toggle="tooltip" title="Change avatar">
                                     <i className="ki-outline ki-pencil fs-7"></i>
                                     {/*begin::Inputs*/}
-                                    <input type="file" name="avatar" accept=".png, .jpg, .jpeg" />
+                                    <input
+                                        type="file"
+                                        name="avatar"
+                                        accept=".png, .jpg, .jpeg"
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        disabled={uploading}
+                                    />
                                     <input type="hidden" name="avatar_remove" />
                                     {/*end::Inputs*/}
                                 </label>
@@ -43,9 +180,17 @@ const SettingsTab: React.FC = () => {
                                 </span>
                                 {/*end::Cancel*/}
                                 {/*begin::Remove*/}
-                                <span className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="remove" data-bs-toggle="tooltip" title="Remove avatar">
-                                    <i className="ki-outline ki-cross fs-2"></i>
-                                </span>
+                                {logoUrl && (
+                                    <span
+                                        className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow"
+                                        data-kt-image-input-action="remove"
+                                        data-bs-toggle="tooltip"
+                                        title="Remove avatar"
+                                        onClick={handleDeleteLogo}
+                                    >
+                                        <i className="ki-outline ki-cross fs-2"></i>
+                                    </span>
+                                )}
                                 {/*end::Remove*/}
                             </div>
                             {/*end::Image input*/}
