@@ -59,6 +59,17 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const project = projects.find(p => p.id === projectId);
     const projectIndex = projects.findIndex(p => p.id === projectId);
 
+    const statusConfig = {
+        PENDING_PAYMENT: { label: 'Pending Payment', badge: 'badge-light-warning' },
+        ACTIVE: { label: 'Active', badge: 'badge-light-success' },
+        PAUSED: { label: 'Paused', badge: 'badge-light-secondary' },
+        ERROR: { label: 'Error', badge: 'badge-light-danger' }
+    } as const;
+
+    const currentStatus = project?.status && statusConfig[project.status as keyof typeof statusConfig]
+        ? statusConfig[project.status as keyof typeof statusConfig]
+        : { label: 'Unknown', badge: 'badge-light-secondary' };
+
     const colors = ['warning', 'danger', 'primary', 'success', 'info'];
     const color = projectIndex >= 0 ? colors[projectIndex % colors.length] : 'primary';
     const iconClass = `ki-outline ki-abstract-${(projectIndex >= 0 ? (projectIndex % 20) + 10 : 10)} fs-3x fs-lg-4x text-inverse-${color}`;
@@ -282,17 +293,17 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                             {/*begin::Head*/}
                             <div className="d-flex justify-content-between align-items-start flex-wrap mb-2">
                                 {/*begin::Details*/}
-                                <div className="d-flex flex-column">
-                                    {/*begin::Status*/}
-                                    <div className="d-flex align-items-center mb-1">
-                                        <a href="#" className="text-gray-800 text-hover-primary fs-2 fw-bold me-3">{project?.nickname || project?.url || 'Project Details'}</a>
-                                        <span className="badge badge-light-success me-auto">In Progress</span>
+                                    <div className="d-flex flex-column">
+                                        {/*begin::Status*/}
+                                        <div className="d-flex align-items-center mb-1">
+                                            <a href="#" className="text-gray-800 text-hover-primary fs-2 fw-bold me-3">{project?.nickname || project?.url || 'Project Details'}</a>
+                                            <span className={`badge ${currentStatus.badge} me-auto`}>{currentStatus.label}</span>
+                                        </div>
+                                        {/*end::Status*/}
+                                        {/*begin::Description*/}
+                                        <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">{project?.url || 'Project URL'}</div>
+                                        {/*end::Description*/}
                                     </div>
-                                    {/*end::Status*/}
-                                    {/*begin::Description*/}
-                                    <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">{project?.url || 'Project URL'}</div>
-                                    {/*end::Description*/}
-                                </div>
                                 {/*end::Details*/}
                                 {/*begin::Actions*/}
                                 <div className="d-flex mb-4">

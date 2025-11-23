@@ -14,6 +14,7 @@ export interface DashboardWeb {
   lastArticleCreatedAt?: string | null;
   articleCount?: number;
   articlePublishedCount?: number;
+  status?: string;
 }
 
 interface DashboardLayoutProps {
