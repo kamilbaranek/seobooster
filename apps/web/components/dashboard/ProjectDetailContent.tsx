@@ -41,16 +41,7 @@ interface ArticleListItem {
     createdAt: string;
 }
 
-interface ArticleImageForStrip {
-    id: string;
-    status: 'PENDING' | 'SUCCESS' | 'FAILED';
-    imageUrl?: string | null;
-    isFeatured: boolean;
-}
 
-interface ArticleImagesResponseForStrip {
-    images: ArticleImageForStrip[];
-}
 
 const formatLastArticleDate = (value?: string | null) => {
     if (!value) {
@@ -76,7 +67,6 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const [articlePlans, setArticlePlans] = useState<ArticlePlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
-    const [recentArticleImages, setRecentArticleImages] = useState<Record<string, string | null>>({});
     const [recentArticleImageErrors, setRecentArticleImageErrors] = useState<Record<string, boolean>>({});
     const [isRegeneratingScreenshot, setIsRegeneratingScreenshot] = useState(false);
     const [localProject, setLocalProject] = useState(project);
@@ -163,39 +153,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
         fetchArticles();
     }, [projectId]);
 
-    // Fetch images for latest articles (same endpoint as article detail page)
-    useEffect(() => {
-        if (!projectId || recentArticles.length === 0) return;
 
-        const loadImages = async () => {
-            const targets = recentArticles.slice(0, 7);
-            const updates: Record<string, string | null> = {};
-
-            for (const article of targets) {
-                // Skip if we already have an image cached
-                if (recentArticleImages[article.id] !== undefined) continue;
-
-                try {
-                    const payload = await apiFetch<ArticleImagesResponseForStrip>(
-                        `/webs/${projectId}/articles/${article.id}/images`
-                    );
-                    const images = payload.images || [];
-                    const featured = images.find(img => img.isFeatured && img.status === 'SUCCESS' && img.imageUrl);
-                    const first = images.find(img => img.status === 'SUCCESS' && img.imageUrl);
-                    updates[article.id] = (featured || first)?.imageUrl ?? null;
-                } catch (error) {
-                    console.error('Failed to fetch article images for strip:', error);
-                    updates[article.id] = null;
-                }
-            }
-
-            if (Object.keys(updates).length) {
-                setRecentArticleImages(prev => ({ ...prev, ...updates }));
-            }
-        };
-
-        loadImages();
-    }, [projectId, recentArticles, recentArticleImages]);
 
     const summaryChartOptions: ApexOptions = {
         chart: {
@@ -605,7 +563,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                         const fallbackColors = ['primary', 'success', 'info', 'warning', 'danger', 'dark', 'secondary'];
                                         const color = fallbackColors[idx % fallbackColors.length];
                                         const fallbackLetter = article.title?.trim()?.[0]?.toUpperCase() || '?';
-                                        const imageUrl = recentArticleImages[article.id] ?? article.featuredImageUrl ?? null;
+                                        const imageUrl = article.featuredImageUrl;
                                         return (
                                             <div
                                                 key={article.id}

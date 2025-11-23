@@ -29,7 +29,7 @@ export class ArticlesService {
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
     private readonly jobQueueService: JobQueueService
-  ) {}
+  ) { }
 
   async listArticles(userId: string, webId: string, query: ArticleListQueryDto) {
     await this.ensureWebOwnedByUser(userId, webId);
@@ -285,8 +285,8 @@ export class ArticlesService {
     const firstImage = article.images?.find((img) => img.status === 'SUCCESS' && isHttpUrl(img.imageUrl))?.imageUrl;
 
     const resolvedFeatured =
-      (isHttpUrl(featuredFromImages) && featuredFromImages) ||
       (isHttpUrl(article.featuredImageUrl) && article.featuredImageUrl) ||
+      (isHttpUrl(featuredFromImages) && featuredFromImages) ||
       (isHttpUrl(firstImage) && firstImage) ||
       null;
 
