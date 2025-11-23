@@ -179,6 +179,15 @@ export class OpenRouterProvider implements AiProvider {
 
     this.lastMessageContent = content;
 
+    // Warn about incompatible models
+    const isDeepResearchModel = model?.toLowerCase().includes('deep-research');
+    if (isDeepResearchModel) {
+      throw new Error(
+        `Model ${model} is a research model designed for long-form reports, not structured JSON output. ` +
+        `Please use a standard model like 'perplexity/llama-3.1-sonar-small-128k-online' or switch to a different provider.`
+      );
+    }
+
     const tryParseJson = (text: string): JsonResponse<T> | T => {
       return JSON.parse(text) as JsonResponse<T> | T;
     };
@@ -187,22 +196,29 @@ export class OpenRouterProvider implements AiProvider {
     try {
       parsed = tryParseJson(content);
     } catch (parseError) {
-      // Některé modely (zejména když JSON mode není plně podporovaný)
-      // vrací JSON zabalený v ```json ... ``` nebo podobném code fence.
-      const fenceMatch = content.match(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/);
-      if (fenceMatch && fenceMatch[1]) {
-        const inner = fenceMatch[1].trim();
+      // Try to find JSON in markdown code fences
+      const jsonFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonFenceMatch && jsonFenceMatch[1]) {
+        const inner = jsonFenceMatch[1].trim();
         try {
           parsed = tryParseJson(inner);
         } catch (innerError) {
           if (forceJsonResponse) {
-            throw innerError;
+            const preview = content.substring(0, 200).replace(/\n/g, ' ');
+            throw new Error(
+              `Model returned non-JSON content. Preview: "${preview}..." ` +
+              `This may indicate an incompatible model or prompt issue.`
+            );
           }
           return fallback;
         }
       } else {
         if (forceJsonResponse) {
-          throw parseError;
+          const preview = content.substring(0, 200).replace(/\n/g, ' ');
+          throw new Error(
+            `Failed to parse JSON from model response. Preview: "${preview}..." ` +
+            `The model may not support structured output.`
+          );
         }
         return fallback;
       }
