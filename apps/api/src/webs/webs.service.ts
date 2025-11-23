@@ -659,6 +659,17 @@ export class WebsService {
     return { queued: true, planId: plan.id };
   }
 
+  async rescanWebsite(userId: string, id: string) {
+    const web = await this.prisma.web.findFirst({
+      where: { id, userId }
+    });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+    await this.jobQueueService.enqueueScanWebsite(web.id);
+    return { queued: true };
+  }
+
   async triggerScan(userId: string, id: string) {
     const web = await this.prisma.web.findFirst({
       where: { id, userId }

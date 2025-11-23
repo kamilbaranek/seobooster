@@ -237,41 +237,47 @@ export const useDashboardInteractions = (enabled: boolean) => {
 
         document.addEventListener('click', onDocumentClick);
 
-        const toolbarTriggers = Array.from(
-            document.querySelectorAll<HTMLElement>('.card-toolbar [data-kt-menu-trigger]')
-        );
+        const onTriggerClick = (event: Event) => {
+            const target = event.target as HTMLElement;
+            const trigger = target.closest('[data-kt-menu-trigger="click"]') as HTMLElement | null;
 
-        toolbarTriggers.forEach((button) => {
-            const sibling = button.nextElementSibling as HTMLElement | null;
-            const menu =
-                sibling && sibling.matches('[data-kt-menu="true"]')
-                    ? sibling
-                    : (button.parentElement?.querySelector<HTMLElement>('[data-kt-menu="true"]') ?? null);
+            if (!trigger) return;
 
-            if (!menu) {
+            // Skip if handled by other specific logic
+            if (
+                trigger.closest('.app-navbar-item') ||
+                trigger.closest('#kt_aside_menu') ||
+                trigger.closest('#kt_app_sidebar_footer')
+            ) {
                 return;
             }
 
-            const handler = (event: Event) => {
-                event.preventDefault();
-                event.stopPropagation();
+            event.preventDefault();
+            event.stopPropagation();
 
-                const isShown = menu.classList.contains('show');
-                closeDropdownMenus();
-                if (!isShown) {
-                    menu.classList.add('show');
-                    positionDropdown(
-                        button,
-                        menu,
-                        button.getAttribute('data-kt-menu-placement') ?? 'bottom-end',
-                        button.getAttribute('data-kt-menu-offset')
-                    );
-                }
-            };
+            const sibling = trigger.nextElementSibling as HTMLElement | null;
+            const menu =
+                sibling && sibling.matches('[data-kt-menu="true"]')
+                    ? sibling
+                    : (trigger.parentElement?.querySelector<HTMLElement>('[data-kt-menu="true"]') ?? null);
 
-            button.addEventListener('click', handler);
-            toolbarBindings.push({ button, handler });
-        });
+            if (!menu) return;
+
+            const isShown = menu.classList.contains('show');
+            closeDropdownMenus();
+
+            if (!isShown) {
+                menu.classList.add('show');
+                positionDropdown(
+                    trigger,
+                    menu,
+                    trigger.getAttribute('data-kt-menu-placement') ?? 'bottom-end',
+                    trigger.getAttribute('data-kt-menu-offset')
+                );
+            }
+        };
+
+        document.addEventListener('click', onTriggerClick);
 
         const sidebarFooter = document.getElementById('kt_app_sidebar_footer');
         if (sidebarFooter) {
@@ -499,6 +505,7 @@ export const useDashboardInteractions = (enabled: boolean) => {
                 }
             });
             document.removeEventListener('click', onDocumentClick);
+            document.removeEventListener('click', onTriggerClick);
 
             themeBindings.forEach(({ link, handler }) => {
                 link.removeEventListener('click', handler);

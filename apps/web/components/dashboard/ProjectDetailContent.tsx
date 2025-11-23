@@ -8,6 +8,7 @@ import SettingsTab from './settings/SettingsTab';
 import CalendarTab from './calendar/CalendarTab';
 import { ApexOptions } from 'apexcharts';
 import { apiFetch } from '../../lib/api-client';
+import Swal from 'sweetalert2';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -293,17 +294,17 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                             {/*begin::Head*/}
                             <div className="d-flex justify-content-between align-items-start flex-wrap mb-2">
                                 {/*begin::Details*/}
-                                    <div className="d-flex flex-column">
-                                        {/*begin::Status*/}
-                                        <div className="d-flex align-items-center mb-1">
-                                            <a href="#" className="text-gray-800 text-hover-primary fs-2 fw-bold me-3">{project?.nickname || project?.url || 'Project Details'}</a>
-                                            <span className={`badge ${currentStatus.badge} me-auto`}>{currentStatus.label}</span>
-                                        </div>
-                                        {/*end::Status*/}
-                                        {/*begin::Description*/}
-                                        <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">{project?.url || 'Project URL'}</div>
-                                        {/*end::Description*/}
+                                <div className="d-flex flex-column">
+                                    {/*begin::Status*/}
+                                    <div className="d-flex align-items-center mb-1">
+                                        <a href="#" className="text-gray-800 text-hover-primary fs-2 fw-bold me-3">{project?.nickname || project?.url || 'Project Details'}</a>
+                                        <span className={`badge ${currentStatus.badge} me-auto`}>{currentStatus.label}</span>
                                     </div>
+                                    {/*end::Status*/}
+                                    {/*begin::Description*/}
+                                    <div className="d-flex flex-wrap fw-semibold mb-4 fs-5 text-gray-500">{project?.url || 'Project URL'}</div>
+                                    {/*end::Description*/}
+                                </div>
                                 {/*end::Details*/}
                                 {/*begin::Actions*/}
                                 <div className="d-flex mb-4">
@@ -318,76 +319,142 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                         <div className="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-800 menu-state-bg-light-primary fw-semibold w-200px py-3" data-kt-menu="true">
                                             {/*begin::Heading*/}
                                             <div className="menu-item px-3">
-                                                <div className="menu-content text-muted pb-2 px-3 fs-7 text-uppercase">Payments</div>
+                                                <div className="menu-content text-muted pb-2 px-3 fs-7 text-uppercase">Actions</div>
                                             </div>
                                             {/*end::Heading*/}
                                             {/*begin::Menu item*/}
                                             <div className="menu-item px-3">
-                                                <a href="#" className="menu-link px-3">Create Invoice</a>
+                                                <a href="#" className="menu-link px-3" onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    const result = await Swal.fire({
+                                                        text: "Are you sure you want to regenerate the website screenshot?",
+                                                        icon: "warning",
+                                                        showCancelButton: true,
+                                                        buttonsStyling: false,
+                                                        confirmButtonText: "Yes, regenerate!",
+                                                        cancelButtonText: "No, cancel",
+                                                        customClass: {
+                                                            confirmButton: "btn btn-primary",
+                                                            cancelButton: "btn btn-active-light"
+                                                        }
+                                                    });
+
+                                                    if (result.isConfirmed && projectId) {
+                                                        try {
+                                                            await apiFetch(`/webs/${projectId}/refresh-screenshot`, { method: 'POST' });
+                                                            Swal.fire({
+                                                                text: "Screenshot regeneration started!",
+                                                                icon: "success",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        } catch (error) {
+                                                            console.error(error);
+                                                            Swal.fire({
+                                                                text: "Failed to start regeneration.",
+                                                                icon: "error",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                }}>Regenerate Screenshot</a>
                                             </div>
                                             {/*end::Menu item*/}
                                             {/*begin::Menu item*/}
                                             <div className="menu-item px-3">
-                                                <a href="#" className="menu-link flex-stack px-3">Create Payment
-                                                    <span className="ms-2" data-bs-toggle="tooltip" title="Specify a target name for future usage and reference">
-                                                        <i className="ki-outline ki-information fs-6"></i>
-                                                    </span></a>
+                                                <a href="#" className="menu-link px-3" onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    const result = await Swal.fire({
+                                                        text: "Are you sure you want to regenerate the favicon?",
+                                                        icon: "warning",
+                                                        showCancelButton: true,
+                                                        buttonsStyling: false,
+                                                        confirmButtonText: "Yes, regenerate!",
+                                                        cancelButtonText: "No, cancel",
+                                                        customClass: {
+                                                            confirmButton: "btn btn-primary",
+                                                            cancelButton: "btn btn-active-light"
+                                                        }
+                                                    });
+
+                                                    if (result.isConfirmed && projectId) {
+                                                        try {
+                                                            await apiFetch(`/webs/${projectId}/refresh-favicon`, { method: 'POST' });
+                                                            Swal.fire({
+                                                                text: "Favicon regeneration started!",
+                                                                icon: "success",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        } catch (error) {
+                                                            console.error(error);
+                                                            Swal.fire({
+                                                                text: "Failed to start regeneration.",
+                                                                icon: "error",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                }}>Regenerate Favicon</a>
                                             </div>
                                             {/*end::Menu item*/}
                                             {/*begin::Menu item*/}
                                             <div className="menu-item px-3">
-                                                <a href="#" className="menu-link px-3">Generate Bill</a>
-                                            </div>
-                                            {/*end::Menu item*/}
-                                            {/*begin::Menu item*/}
-                                            <div className="menu-item px-3" data-kt-menu-trigger="hover" data-kt-menu-placement="right-end">
-                                                <a href="#" className="menu-link px-3">
-                                                    <span className="menu-title">Subscription</span>
-                                                    <span className="menu-arrow"></span>
-                                                </a>
-                                                {/*begin::Menu sub*/}
-                                                <div className="menu-sub menu-sub-dropdown w-175px py-4">
-                                                    {/*begin::Menu item*/}
-                                                    <div className="menu-item px-3">
-                                                        <a href="#" className="menu-link px-3">Plans</a>
-                                                    </div>
-                                                    {/*end::Menu item*/}
-                                                    {/*begin::Menu item*/}
-                                                    <div className="menu-item px-3">
-                                                        <a href="#" className="menu-link px-3">Billing</a>
-                                                    </div>
-                                                    {/*end::Menu item*/}
-                                                    {/*begin::Menu item*/}
-                                                    <div className="menu-item px-3">
-                                                        <a href="#" className="menu-link px-3">Statements</a>
-                                                    </div>
-                                                    {/*end::Menu item*/}
-                                                    {/*begin::Menu separator*/}
-                                                    <div className="separator my-2"></div>
-                                                    {/*end::Menu separator*/}
-                                                    {/*begin::Menu item*/}
-                                                    <div className="menu-item px-3">
-                                                        <div className="menu-content px-3">
-                                                            {/*begin::Switch*/}
-                                                            <label className="form-check form-switch form-check-custom form-check-solid">
-                                                                {/*begin::Input*/}
-                                                                <input className="form-check-input w-30px h-20px" type="checkbox" value="1" defaultChecked={true} name="notifications" />
-                                                                {/*end::Input*/}
-                                                                {/*end::Label*/}
-                                                                <span className="form-check-label text-muted fs-6">Recuring</span>
-                                                                {/*end::Label*/}
-                                                            </label>
-                                                            {/*end::Switch*/}
-                                                        </div>
-                                                    </div>
-                                                    {/*end::Menu item*/}
-                                                </div>
-                                                {/*end::Menu sub*/}
-                                            </div>
-                                            {/*end::Menu item*/}
-                                            {/*begin::Menu item*/}
-                                            <div className="menu-item px-3 my-1">
-                                                <a href="#" className="menu-link px-3">Settings</a>
+                                                <a href="#" className="menu-link px-3" onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    const result = await Swal.fire({
+                                                        text: "Are you sure you want to rescan the website? This will trigger a full analysis.",
+                                                        icon: "warning",
+                                                        showCancelButton: true,
+                                                        buttonsStyling: false,
+                                                        confirmButtonText: "Yes, rescan!",
+                                                        cancelButtonText: "No, cancel",
+                                                        customClass: {
+                                                            confirmButton: "btn btn-primary",
+                                                            cancelButton: "btn btn-active-light"
+                                                        }
+                                                    });
+
+                                                    if (result.isConfirmed && projectId) {
+                                                        try {
+                                                            await apiFetch(`/webs/${projectId}/rescan`, { method: 'POST' });
+                                                            Swal.fire({
+                                                                text: "Website rescan started!",
+                                                                icon: "success",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        } catch (error) {
+                                                            console.error(error);
+                                                            Swal.fire({
+                                                                text: "Failed to start rescan.",
+                                                                icon: "error",
+                                                                buttonsStyling: false,
+                                                                confirmButtonText: "Ok, got it!",
+                                                                customClass: {
+                                                                    confirmButton: "btn btn-primary"
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                }}>Rescan Website</a>
                                             </div>
                                             {/*end::Menu item*/}
                                         </div>

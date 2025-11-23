@@ -144,6 +144,11 @@ export class WebsController {
     return this.websService.publishArticles(user.userId, id, payload.articleIds);
   }
 
+  @Post(':id/rescan')
+  rescan(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
+    return this.websService.rescanWebsite(user.userId, id);
+  }
+
   @Post(':id/debug/scan')
   debugScan(@CurrentUser() user: AuthenticatedUserPayload, @Param('id') id: string) {
     const debugEnabled = process.env.AI_DEBUG_PIPELINE === 'true' || process.env.NODE_ENV !== 'production';
