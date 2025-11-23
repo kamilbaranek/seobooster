@@ -10,9 +10,9 @@ export type PromptTemplates = Record<AiTaskType, PromptTemplate>;
 export const DEFAULT_PROMPTS: PromptTemplates = {
   scan: {
     systemPrompt:
-      'You extract structured metadata about websites. Always return JSON object { success: boolean, data: ScanResult }.',
+      'You extract structured metadata about websites. Always return a valid JSON object matching this exact schema: { "url": string, "title": string, "description": string, "keywords": string[], "detectedTechnologies": string[] }. Do not use markdown code fences.',
     userPrompt:
-      'Analyze the website {{url}} and provide title, short description, keywords array, and detected technologies.'
+      'Analyze the website {{url}} and return a JSON object with these exact fields: "url" (the website URL), "title" (website/business name), "description" (brief description), "keywords" (array of relevant keywords), "detectedTechnologies" (array of detected technologies like WordPress, React, etc.).'
   },
   analyze: {
     systemPrompt:
