@@ -25,12 +25,14 @@ interface ArticleImage {
 const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
     const [images, setImages] = useState<ArticleImage[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
     const fetchImages = async () => {
         if (article.webId && article.articleId) {
             try {
-                const data = await apiFetch<{ images: ArticleImage[] }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
+                const data = await apiFetch<{ images: ArticleImage[], remaining: number }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
                 setImages(data.images || []);
+                setRemainingAttempts(data.remaining);
             } catch (err) {
                 console.error("Failed to load images", err);
             }
@@ -73,6 +75,20 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
             // Fetch image usage stats
             const imagesData = await apiFetch<{ limit: number; generated: number; remaining: number }>(`/webs/${article.webId}/articles/${article.articleId}/images`);
             const attemptsLeft = imagesData.remaining;
+            setRemainingAttempts(attemptsLeft);
+
+            if (attemptsLeft <= 0) {
+                Swal.fire({
+                    text: "You have reached the image generation limit for this article.",
+                    icon: "warning",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary",
+                    }
+                });
+                return;
+            }
 
             Swal.fire({
                 title: "Generate New Picture",
@@ -95,6 +111,8 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
 
                         if (response.success && response.image) {
                             setImages(prev => [...prev, response.image]);
+                            // Decrement remaining attempts locally
+                            setRemainingAttempts(prev => (prev !== null ? Math.max(0, prev - 1) : null));
                         }
 
                         Swal.fire({
@@ -154,9 +172,16 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                         {/*end::Rewrite*/}
                         {/*begin::New picture*/}
                         {article.articleId && (
-                            <a href="#" onClick={handleNewPicture} className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="New picture">
+                            <button
+                                onClick={handleNewPicture}
+                                className={`btn btn-sm btn-icon btn-light btn-active-light-primary me-2 ${remainingAttempts !== null && remainingAttempts <= 0 ? 'disabled opacity-50' : ''}`}
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title={remainingAttempts !== null && remainingAttempts <= 0 ? "Limit reached" : "New picture"}
+                                disabled={remainingAttempts !== null && remainingAttempts <= 0}
+                            >
                                 <i className="ki-outline ki-picture fs-2 m-0"></i>
-                            </a>
+                            </button>
                         )}
                         {/*end::New picture*/}
                         {/*begin::Delete*/}

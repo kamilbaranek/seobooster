@@ -41,6 +41,20 @@ export class ArticlesImagesController {
       throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
     }
 
+    // Cleanup stale pending images (older than 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await this.prisma.articleImage.updateMany({
+      where: {
+        articleId,
+        status: 'PENDING',
+        createdAt: { lt: tenMinutesAgo }
+      },
+      data: {
+        status: 'FAILED',
+        errorMessage: 'Generation timed out'
+      }
+    });
+
     const article = await this.prisma.article.findFirst({
       where: { id: articleId, webId },
       include: {
@@ -83,6 +97,20 @@ export class ArticlesImagesController {
     if (!web) {
       throw new HttpException('Website not found', HttpStatus.NOT_FOUND);
     }
+
+    // Cleanup stale pending images (older than 10 minutes)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await this.prisma.articleImage.updateMany({
+      where: {
+        articleId,
+        status: 'PENDING',
+        createdAt: { lt: tenMinutesAgo }
+      },
+      data: {
+        status: 'FAILED',
+        errorMessage: 'Generation timed out'
+      }
+    });
 
     const article = await this.prisma.article.findFirst({
       where: { id: articleId, webId },
