@@ -122,17 +122,21 @@ export class OpenRouterProvider implements AiProvider {
     };
 
     if (forceJsonResponse) {
-      if (task === 'strategy') {
-        body.response_format = {
-          type: 'json_schema',
-          json_schema: {
-            name: 'seo_strategy',
-            strict: true,
-            schema: STRATEGY_JSON_SCHEMA
-          }
-        };
-      } else {
-        body.response_format = { type: 'json_object' };
+      // Perplexity models don't support response_format parameter
+      const isPerplexity = model?.toLowerCase().includes('perplexity');
+      if (!isPerplexity) {
+        if (task === 'strategy') {
+          body.response_format = {
+            type: 'json_schema',
+            json_schema: {
+              name: 'seo_strategy',
+              strict: true,
+              schema: STRATEGY_JSON_SCHEMA
+            }
+          };
+        } else {
+          body.response_format = { type: 'json_object' };
+        }
       }
     }
 
@@ -385,7 +389,11 @@ export class OpenRouterProvider implements AiProvider {
     };
 
     if (options?.responseFormat === 'json_object') {
-      body.response_format = { type: 'json_object' };
+      // Perplexity models don't support response_format parameter
+      const isPerplexity = model?.toLowerCase().includes('perplexity');
+      if (!isPerplexity) {
+        body.response_format = { type: 'json_object' };
+      }
     }
 
     const response = await fetch(`${this.config.baseUrl ?? 'https://openrouter.ai/api/v1'}/chat/completions`, {
