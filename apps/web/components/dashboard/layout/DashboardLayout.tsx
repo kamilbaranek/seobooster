@@ -13,6 +13,7 @@ export interface DashboardWeb {
   screenshotUrl?: string;
   lastArticleCreatedAt?: string | null;
   articleCount?: number;
+  articlePublishedCount?: number;
 }
 
 interface DashboardLayoutProps {
