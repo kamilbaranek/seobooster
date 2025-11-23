@@ -60,6 +60,14 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const project = projects.find(p => p.id === projectId);
     const projectIndex = projects.findIndex(p => p.id === projectId);
 
+    const [activeTab, setActiveTab] = useState('overview');
+    const [activeScheduleDay, setActiveScheduleDay] = useState(0);
+    const [articlePlans, setArticlePlans] = useState<ArticlePlan[]>([]);
+    const [loadingPlans, setLoadingPlans] = useState(false);
+    const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
+    const [isRegeneratingScreenshot, setIsRegeneratingScreenshot] = useState(false);
+    const [localProject, setLocalProject] = useState(project);
+
     const statusConfig = {
         PENDING_PAYMENT: { label: 'Pending Payment', badge: 'badge-light-warning' },
         ACTIVE: { label: 'Active', badge: 'badge-light-success' },
@@ -67,40 +75,45 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
         ERROR: { label: 'Error', badge: 'badge-light-danger' }
     } as const;
 
-    const currentStatus = project?.status && statusConfig[project.status as keyof typeof statusConfig]
-        ? statusConfig[project.status as keyof typeof statusConfig]
+    const currentStatus = localProject?.status && statusConfig[localProject.status as keyof typeof statusConfig]
+        ? statusConfig[localProject.status as keyof typeof statusConfig]
         : { label: 'Unknown', badge: 'badge-light-secondary' };
 
     const colors = ['warning', 'danger', 'primary', 'success', 'info'];
     const color = projectIndex >= 0 ? colors[projectIndex % colors.length] : 'primary';
     const iconClass = `ki-outline ki-abstract-${(projectIndex >= 0 ? (projectIndex % 20) + 10 : 10)} fs-3x fs-lg-4x text-inverse-${color}`;
-    const lastArticleDate = project?.lastArticleCreatedAt ? formatLastArticleDate(project.lastArticleCreatedAt) : null;
-    const lastArticleDisplay = lastArticleDate ?? (project ? 'No articles yet' : '—');
+    const lastArticleDate = localProject?.lastArticleCreatedAt ? formatLastArticleDate(localProject.lastArticleCreatedAt) : null;
+    const lastArticleDisplay = lastArticleDate ?? (localProject ? 'No articles yet' : '—');
 
-    const [activeTab, setActiveTab] = useState('overview');
-    const [activeScheduleDay, setActiveScheduleDay] = useState(0);
-    const [articlePlans, setArticlePlans] = useState<ArticlePlan[]>([]);
-    const [loadingPlans, setLoadingPlans] = useState(false);
-    const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
-    const [isRegeneratingScreenshot, setIsRegeneratingScreenshot] = useState(false);
+    // Sync localProject with project from props/hook
+    useEffect(() => {
+        if (project) {
+            setLocalProject(project);
+        }
+    }, [project]);
 
-    // Poll for project updates when regenerating screenshot
+    // Poll for specific project updates when regenerating screenshot
     useEffect(() => {
         if (!isRegeneratingScreenshot || !projectId) return;
 
         const interval = setInterval(async () => {
-            await refetch();
+            try {
+                const updatedProject = await apiFetch<any>(`/webs/${projectId}`, { cache: 'no-store' });
+                if (updatedProject) {
+                    setLocalProject(prev => ({ ...prev, ...updatedProject }));
+
+                    // Check if status changed from PENDING to SUCCESS or FAILED
+                    if (updatedProject.screenshotStatus !== 'PENDING') {
+                        setIsRegeneratingScreenshot(false);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to poll project details", error);
+            }
         }, 3000);
 
         return () => clearInterval(interval);
-    }, [isRegeneratingScreenshot, projectId, refetch]);
-
-    // Stop regenerating state when status is no longer PENDING
-    useEffect(() => {
-        if (isRegeneratingScreenshot && project?.screenshotStatus !== 'PENDING') {
-            setIsRegeneratingScreenshot(false);
-        }
-    }, [project?.screenshotStatus, isRegeneratingScreenshot]);
+    }, [isRegeneratingScreenshot, projectId]);
 
     // Fetch article plans when projectId changes
     useEffect(() => {
@@ -296,7 +309,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                     {/*begin::Details*/}
                     <div className="d-flex flex-wrap flex-sm-nowrap mb-6">
                         {/*begin::Image*/}
-                        <div className={`d-flex flex-center flex-shrink-0 bg-${(project?.screenshotUrl || project?.faviconUrl) ? 'light' : color} rounded ${project?.screenshotUrl ? 'w-200px w-lg-300px' : 'w-100px h-100px w-lg-150px h-lg-150px'} me-7 mb-4 overflow-hidden position-relative`}>
+                        <div className={`d-flex flex-center flex-shrink-0 bg-${(localProject?.screenshotUrl || localProject?.faviconUrl) ? 'light' : color} rounded ${localProject?.screenshotUrl ? 'w-200px w-lg-300px' : 'w-100px h-100px w-lg-150px h-lg-150px'} me-7 mb-4 overflow-hidden position-relative`}>
                             {isRegeneratingScreenshot ? (
                                 <div className="position-absolute top-50 start-50 translate-middle">
                                     <div className="spinner-border text-primary" role="status">
@@ -304,11 +317,11 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                     </div>
                                 </div>
                             ) : (
-                                (project?.screenshotUrl || project?.faviconUrl) ? (
+                                (localProject?.screenshotUrl || localProject?.faviconUrl) ? (
                                     <img
-                                        className={project?.screenshotUrl ? "w-100" : "mw-50px mw-lg-75px"}
-                                        src={project?.screenshotUrl || project?.faviconUrl}
-                                        alt={project?.nickname || 'Project'}
+                                        className={localProject?.screenshotUrl ? "w-100" : "mw-50px mw-lg-75px"}
+                                        src={localProject?.screenshotUrl || localProject?.faviconUrl}
+                                        alt={localProject?.nickname || 'Project'}
                                     />
                                 ) : (
                                     <i className={iconClass}></i>
