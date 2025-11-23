@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import Select from 'react-select';
 import { countryOptions } from '../../../lib/countryOptions';
@@ -20,6 +20,17 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     const [timezone, setTimezone] = useState(project?.timezone || 'UTC');
     const [language, setLanguage] = useState(project?.language || 'en');
     const [country, setCountry] = useState(project?.country || '');
+
+    // WordPress credentials state
+    const [wpUsername, setWpUsername] = useState('');
+    const [wpPassword, setWpPassword] = useState('');
+    const [wpAutoPublishMode, setWpAutoPublishMode] = useState<'draft_only' | 'manual_approval' | 'auto_publish'>('draft_only');
+    const [hasCredentials, setHasCredentials] = useState(false);
+    const [editingUsername, setEditingUsername] = useState(false);
+    const [editingPassword, setEditingPassword] = useState(false);
+    const [newUsername, setNewUsername] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const timezoneOptions = [
@@ -355,6 +366,118 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
             </div>
         );
     };
+
+    // Fetch WordPress credentials on mount
+    useEffect(() => {
+        const fetchCredentials = async () => {
+            try {
+                const response = await apiFetch(`/webs/${project.id}/credentials`) as any;
+                if (response.hasCredentials && response.credentials) {
+                    setHasCredentials(true);
+                    setWpUsername(response.credentials.username || '');
+                    setWpPassword('************'); // Masked
+                    setWpAutoPublishMode(response.credentials.autoPublishMode || 'draft_only');
+                }
+            } catch (error) {
+                console.error('Failed to fetch credentials:', error);
+            }
+        };
+
+        if (project?.id) {
+            fetchCredentials();
+        }
+    }, [project?.id]);
+
+    // WordPress credentials handlers
+    const handleSaveUsername = async () => {
+        if (!newUsername.trim()) {
+            Swal.fire('Error', 'Username cannot be empty', 'error');
+            return;
+        }
+
+        try {
+            await apiFetch(`/webs/${project.id}/credentials`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    credentials: {
+                        type: 'wordpress_application_password',
+                        baseUrl: project.url,
+                        username: newUsername,
+                        applicationPassword: wpPassword === '************' ? undefined : wpPassword,
+                        autoPublishMode: wpAutoPublishMode
+                    }
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            setWpUsername(newUsername);
+            setEditingUsername(false);
+            setNewUsername('');
+            Swal.fire('Success', 'Username updated successfully', 'success');
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update username', 'error');
+        }
+    };
+
+    const handleSavePassword = async () => {
+        if (!newPassword.trim()) {
+            Swal.fire('Error', 'Application Password cannot be empty', 'error');
+            return;
+        }
+
+        try {
+            await apiFetch(`/webs/${project.id}/credentials`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    credentials: {
+                        type: 'wordpress_application_password',
+                        baseUrl: project.url,
+                        username: wpUsername,
+                        applicationPassword: newPassword,
+                        autoPublishMode: wpAutoPublishMode
+                    }
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            setWpPassword('************');
+            setEditingPassword(false);
+            setNewPassword('');
+            setHasCredentials(true);
+            Swal.fire('Success', 'Application Password updated successfully', 'success');
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update password', 'error');
+        }
+    };
+
+    const handleAutoPublishModeChange = async (mode: 'draft_only' | 'manual_approval' | 'auto_publish') => {
+        if (!hasCredentials) {
+            Swal.fire('Error', 'Please configure WordPress credentials first', 'error');
+            return;
+        }
+
+        try {
+            await apiFetch(`/webs/${project.id}/credentials`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    credentials: {
+                        type: 'wordpress_application_password',
+                        baseUrl: project.url,
+                        username: wpUsername,
+                        applicationPassword: wpPassword === '************' ? undefined : wpPassword,
+                        autoPublishMode: mode
+                    }
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            setWpAutoPublishMode(mode);
+            Swal.fire('Success', 'Auto-publish mode updated successfully', 'success');
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update auto-publish mode', 'error');
+        }
+    };
+
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -397,420 +520,743 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     };
 
     return (
-        <div className="card">
-            {/*begin::Card header*/}
-            <div className="card-header">
-                {/*begin::Card title*/}
-                <div className="card-title fs-3 fw-bold">Project Settings</div>
-                {/*end::Card title*/}
-            </div>
-            {/*end::Card header*/}
-            {/*begin::Form*/}
-            <form id="kt_project_settings_form" className="form" onSubmit={handleSaveSettings}>
-                {/*begin::Card body*/}
-                <div className="card-body p-9">
-                    {/*begin::Row*/}
-                    <div className="row mb-5">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Project Logo</div>
-                        </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-lg-8">
-                            {/*begin::Image input*/}
-                            <div className={`image-input image-input-outline ${!logoUrl ? 'image-input-empty' : ''}`} data-kt-image-input="true">
-                                {/*begin::Preview existing avatar*/}
-                                {renderLogoPreview()}
-                                {/*end::Preview existing avatar*/}
-                                {/*begin::Label*/}
-                                <label className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="change" data-bs-toggle="tooltip" title="Change avatar">
-                                    <i className="ki-outline ki-pencil fs-7"></i>
-                                    {/*begin::Inputs*/}
-                                    <input
-                                        type="file"
-                                        name="avatar"
-                                        accept=".png, .jpg, .jpeg"
-                                        ref={fileInputRef}
-                                        onChange={handleFileChange}
-                                        disabled={uploading}
-                                    />
-                                    <input type="hidden" name="avatar_remove" />
-                                    {/*end::Inputs*/}
-                                </label>
-                                {/*end::Label*/}
-                                {/*begin::Cancel*/}
-                                <span className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="cancel" data-bs-toggle="tooltip" title="Cancel avatar">
-                                    <i className="ki-outline ki-cross fs-2"></i>
-                                </span>
-                                {/*end::Cancel*/}
-                                {/*begin::Remove*/}
-                                {logoUrl && (
-                                    <span
-                                        className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow"
-                                        data-kt-image-input-action="remove"
-                                        data-bs-toggle="tooltip"
-                                        title="Remove avatar"
-                                        onClick={handleDeleteLogo}
-                                    >
+        <>
+            <div className="card mb-5 mb-xl-10">
+                {/*begin::Card header*/}
+                <div className="card-header">
+                    {/*begin::Card title*/}
+                    <div className="card-title fs-3 fw-bold">Project Settings</div>
+                    {/*end::Card title*/}
+                </div>
+                {/*end::Card header*/}
+                {/*begin::Form*/}
+                <form id="kt_project_settings_form" className="form" onSubmit={handleSaveSettings}>
+                    {/*begin::Card body*/}
+                    <div className="card-body p-9">
+                        {/*begin::Row*/}
+                        <div className="row mb-5">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Project Logo</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-lg-8">
+                                {/*begin::Image input*/}
+                                <div className={`image-input image-input-outline ${!logoUrl ? 'image-input-empty' : ''}`} data-kt-image-input="true">
+                                    {/*begin::Preview existing avatar*/}
+                                    {renderLogoPreview()}
+                                    {/*end::Preview existing avatar*/}
+                                    {/*begin::Label*/}
+                                    <label className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="change" data-bs-toggle="tooltip" title="Change avatar">
+                                        <i className="ki-outline ki-pencil fs-7"></i>
+                                        {/*begin::Inputs*/}
+                                        <input
+                                            type="file"
+                                            name="avatar"
+                                            accept=".png, .jpg, .jpeg"
+                                            ref={fileInputRef}
+                                            onChange={handleFileChange}
+                                            disabled={uploading}
+                                        />
+                                        <input type="hidden" name="avatar_remove" />
+                                        {/*end::Inputs*/}
+                                    </label>
+                                    {/*end::Label*/}
+                                    {/*begin::Cancel*/}
+                                    <span className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow" data-kt-image-input-action="cancel" data-bs-toggle="tooltip" title="Cancel avatar">
                                         <i className="ki-outline ki-cross fs-2"></i>
                                     </span>
-                                )}
-                                {/*end::Remove*/}
+                                    {/*end::Cancel*/}
+                                    {/*begin::Remove*/}
+                                    {logoUrl && (
+                                        <span
+                                            className="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-white shadow"
+                                            data-kt-image-input-action="remove"
+                                            data-bs-toggle="tooltip"
+                                            title="Remove avatar"
+                                            onClick={handleDeleteLogo}
+                                        >
+                                            <i className="ki-outline ki-cross fs-2"></i>
+                                        </span>
+                                    )}
+                                    {/*end::Remove*/}
+                                </div>
+                                {/*end::Image input*/}
+                                {/*begin::Hint*/}
+                                <div className="form-text">Allowed file types: png, jpg, jpeg.</div>
+                                {/*end::Hint*/}
                             </div>
-                            {/*end::Image input*/}
-                            {/*begin::Hint*/}
-                            <div className="form-text">Allowed file types: png, jpg, jpeg.</div>
-                            {/*end::Hint*/}
+                            {/*end::Col*/}
                         </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Project Name</div>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Project Name</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <input
+                                    type="text"
+                                    className="form-control form-control-solid"
+                                    name="name"
+                                    value={projectName}
+                                    onChange={(e) => setProjectName(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <input
-                                type="text"
-                                className="form-control form-control-solid"
-                                name="name"
-                                value={projectName}
-                                onChange={(e) => setProjectName(e.target.value)}
-                            />
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Project URL</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <input
+                                    type="text"
+                                    className="form-control form-control-solid"
+                                    name="url"
+                                    value={project?.url || ''}
+                                    readOnly
+                                    disabled
+                                />
+                            </div>
                         </div>
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Project URL</div>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Business description</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <textarea
+                                    name="description"
+                                    className="form-control form-control-solid h-100px"
+                                    value={businessDescription}
+                                    onChange={(e) => setBusinessDescription(e.target.value)}
+                                ></textarea>
+                            </div>
+                            {/*begin::Col*/}
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <input
-                                type="text"
-                                className="form-control form-control-solid"
-                                name="url"
-                                value={project?.url || ''}
-                                readOnly
-                                disabled
-                            />
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Business Audience</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <textarea
+                                    name="audience"
+                                    className="form-control form-control-solid h-100px"
+                                    value={businessAudience}
+                                    onChange={(e) => setBusinessAudience(e.target.value)}
+                                ></textarea>
+                            </div>
                         </div>
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Business description</div>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Country</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <Select
+                                    options={countryOptions}
+                                    value={countryOptions.find(opt => opt.value === country)}
+                                    onChange={(option) => setCountry(option?.value || '')}
+                                    className="react-select-container"
+                                    classNamePrefix="react-select"
+                                    placeholder="Select a country.."
+                                    styles={{
+                                        control: (base, state) => ({
+                                            ...base,
+                                            minHeight: '44px',
+                                            borderRadius: '0.475rem',
+                                            borderColor: 'var(--bs-gray-300)',
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
+                                            '&:hover': {
+                                                borderColor: 'var(--bs-gray-400)'
+                                            }
+                                        }),
+                                        menu: (base) => ({
+                                            ...base,
+                                            zIndex: 9999,
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            borderRadius: '0.475rem',
+                                            border: '1px solid var(--bs-gray-300)',
+                                            boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
+                                        }),
+                                        menuList: (base) => ({
+                                            ...base,
+                                            padding: '0.5rem 0'
+                                        }),
+                                        option: (base, state) => ({
+                                            ...base,
+                                            backgroundColor: state.isSelected
+                                                ? 'var(--bs-primary)'
+                                                : state.isFocused
+                                                    ? 'var(--bs-gray-100)'
+                                                    : 'transparent',
+                                            color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
+                                            cursor: 'pointer',
+                                            '&:active': {
+                                                backgroundColor: 'var(--bs-primary)'
+                                            }
+                                        }),
+                                        singleValue: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        input: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        placeholder: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-500)'
+                                        })
+                                    }}
+                                />
+                            </div>
+                            {/*end::Col*/}
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <textarea
-                                name="description"
-                                className="form-control form-control-solid h-100px"
-                                value={businessDescription}
-                                onChange={(e) => setBusinessDescription(e.target.value)}
-                            ></textarea>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Article Language</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <Select
+                                    options={languageOptions}
+                                    value={languageOptions.find(opt => opt.value === language)}
+                                    onChange={(option) => setLanguage(option?.value || 'en')}
+                                    className="react-select-container"
+                                    classNamePrefix="react-select"
+                                    placeholder="Select a language.."
+                                    styles={{
+                                        control: (base, state) => ({
+                                            ...base,
+                                            minHeight: '44px',
+                                            borderRadius: '0.475rem',
+                                            borderColor: 'var(--bs-gray-300)',
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
+                                            '&:hover': {
+                                                borderColor: 'var(--bs-gray-400)'
+                                            }
+                                        }),
+                                        menu: (base) => ({
+                                            ...base,
+                                            zIndex: 9999,
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            borderRadius: '0.475rem',
+                                            border: '1px solid var(--bs-gray-300)',
+                                            boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
+                                        }),
+                                        menuList: (base) => ({
+                                            ...base,
+                                            padding: '0.5rem 0'
+                                        }),
+                                        option: (base, state) => ({
+                                            ...base,
+                                            backgroundColor: state.isSelected
+                                                ? 'var(--bs-primary)'
+                                                : state.isFocused
+                                                    ? 'var(--bs-gray-100)'
+                                                    : 'transparent',
+                                            color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
+                                            cursor: 'pointer',
+                                            '&:active': {
+                                                backgroundColor: 'var(--bs-primary)'
+                                            }
+                                        }),
+                                        singleValue: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        input: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        placeholder: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-500)'
+                                        })
+                                    }}
+                                />
+                            </div>
+                            {/*end::Col*/}
                         </div>
-                        {/*begin::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Business Audience</div>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Time Zone</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <Select
+                                    options={timezoneOptions}
+                                    value={timezoneOptions.find(opt => opt.value === timezone)}
+                                    onChange={(option) => setTimezone(option?.value || 'UTC')}
+                                    className="react-select-container"
+                                    classNamePrefix="react-select"
+                                    placeholder="Select a timezone.."
+                                    styles={{
+                                        control: (base, state) => ({
+                                            ...base,
+                                            minHeight: '44px',
+                                            borderRadius: '0.475rem',
+                                            borderColor: 'var(--bs-gray-300)',
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
+                                            '&:hover': {
+                                                borderColor: 'var(--bs-gray-400)'
+                                            }
+                                        }),
+                                        menu: (base) => ({
+                                            ...base,
+                                            zIndex: 9999,
+                                            backgroundColor: 'var(--bs-body-bg)',
+                                            borderRadius: '0.475rem',
+                                            border: '1px solid var(--bs-gray-300)',
+                                            boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
+                                        }),
+                                        menuList: (base) => ({
+                                            ...base,
+                                            padding: '0.5rem 0'
+                                        }),
+                                        option: (base, state) => ({
+                                            ...base,
+                                            backgroundColor: state.isSelected
+                                                ? 'var(--bs-primary)'
+                                                : state.isFocused
+                                                    ? 'var(--bs-gray-100)'
+                                                    : 'transparent',
+                                            color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
+                                            cursor: 'pointer',
+                                            '&:active': {
+                                                backgroundColor: 'var(--bs-primary)'
+                                            }
+                                        }),
+                                        singleValue: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        input: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-700)'
+                                        }),
+                                        placeholder: (base) => ({
+                                            ...base,
+                                            color: 'var(--bs-gray-500)'
+                                        })
+                                    }}
+                                />
+                            </div>
+                            {/*end::Col*/}
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <textarea
-                                name="audience"
-                                className="form-control form-control-solid h-100px"
-                                value={businessAudience}
-                                onChange={(e) => setBusinessAudience(e.target.value)}
-                            ></textarea>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Publication Schedule</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9">
+                                <div className="d-flex flex-wrap fw-semibold h-100">
+                                    {daysOfWeek.map(day => (
+                                        <div key={day.id} className="form-check form-check-custom form-check-solid me-9 mb-3">
+                                            <input
+                                                className="form-check-input"
+                                                type="checkbox"
+                                                value={day.id}
+                                                id={day.id}
+                                                checked={publicationSchedule.includes(day.id)}
+                                                onChange={() => handleDayToggle(day.id)}
+                                            />
+                                            <label className="form-check-label ms-3" htmlFor={day.id}>{day.label}</label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {/*end::Col*/}
                         </div>
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Country</div>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Auto-publish to CMS</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9">
+                                <div className="form-check form-switch form-check-custom form-check-solid">
+                                    <input className="form-check-input" type="checkbox" value="" id="status" name="status" defaultChecked={true} />
+                                    <label className="form-check-label fw-semibold text-gray-500 ms-3" htmlFor="status">Active</label>
+                                </div>
+                            </div>
+                            {/*end::Col*/}
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <Select
-                                options={countryOptions}
-                                value={countryOptions.find(opt => opt.value === country)}
-                                onChange={(option) => setCountry(option?.value || '')}
-                                className="react-select-container"
-                                classNamePrefix="react-select"
-                                placeholder="Select a country.."
-                                styles={{
-                                    control: (base, state) => ({
-                                        ...base,
-                                        minHeight: '44px',
-                                        borderRadius: '0.475rem',
-                                        borderColor: 'var(--bs-gray-300)',
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'var(--bs-gray-400)'
-                                        }
-                                    }),
-                                    menu: (base) => ({
-                                        ...base,
-                                        zIndex: 9999,
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        borderRadius: '0.475rem',
-                                        border: '1px solid var(--bs-gray-300)',
-                                        boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
-                                    }),
-                                    menuList: (base) => ({
-                                        ...base,
-                                        padding: '0.5rem 0'
-                                    }),
-                                    option: (base, state) => ({
-                                        ...base,
-                                        backgroundColor: state.isSelected
-                                            ? 'var(--bs-primary)'
-                                            : state.isFocused
-                                                ? 'var(--bs-gray-100)'
-                                                : 'transparent',
-                                        color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
-                                        cursor: 'pointer',
-                                        '&:active': {
-                                            backgroundColor: 'var(--bs-primary)'
-                                        }
-                                    }),
-                                    singleValue: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    input: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    placeholder: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-500)'
-                                    })
-                                }}
-                            />
-                        </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Article Language</div>
-                        </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <Select
-                                options={languageOptions}
-                                value={languageOptions.find(opt => opt.value === language)}
-                                onChange={(option) => setLanguage(option?.value || 'en')}
-                                className="react-select-container"
-                                classNamePrefix="react-select"
-                                placeholder="Select a language.."
-                                styles={{
-                                    control: (base, state) => ({
-                                        ...base,
-                                        minHeight: '44px',
-                                        borderRadius: '0.475rem',
-                                        borderColor: 'var(--bs-gray-300)',
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'var(--bs-gray-400)'
-                                        }
-                                    }),
-                                    menu: (base) => ({
-                                        ...base,
-                                        zIndex: 9999,
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        borderRadius: '0.475rem',
-                                        border: '1px solid var(--bs-gray-300)',
-                                        boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
-                                    }),
-                                    menuList: (base) => ({
-                                        ...base,
-                                        padding: '0.5rem 0'
-                                    }),
-                                    option: (base, state) => ({
-                                        ...base,
-                                        backgroundColor: state.isSelected
-                                            ? 'var(--bs-primary)'
-                                            : state.isFocused
-                                                ? 'var(--bs-gray-100)'
-                                                : 'transparent',
-                                        color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
-                                        cursor: 'pointer',
-                                        '&:active': {
-                                            backgroundColor: 'var(--bs-primary)'
-                                        }
-                                    }),
-                                    singleValue: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    input: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    placeholder: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-500)'
-                                    })
-                                }}
-                            />
-                        </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Time Zone</div>
-                        </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9 fv-row">
-                            <Select
-                                options={timezoneOptions}
-                                value={timezoneOptions.find(opt => opt.value === timezone)}
-                                onChange={(option) => setTimezone(option?.value || 'UTC')}
-                                className="react-select-container"
-                                classNamePrefix="react-select"
-                                placeholder="Select a timezone.."
-                                styles={{
-                                    control: (base, state) => ({
-                                        ...base,
-                                        minHeight: '44px',
-                                        borderRadius: '0.475rem',
-                                        borderColor: 'var(--bs-gray-300)',
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
-                                        '&:hover': {
-                                            borderColor: 'var(--bs-gray-400)'
-                                        }
-                                    }),
-                                    menu: (base) => ({
-                                        ...base,
-                                        zIndex: 9999,
-                                        backgroundColor: 'var(--bs-body-bg)',
-                                        borderRadius: '0.475rem',
-                                        border: '1px solid var(--bs-gray-300)',
-                                        boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
-                                    }),
-                                    menuList: (base) => ({
-                                        ...base,
-                                        padding: '0.5rem 0'
-                                    }),
-                                    option: (base, state) => ({
-                                        ...base,
-                                        backgroundColor: state.isSelected
-                                            ? 'var(--bs-primary)'
-                                            : state.isFocused
-                                                ? 'var(--bs-gray-100)'
-                                                : 'transparent',
-                                        color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
-                                        cursor: 'pointer',
-                                        '&:active': {
-                                            backgroundColor: 'var(--bs-primary)'
-                                        }
-                                    }),
-                                    singleValue: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    input: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-700)'
-                                    }),
-                                    placeholder: (base) => ({
-                                        ...base,
-                                        color: 'var(--bs-gray-500)'
-                                    })
-                                }}
-                            />
-                        </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row mb-8">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Publication Schedule</div>
-                        </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9">
-                            <div className="d-flex flex-wrap fw-semibold h-100">
-                                {daysOfWeek.map(day => (
-                                    <div key={day.id} className="form-check form-check-custom form-check-solid me-9 mb-3">
-                                        <input
-                                            className="form-check-input"
-                                            type="checkbox"
-                                            value={day.id}
-                                            id={day.id}
-                                            checked={publicationSchedule.includes(day.id)}
-                                            onChange={() => handleDayToggle(day.id)}
-                                        />
-                                        <label className="form-check-label ms-3" htmlFor={day.id}>{day.label}</label>
+                        {/*end::Row*/}
+                        {/*begin::Row*/}
+                        <div className="row mb-8">
+                            {/*begin::Col*/}
+                            <div className="col-xl-3">
+                                <div className="fs-6 fw-semibold mt-2 mb-3">Auto-publish Mode</div>
+                            </div>
+                            {/*end::Col*/}
+                            {/*begin::Col*/}
+                            <div className="col-xl-9 fv-row">
+                                <div className="mb-3">
+                                    <label className="d-flex align-items-center fs-5 fw-semibold">
+                                        <span className="required">Auto-publish Mode</span>
+                                        <span
+                                            className="ms-1"
+                                            data-bs-toggle="tooltip"
+                                            title="Choose how new articles are sent to WordPress"
+                                        >
+                                            <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
+                                        </span>
+                                    </label>
+                                    <div className="fs-7 fw-semibold text-muted">Draft only, require approval, or publish automatically.</div>
+                                </div>
+                                <div className="fv-row">
+                                    <div className="btn-group w-100" data-kt-buttons="true" data-kt-buttons-target="[data-kt-button]">
+                                        <label
+                                            className={`btn btn-outline btn-active-success btn-color-muted ${wpAutoPublishMode === 'draft_only' ? 'active' : ''}`}
+                                            data-kt-button="true"
+                                        >
+                                            <input
+                                                className="btn-check"
+                                                type="radio"
+                                                name="auto_publish_mode"
+                                                value="draft_only"
+                                                checked={wpAutoPublishMode === 'draft_only'}
+                                                onChange={() => handleAutoPublishModeChange('draft_only')}
+                                            />
+                                            Draft Only
+                                        </label>
+                                        <label
+                                            className={`btn btn-outline btn-active-success btn-color-muted ${wpAutoPublishMode === 'manual_approval' ? 'active' : ''}`}
+                                            data-kt-button="true"
+                                        >
+                                            <input
+                                                className="btn-check"
+                                                type="radio"
+                                                name="auto_publish_mode"
+                                                value="manual_approval"
+                                                checked={wpAutoPublishMode === 'manual_approval'}
+                                                onChange={() => handleAutoPublishModeChange('manual_approval')}
+                                            />
+                                            Manual Approval
+                                        </label>
+                                        <label
+                                            className={`btn btn-outline btn-active-success btn-color-muted ${wpAutoPublishMode === 'auto_publish' ? 'active' : ''}`}
+                                            data-kt-button="true"
+                                        >
+                                            <input
+                                                className="btn-check"
+                                                type="radio"
+                                                name="auto_publish_mode"
+                                                value="auto_publish"
+                                                checked={wpAutoPublishMode === 'auto_publish'}
+                                                onChange={() => handleAutoPublishModeChange('auto_publish')}
+                                            />
+                                            Auto Publish
+                                        </label>
                                     </div>
-                                ))}
+                                </div>
+                            </div>
+                            {/*end::Col*/}
+                        </div>
+                        {/*end::Row*/}
+                    </div>
+                    {/*end::Card body*/}
+                    {/*begin::Card footer*/}
+                    <div className="card-footer d-flex justify-content-end py-6 px-9">
+                        <button type="reset" className="btn btn-light btn-active-light-primary me-2">Discard</button>
+                        <button type="submit" className="btn btn-primary" id="kt_project_settings_submit">Save Changes</button>
+                    </div>
+                    {/*end::Card footer*/}
+                </form>
+                {/*end:Form*/}
+            </div>
+            {/*end::Project Settings Card*/}
+
+            {/*begin::WordPress Credentials*/}
+            <div className="card mb-5 mb-xl-10">
+                {/*begin::Card header*/}
+                <div className="card-header border-0 cursor-pointer" role="button" data-bs-toggle="collapse" data-bs-target="#kt_wordpress_credentials">
+                    <div className="card-title m-0">
+                        <h3 className="fw-bold m-0">WordPress Credentials</h3>
+                    </div>
+                </div>
+                {/*end::Card header*/}
+                {/*begin::Content*/}
+                <div id="kt_wordpress_credentials" className="collapse show">
+                    {/*begin::Card body*/}
+                    <div className="card-body border-top p-9">
+                        {/*begin::WordPress Username*/}
+                        <div className="d-flex flex-wrap align-items-center">
+                            {/*begin::Label*/}
+                            <div id="kt_wp_username">
+                                <div className="fs-6 fw-bold mb-1">WordPress Username</div>
+                                <div className="fw-semibold text-gray-600">{wpUsername || 'Not configured'}</div>
+                            </div>
+                            {/*end::Label*/}
+                            {/*begin::Edit*/}
+                            <div id="kt_wp_username_edit" className={`flex-row-fluid ${editingUsername ? '' : 'd-none'}`}>
+                                {/*begin::Form*/}
+                                <div className="row mb-6">
+                                    <div className="col-lg-6 mb-4 mb-lg-0">
+                                        <div className="fv-row mb-0">
+                                            <label htmlFor="wp_username" className="form-label fs-6 fw-bold mb-3">Enter WordPress Username</label>
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-lg form-control-solid"
+                                                id="wp_username"
+                                                placeholder="WordPress Username"
+                                                value={newUsername}
+                                                onChange={(e) => setNewUsername(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="d-flex">
+                                    <button type="button" className="btn btn-primary me-2 px-6" onClick={handleSaveUsername}>Update Username</button>
+                                    <button type="button" className="btn btn-color-gray-500 btn-active-light-primary px-6" onClick={() => { setEditingUsername(false); setNewUsername(''); }}>Cancel</button>
+                                </div>
+                                {/*end::Form*/}
+                            </div>
+                            {/*end::Edit*/}
+                            {/*begin::Action*/}
+                            <div id="kt_wp_username_button" className={`ms-auto ${editingUsername ? 'd-none' : ''}`}>
+                                <button className="btn btn-light btn-active-light-primary" onClick={() => { setEditingUsername(true); setNewUsername(wpUsername); }}>Change Username</button>
+                            </div>
+                            {/*end::Action*/}
+                        </div>
+                        {/*end::WordPress Username*/}
+                        {/*begin::Separator*/}
+                        <div className="separator separator-dashed my-6"></div>
+                        {/*end::Separator*/}
+                        {/*begin::Application Password*/}
+                        <div className="d-flex flex-wrap align-items-center mb-10">
+                            {/*begin::Label*/}
+                            <div id="kt_wp_password">
+                                <div className="fs-6 fw-bold mb-1">Application Password</div>
+                                <div className="fw-semibold text-gray-600">{wpPassword || 'Not configured'}</div>
+                            </div>
+                            {/*end::Label*/}
+                            {/*begin::Edit*/}
+                            <div id="kt_wp_password_edit" className={`flex-row-fluid ${editingPassword ? '' : 'd-none'}`}>
+                                {/*begin::Form*/}
+                                <div className="row mb-1">
+                                    <div className="col-lg-6">
+                                        <div className="fv-row mb-0">
+                                            <label htmlFor="wp_app_password" className="form-label fs-6 fw-bold mb-3">New Application Password</label>
+                                            <input
+                                                type="password"
+                                                className="form-control form-control-lg form-control-solid"
+                                                id="wp_app_password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="form-text mb-5">Generate an Application Password in your WordPress dashboard under Users → Profile → Application Passwords</div>
+                                <div className="d-flex">
+                                    <button type="button" className="btn btn-primary me-2 px-6" onClick={handleSavePassword}>Update Password</button>
+                                    <button type="button" className="btn btn-color-gray-500 btn-active-light-primary px-6" onClick={() => { setEditingPassword(false); setNewPassword(''); }}>Cancel</button>
+                                </div>
+                                {/*end::Form*/}
+                            </div>
+                            {/*end::Edit*/}
+                            {/*begin::Action*/}
+                            <div id="kt_wp_password_button" className={`ms-auto ${editingPassword ? 'd-none' : ''}`}>
+                                <button className="btn btn-light btn-active-light-primary" onClick={() => setEditingPassword(true)}>Update Password</button>
+                            </div>
+                            {/*end::Action*/}
+                        </div>
+                        {/*end::Application Password*/}
+                    </div>
+                    {/*end::Card body*/}
+                </div>
+                {/*end::Content*/}
+            </div>
+            {/*end::WordPress Credentials*/}
+
+            {/*begin::Connected Accounts*/}
+            <div className="card mb-5 mb-xl-10">
+                {/*begin::Card header*/}
+                <div
+                    className="card-header border-0 cursor-pointer"
+                    role="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#kt_account_connected_accounts"
+                    aria-expanded="true"
+                    aria-controls="kt_account_connected_accounts"
+                >
+                    <div className="card-title m-0">
+                        <h3 className="fw-bold m-0">Connected Accounts</h3>
+                    </div>
+                </div>
+                {/*end::Card header*/}
+                {/*begin::Content*/}
+                <div id="kt_account_connected_accounts" className="collapse show">
+                    {/*begin::Card body*/}
+                    <div className="card-body border-top p-9">
+                        {/*begin::Notice*/}
+                        <div className="notice d-flex bg-light-primary rounded border-primary border border-dashed mb-9 p-6">
+                            <i className="ki-outline ki-design-1 fs-2tx text-primary me-4"></i>
+                            <div className="d-flex flex-stack flex-grow-1">
+                                <div className="fw-semibold">
+                                    <div className="fs-6 text-gray-700">
+                                        Two-factor authentication adds an extra layer of security to your account. To log in, you'll need to provide a 4 digit code.{' '}
+                                        <a href="#" className="fw-bold">Learn More</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
-                    {/*begin::Row*/}
-                    <div className="row">
-                        {/*begin::Col*/}
-                        <div className="col-xl-3">
-                            <div className="fs-6 fw-semibold mt-2 mb-3">Auto-publish to CMS</div>
+                        {/*end::Notice*/}
+                        {/*begin::Items*/}
+                        <div className="py-2">
+                            {/*begin::Item*/}
+                            <div className="d-flex flex-stack">
+                                <div className="d-flex">
+                                    <img src="/assets/media/svg/brand-logos/google-icon.svg" className="w-30px me-6" alt="Google" />
+                                    <div className="d-flex flex-column">
+                                        <a href="#" className="fs-5 text-gray-900 text-hover-primary fw-bold">Google</a>
+                                        <div className="fs-6 fw-semibold text-gray-500">Plan properly your workflow</div>
+                                    </div>
+                                </div>
+                                <div className="d-flex justify-content-end">
+                                    <div className="form-check form-check-solid form-check-custom form-switch">
+                                        <input className="form-check-input w-45px h-30px" type="checkbox" id="googleswitch" defaultChecked />
+                                        <label className="form-check-label" htmlFor="googleswitch"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            {/*end::Item*/}
+                            <div className="separator separator-dashed my-5"></div>
+                            {/*begin::Item*/}
+                            <div className="d-flex flex-stack">
+                                <div className="d-flex">
+                                    <img src="/assets/media/svg/brand-logos/github.svg" className="w-30px me-6" alt="GitHub" />
+                                    <div className="d-flex flex-column">
+                                        <a href="#" className="fs-5 text-gray-900 text-hover-primary fw-bold">Github</a>
+                                        <div className="fs-6 fw-semibold text-gray-500">Keep eye on your repositories</div>
+                                    </div>
+                                </div>
+                                <div className="d-flex justify-content-end">
+                                    <div className="form-check form-check-solid form-check-custom form-switch">
+                                        <input className="form-check-input w-45px h-30px" type="checkbox" id="githubswitch" defaultChecked />
+                                        <label className="form-check-label" htmlFor="githubswitch"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            {/*end::Item*/}
+                            <div className="separator separator-dashed my-5"></div>
+                            {/*begin::Item*/}
+                            <div className="d-flex flex-stack">
+                                <div className="d-flex">
+                                    <img src="/assets/media/svg/brand-logos/slack-icon.svg" className="w-30px me-6" alt="Slack" />
+                                    <div className="d-flex flex-column">
+                                        <a href="#" className="fs-5 text-gray-900 text-hover-primary fw-bold">Slack</a>
+                                        <div className="fs-6 fw-semibold text-gray-500">Integrate project discussions</div>
+                                    </div>
+                                </div>
+                                <div className="d-flex justify-content-end">
+                                    <div className="form-check form-check-solid form-check-custom form-switch">
+                                        <input className="form-check-input w-45px h-30px" type="checkbox" id="slackswitch" />
+                                        <label className="form-check-label" htmlFor="slackswitch"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            {/*end::Item*/}
                         </div>
-                        {/*end::Col*/}
-                        {/*begin::Col*/}
-                        <div className="col-xl-9">
-                            <div className="form-check form-switch form-check-custom form-check-solid">
-                                <input className="form-check-input" type="checkbox" value="" id="status" name="status" defaultChecked={true} />
-                                <label className="form-check-label fw-semibold text-gray-500 ms-3" htmlFor="status">Active</label>
+                        {/*end::Items*/}
+                    </div>
+                    {/*end::Card body*/}
+                    {/*begin::Card footer*/}
+                    <div className="card-footer d-flex justify-content-end py-6 px-9">
+                        <button className="btn btn-light btn-active-light-primary me-2" type="button">Discard</button>
+                        <button className="btn btn-primary" type="button">Save Changes</button>
+                    </div>
+                    {/*end::Card footer*/}
+                </div>
+                {/*end::Content*/}
+            </div>
+            {/*end::Connected Accounts*/}
+
+            {/*begin::Deactivate Web*/}
+            <div className="card">
+                <div
+                    className="card-header border-0 cursor-pointer"
+                    role="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#kt_web_deactivate"
+                    aria-expanded="true"
+                    aria-controls="kt_web_deactivate"
+                >
+                    <div className="card-title m-0">
+                        <h3 className="fw-bold m-0">Deactivate Web</h3>
+                    </div>
+                </div>
+                <div id="kt_web_deactivate" className="collapse show">
+                    <form className="form">
+                        <div className="card-body border-top p-9">
+                            <div className="notice d-flex bg-light-warning rounded border-warning border border-dashed mb-9 p-6">
+                                <i className="ki-outline ki-information fs-2tx text-warning me-4"></i>
+                                <div className="d-flex flex-stack flex-grow-1">
+                                    <div className="fw-semibold">
+                                        <h4 className="text-gray-900 fw-bold">You are deactivating this web</h4>
+                                        <div className="fs-6 text-gray-700">
+                                            Deactivating stops publishing and processing for this site. You can reactivate later.{' '}
+                                            <a className="fw-bold" href="#">Learn more</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="form-check form-check-solid fv-row">
+                                <input name="deactivate" className="form-check-input" type="checkbox" value="" id="deactivate_web" />
+                                <label className="form-check-label fw-semibold ps-2 fs-6" htmlFor="deactivate_web">I confirm deactivation of this web</label>
                             </div>
                         </div>
-                        {/*end::Col*/}
-                    </div>
-                    {/*end::Row*/}
+                        <div className="card-footer d-flex justify-content-end py-6 px-9">
+                            <button type="button" className="btn btn-danger fw-semibold">Deactivate Web</button>
+                        </div>
+                    </form>
                 </div>
-                {/*end::Card body*/}
-                {/*begin::Card footer*/}
-                <div className="card-footer d-flex justify-content-end py-6 px-9">
-                    <button type="reset" className="btn btn-light btn-active-light-primary me-2">Discard</button>
-                    <button type="submit" className="btn btn-primary" id="kt_project_settings_submit">Save Changes</button>
-                </div>
-                {/*end::Card footer*/}
-            </form>
-            {/*end:Form*/}
-        </div>
+            </div>
+            {/*end::Deactivate Web*/}
+        </>
     );
 };
 
