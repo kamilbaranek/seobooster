@@ -276,11 +276,19 @@ export class ArticlesService {
   }
 
   private mapArticleListItem(article: ArticleWithWordpressRelations) {
+    const isHttpUrl = (value?: string | null) =>
+      typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'));
+
     const featuredFromImages = article.images
-      ?.find((img) => img.isFeatured && img.status === 'SUCCESS' && img.imageUrl)
+      ?.find((img) => img.isFeatured && img.status === 'SUCCESS' && isHttpUrl(img.imageUrl))
       ?.imageUrl;
-    const firstImage = article.images?.find((img) => img.status === 'SUCCESS' && img.imageUrl)?.imageUrl;
-    const resolvedFeatured = featuredFromImages || article.featuredImageUrl || firstImage || null;
+    const firstImage = article.images?.find((img) => img.status === 'SUCCESS' && isHttpUrl(img.imageUrl))?.imageUrl;
+
+    const resolvedFeatured =
+      (isHttpUrl(featuredFromImages) && featuredFromImages) ||
+      (isHttpUrl(article.featuredImageUrl) && article.featuredImageUrl) ||
+      (isHttpUrl(firstImage) && firstImage) ||
+      null;
 
     return {
       id: article.id,
