@@ -77,6 +77,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
     const [recentArticleImages, setRecentArticleImages] = useState<Record<string, string | null>>({});
+    const [recentArticleImageErrors, setRecentArticleImageErrors] = useState<Record<string, boolean>>({});
     const [isRegeneratingScreenshot, setIsRegeneratingScreenshot] = useState(false);
     const [localProject, setLocalProject] = useState(project);
 
@@ -612,8 +613,17 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                                 data-bs-toggle="tooltip"
                                                 title={article.title}
                                             >
-                                                {imageUrl ? (
-                                                    <img alt={article.title} src={imageUrl} />
+                                                {imageUrl && !recentArticleImageErrors[article.id] ? (
+                                                    <img
+                                                        alt={article.title}
+                                                        src={imageUrl}
+                                                        onError={() =>
+                                                            setRecentArticleImageErrors((prev) => ({
+                                                                ...prev,
+                                                                [article.id]: true
+                                                            }))
+                                                        }
+                                                    />
                                                 ) : (
                                                     <span className={`symbol-label bg-${color} text-inverse-${color} fw-bold`}>{fallbackLetter}</span>
                                                 )}
