@@ -48,7 +48,15 @@ export class ArticlesService {
       where,
       include: {
         wordpressCategory: true,
-        wordpressAuthor: true
+        wordpressAuthor: true,
+        images: {
+          orderBy: { position: 'asc' },
+          select: {
+            imageUrl: true,
+            isFeatured: true,
+            status: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * take,
@@ -267,6 +275,12 @@ export class ArticlesService {
   }
 
   private mapArticleListItem(article: ArticleWithWordpressRelations) {
+    const featuredFromImages = article.images
+      ?.find((img) => img.isFeatured && img.status === 'SUCCESS' && img.imageUrl)
+      ?.imageUrl;
+    const firstImage = article.images?.find((img) => img.status === 'SUCCESS' && img.imageUrl)?.imageUrl;
+    const resolvedFeatured = featuredFromImages || article.featuredImageUrl || firstImage || null;
+
     return {
       id: article.id,
       title: article.title,
@@ -275,7 +289,7 @@ export class ArticlesService {
       updatedAt: article.updatedAt,
       publishedAt: article.publishedAt,
       wordpressPostId: article.wordpressPostId,
-      featuredImageUrl: article.featuredImageUrl,
+      featuredImageUrl: resolvedFeatured,
       category: this.mapCategory(article.wordpressCategory),
       author: this.mapAuthor(article.wordpressAuthor),
       tags: this.resolveTags(article.tags)
