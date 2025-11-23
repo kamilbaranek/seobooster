@@ -32,6 +32,14 @@ interface ProjectDetailContentProps {
     projectId?: string;
 }
 
+interface ArticleListItem {
+    id: string;
+    title: string;
+    status: string;
+    featuredImageUrl?: string | null;
+    createdAt: string;
+}
+
 const formatLastArticleDate = (value?: string | null) => {
     if (!value) {
         return null;
@@ -61,6 +69,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
     const [activeScheduleDay, setActiveScheduleDay] = useState(0);
     const [articlePlans, setArticlePlans] = useState<ArticlePlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
+    const [recentArticles, setRecentArticles] = useState<ArticleListItem[]>([]);
 
     // Fetch article plans when projectId changes
     useEffect(() => {
@@ -79,6 +88,22 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
         };
 
         fetchArticlePlans();
+    }, [projectId]);
+
+    // Fetch latest articles for avatar strip
+    useEffect(() => {
+        if (!projectId) return;
+
+        const fetchArticles = async () => {
+            try {
+                const response = await apiFetch<{ items: ArticleListItem[] }>(`/webs/${projectId}/articles?limit=8`);
+                setRecentArticles(response.items || []);
+            } catch (error) {
+                console.error('Failed to fetch recent articles:', error);
+            }
+        };
+
+        fetchArticles();
     }, [projectId]);
 
     const summaryChartOptions: ApexOptions = {
@@ -406,55 +431,36 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                                     {/*end::Stat*/}
                                 </div>
                                 {/*end::Stats*/}
-                                {/*begin::Users*/}
+                                {/*begin::Articles strip*/}
                                 <div className="symbol-group symbol-hover mb-3">
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Alan Warden">
-                                        <span className="symbol-label bg-warning text-inverse-warning fw-bold">A</span>
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Michael Eberon">
-                                        <img alt="Pic" src="/assets/media/avatars/300-11.jpg" />
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Michelle Swanston">
-                                        <img alt="Pic" src="/assets/media/avatars/300-7.jpg" />
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Francis Mitcham">
-                                        <img alt="Pic" src="/assets/media/avatars/300-20.jpg" />
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Susan Redwood">
-                                        <span className="symbol-label bg-primary text-inverse-primary fw-bold">S</span>
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Melody Macy">
-                                        <img alt="Pic" src="/assets/media/avatars/300-2.jpg" />
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Perry Matthew">
-                                        <span className="symbol-label bg-info text-inverse-info fw-bold">P</span>
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::User*/}
-                                    <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Barry Walter">
-                                        <img alt="Pic" src="/assets/media/avatars/300-12.jpg" />
-                                    </div>
-                                    {/*end::User*/}
-                                    {/*begin::All users*/}
-                                    <a href="#" className="symbol symbol-35px symbol-circle" data-bs-toggle="modal" data-bs-target="#kt_modal_view_users">
-                                        <span className="symbol-label bg-dark text-inverse-dark fs-8 fw-bold" data-bs-toggle="tooltip" data-bs-trigger="hover" title="View more users">+42</span>
-                                    </a>
-                                    {/*end::All users*/}
+                                    {recentArticles.slice(0, 7).map((article, idx) => {
+                                        const fallbackColors = ['primary', 'success', 'info', 'warning', 'danger', 'dark', 'secondary'];
+                                        const color = fallbackColors[idx % fallbackColors.length];
+                                        const fallbackLetter = article.title?.trim()?.[0]?.toUpperCase() || '?';
+                                        return (
+                                            <div
+                                                key={article.id}
+                                                className="symbol symbol-35px symbol-circle"
+                                                data-bs-toggle="tooltip"
+                                                title={article.title}
+                                            >
+                                                {article.featuredImageUrl ? (
+                                                    <img alt={article.title} src={article.featuredImageUrl} />
+                                                ) : (
+                                                    <span className={`symbol-label bg-${color} text-inverse-${color} fw-bold`}>{fallbackLetter}</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    {recentArticles.length > 7 && (
+                                        <div className="symbol symbol-35px symbol-circle">
+                                            <span className="symbol-label bg-dark text-inverse-dark fs-8 fw-bold" data-bs-toggle="tooltip" data-bs-trigger="hover" title="More articles">
+                                                +{recentArticles.length - 7}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                                {/*end::Users*/}
+                                {/*end::Articles strip*/}
                             </div>
                             {/*end::Info*/}
                         </div>
