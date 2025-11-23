@@ -17,5 +17,6 @@ export interface AuthResponse {
       url: string;
       status: WebStatus;
     }>;
+    planName?: string;
   };
 }

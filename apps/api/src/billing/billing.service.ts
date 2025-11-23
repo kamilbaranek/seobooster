@@ -5,8 +5,12 @@ import { Prisma, SubscriptionStatus, WebStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobQueueService } from '../queues/queues.service';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
+import { PLANS, getPlanById, getPlanByPriceId } from '../config/subscription-plans.config';
 
-type StripeSubscriptionPayload = Stripe.Subscription & { current_period_end?: number };
+type StripeSubscriptionPayload = Stripe.Subscription & {
+  current_period_end?: number;
+  current_period_start?: number;
+};
 
 @Injectable()
 export class BillingService {
@@ -28,22 +32,19 @@ export class BillingService {
   }
 
   async createCheckoutSession(userId: string, payload: CreateCheckoutSessionDto) {
-    const priceId = this.configService.get<string>('STRIPE_PRICE_ID');
-    if (!priceId) {
-      throw new BadRequestException('Stripe price is not configured');
-    }
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured');
     }
 
+    const plan = getPlanById(payload.planId);
+    if (!plan) {
+      throw new BadRequestException('Invalid plan ID');
+    }
+    const priceId = plan.priceId;
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
-    }
-
-    const web = await this.prisma.web.findUnique({ where: { id: payload.webId } });
-    if (!web || web.userId !== userId) {
-      throw new NotFoundException('Website not found');
     }
 
     let customerId = user.stripeCustomerId;
@@ -73,12 +74,12 @@ export class BillingService {
       subscription_data: {
         metadata: {
           userId,
-          webId: payload.webId
+          planId: payload.planId
         }
       },
       metadata: {
         userId,
-        webId: payload.webId
+        planId: payload.planId
       }
     });
 
@@ -103,8 +104,9 @@ export class BillingService {
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const metadata = session.metadata ?? {};
     const userId = metadata.userId;
-    const webId = metadata.webId;
-    if (!userId || !webId) {
+    const planId = metadata.planId;
+
+    if (!userId) {
       return;
     }
 
@@ -127,29 +129,23 @@ export class BillingService {
         return;
       }
 
-      const subscriptionRecord = await tx.subscription.upsert({
+      await tx.subscription.upsert({
         where: { stripeSubscriptionId: subscriptionId },
         update: {
           status: SubscriptionStatus.ACTIVE,
-          currentPeriodEnd: session.expires_at ? new Date(session.expires_at * 1000) : null
+          planId: planId,
+          currentPeriodEnd: session.expires_at ? new Date(session.expires_at * 1000) : null,
+          currentPeriodStart: new Date() // Approximate
         },
         create: {
           userId,
           stripeSubscriptionId: subscriptionId,
-          status: SubscriptionStatus.ACTIVE
-        }
-      });
-
-      await tx.web.update({
-        where: { id: webId },
-        data: {
-          subscriptionId: subscriptionRecord.id,
-          status: WebStatus.ACTIVE
+          status: SubscriptionStatus.ACTIVE,
+          planId: planId,
+          currentPeriodStart: new Date()
         }
       });
     });
-
-    await this.jobQueueService.enqueueScanWebsite(webId);
   }
 
   private async handleSubscriptionUpdated(subscription: StripeSubscriptionPayload) {
@@ -175,35 +171,41 @@ export class BillingService {
 
     const status = this.mapSubscriptionStatus(subscription.status);
 
-    const subscriptionRecord = await this.prisma.subscription.upsert({
+    // Attempt to determine planId from items if not in metadata
+    let planId = metadata.planId;
+    if (!planId && subscription.items?.data?.length > 0) {
+      const priceId = subscription.items.data[0].price.id;
+      const plan = getPlanByPriceId(priceId);
+      if (plan) {
+        planId = plan.id;
+      }
+    }
+
+    await this.prisma.subscription.upsert({
       where: { stripeSubscriptionId: subscription.id },
       update: {
         status,
+        planId,
         currentPeriodEnd: subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000)
+          : null,
+        currentPeriodStart: subscription.current_period_start
+          ? new Date(subscription.current_period_start * 1000)
           : null
       },
       create: {
         userId,
         stripeSubscriptionId: subscription.id,
         status,
+        planId,
         currentPeriodEnd: subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000)
+          : null,
+        currentPeriodStart: subscription.current_period_start
+          ? new Date(subscription.current_period_start * 1000)
           : null
       }
     });
-
-    const webIdFromMetadata = metadata.webId;
-    if (webIdFromMetadata) {
-      await this.prisma.web.updateMany({
-        where: { id: webIdFromMetadata, userId },
-        data: {
-          subscriptionId: subscriptionRecord.id,
-          status: status === SubscriptionStatus.ACTIVE ? WebStatus.ACTIVE : WebStatus.PAUSED
-        }
-      });
-    }
-
   }
 
   private mapSubscriptionStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
@@ -223,5 +225,59 @@ export class BillingService {
       default:
         return SubscriptionStatus.INCOMPLETE;
     }
+  }
+
+  async checkLimit(userId: string, resource: 'webs' | 'articles'): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        subscriptions: {
+          where: { status: SubscriptionStatus.ACTIVE },
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!user || user.subscriptions.length === 0) {
+      // No active subscription -> allow 0 or default free limits?
+      // For now, return false to enforce subscription
+      return false;
+    }
+
+    const subscription = user.subscriptions[0];
+    const planId = subscription.planId;
+    if (!planId) return false;
+
+    const plan = getPlanById(planId);
+    if (!plan) return false;
+
+    if (resource === 'webs') {
+      const webCount = await this.prisma.web.count({
+        where: { userId, status: { not: WebStatus.ERROR } } // Count all non-error webs?
+      });
+      return webCount < plan.limits.webs;
+    }
+
+    if (resource === 'articles') {
+      if (!subscription.currentPeriodStart) return false;
+      const articleCount = await this.prisma.article.count({
+        where: {
+          web: { userId },
+          createdAt: { gte: subscription.currentPeriodStart }
+        }
+      });
+      return articleCount < plan.limits.articlesPerMonth;
+    }
+
+    return false;
+  }
+
+  async getPlans() {
+    return Object.values(PLANS).map(p => ({
+      id: p.id,
+      name: p.name,
+      limits: p.limits
+    }));
   }
 }

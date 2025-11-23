@@ -6,6 +6,7 @@ import type { WordpressPublishMode } from '@seobooster/wp-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobQueueService } from '../queues/queues.service';
 import { EncryptionService } from '../crypto/encryption.service';
+import { BillingService } from '../billing/billing.service';
 import { CreateWebDto } from './dto/create-web.dto';
 import { UpdateWebDto } from './dto/update-web.dto';
 import { UpsertCredentialsDto } from './dto/upsert-credentials.dto';
@@ -16,10 +17,16 @@ export class WebsService {
     private readonly prisma: PrismaService,
     private readonly jobQueueService: JobQueueService,
     private readonly encryptionService: EncryptionService,
+    private readonly billingService: BillingService,
     @Inject(ASSET_STORAGE) private readonly storage: AssetStorage
   ) { }
 
   async create(userId: string, dto: CreateWebDto) {
+    const canCreateWeb = await this.billingService.checkLimit(userId, 'webs');
+    if (!canCreateWeb) {
+      throw new BadRequestException('Dosáhli jste limitu počtu webů pro váš plán. Prosím upgradujte.');
+    }
+
     const existing = await this.prisma.web.findUnique({ where: { url: dto.url } });
     if (existing && existing.userId !== userId) {
       throw new BadRequestException('Website already assigned to another account');
@@ -630,6 +637,11 @@ export class WebsService {
   }
 
   async triggerArticleGeneration(userId: string, id: string) {
+    const canGenerateArticle = await this.billingService.checkLimit(userId, 'articles');
+    if (!canGenerateArticle) {
+      throw new BadRequestException('Dosáhli jste měsíčního limitu článků. Prosím upgradujte nebo počkejte na další období.');
+    }
+
     const web = await this.prisma.web.findFirst({
       where: { id, userId }
     });

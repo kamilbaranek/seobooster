@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Get } from '@nestjs/common';
 import type Stripe from 'stripe';
 import { BillingService } from './billing.service';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
@@ -8,7 +8,7 @@ import { AuthenticatedUserPayload } from '../auth/types/auth-response';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Post('checkout-session')
   @UseGuards(JwtAuthGuard)
@@ -22,5 +22,10 @@ export class BillingController {
   @Post('webhook')
   handleWebhook(@Body() payload: Stripe.Event) {
     return this.billingService.handleWebhook(payload);
+  }
+
+  @Get('plans')
+  getPlans() {
+    return this.billingService.getPlans();
   }
 }

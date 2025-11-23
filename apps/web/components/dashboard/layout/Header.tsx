@@ -6,6 +6,7 @@ interface UserProfile {
     email: string;
     firstName?: string;
     lastName?: string;
+    planName?: string;
 }
 
 interface MeResponse {
@@ -845,7 +846,10 @@ const Header = () => {
                                         {/*begin::Username*/}
                                         <div className="d-flex flex-column">
                                             <div className="fw-bold d-flex align-items-center fs-5">Ana Fox
-                                                <span className="badge badge-light-success fw-bold fs-8 px-2 py-1 ms-2">Pro</span></div>
+                                                {user?.planName && (
+                                                    <span className="badge badge-light-success fw-bold fs-8 px-2 py-1 ms-2">{user.planName}</span>
+                                                )}
+                                            </div>
                                             <a href="#" className="fw-semibold text-muted text-hover-primary fs-7">{user?.email || 'Loading...'}</a>
                                         </div>
                                         {/*end::Username*/}

@@ -2,7 +2,7 @@ import { IsString, IsUrl } from 'class-validator';
 
 export class CreateCheckoutSessionDto {
   @IsString()
-  webId!: string;
+  planId!: string;
 
   @IsUrl({ require_tld: false })
   successUrl!: string;

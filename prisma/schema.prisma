@@ -81,6 +81,8 @@ model Subscription {
   userId                String
   stripeSubscriptionId  String             @unique
   status                SubscriptionStatus
+  planId                String?
+  currentPeriodStart    DateTime?
   currentPeriodEnd      DateTime?
   imageGenerationLimit  Int                @default(3)
   createdAt             DateTime           @default(now())
