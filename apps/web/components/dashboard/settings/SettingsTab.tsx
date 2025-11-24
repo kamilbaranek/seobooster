@@ -15,7 +15,9 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     const [businessDescription, setBusinessDescription] = useState(project?.seoStrategies?.[0]?.businessDescription || '');
     const [businessAudience, setBusinessAudience] = useState(project?.seoStrategies?.[0]?.businessTargetAudience || '');
     const [publicationSchedule, setPublicationSchedule] = useState<string[]>(
-        project?.publicationSchedule || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        (project?.publicationSchedule && project.publicationSchedule.length > 0)
+            ? project.publicationSchedule
+            : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
     );
     const [timezone, setTimezone] = useState(project?.timezone || 'UTC');
     const [language, setLanguage] = useState(project?.language || 'en');
@@ -27,7 +29,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
             setProjectName(project.nickname || '');
             setBusinessDescription(project.seoStrategies?.[0]?.businessDescription || '');
             setBusinessAudience(project.seoStrategies?.[0]?.businessTargetAudience || '');
-            setPublicationSchedule(project.publicationSchedule || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+            setPublicationSchedule(
+                (project.publicationSchedule && project.publicationSchedule.length > 0)
+                    ? project.publicationSchedule
+                    : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            );
             setTimezone(project.timezone || 'UTC');
             setLanguage(project.language || 'en');
             setCountry(project.country || '');

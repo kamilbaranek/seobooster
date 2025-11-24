@@ -74,6 +74,50 @@ export class ArticlesService {
     };
   }
 
+  async listAllArticlePlans(userId: string) {
+    const plans = await this.prisma.articlePlan.findMany({
+      where: {
+        web: {
+          userId
+        }
+      },
+      include: {
+        web: {
+          select: {
+            id: true,
+            nickname: true,
+            url: true
+          }
+        },
+        article: {
+          select: {
+            title: true,
+            featuredImageUrl: true
+          }
+        },
+        supportingArticle: true,
+        cluster: true
+      },
+      orderBy: { plannedPublishAt: 'asc' }
+    });
+
+    return plans.map((plan) => ({
+      id: plan.id,
+      webId: plan.webId,
+      web: plan.web,
+      articleId: plan.articleId,
+      status: plan.status,
+      plannedPublishAt: plan.plannedPublishAt,
+      articleTitle: plan.article?.title ?? plan.supportingArticle.title,
+      articleKeywords: plan.supportingArticle.keywords,
+      articleIntent: plan.supportingArticle.intent,
+      articleFunnelStage: plan.supportingArticle.funnelStage,
+      clusterName: plan.cluster.pillarPage,
+      clusterIntent: plan.cluster.clusterIntent,
+      featuredImageUrl: plan.article?.featuredImageUrl
+    }));
+  }
+
   async getArticle(userId: string, webId: string, articleId: string) {
     await this.ensureWebOwnedByUser(userId, webId);
     const article = (await this.prisma.article.findFirst({

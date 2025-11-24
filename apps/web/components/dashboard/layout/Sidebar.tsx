@@ -44,6 +44,19 @@ const Sidebar = () => {
 					<div data-kt-menu-trigger="{default: 'click', lg: 'hover'}" data-kt-menu-placement="right-start" className="menu-item py-2">
 						{/*begin:Menu link*/}
 						<span className="menu-link menu-center">
+							<a className="menu-link" href="/dashboard/calendar">
+								<span className="menu-icon me-0">
+									<i className="ki-outline ki-calendar-8 fs-1"></i>
+								</span>
+							</a>
+						</span>
+						{/*end:Menu link*/}
+					</div>
+					{/*end:Menu item*/}
+					{/*begin:Menu item*/}
+					<div data-kt-menu-trigger="{default: 'click', lg: 'hover'}" data-kt-menu-placement="right-start" className="menu-item py-2">
+						{/*begin:Menu link*/}
+						<span className="menu-link menu-center">
 							<span className="menu-icon me-0">
 								<i className="ki-outline ki-notification-status fs-1"></i>
 							</span>

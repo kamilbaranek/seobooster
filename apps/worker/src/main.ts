@@ -597,9 +597,58 @@ const getInitialPlanStartDate = () => {
   return base;
 };
 
-const getPlannedDateForIndex = (startDate: Date, index: number) => {
+const getPlannedDateForIndex = (startDate: Date, index: number, schedule: string[] = []) => {
   const date = new Date(startDate);
-  date.setUTCDate(date.getUTCDate() + index);
+
+  // Default to Mon-Fri if schedule is empty
+  const activeDays = schedule.length > 0
+    ? schedule.map(d => d.toLowerCase())
+    : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+  const dayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6
+  };
+
+  const allowedDays = activeDays.map(d => dayMap[d]).filter(d => d !== undefined);
+
+  // If no valid days, fallback to all days to avoid infinite loop
+  if (allowedDays.length === 0) {
+    allowedDays.push(0, 1, 2, 3, 4, 5, 6);
+  }
+
+  let daysAdded = 0;
+  // Start checking from the next day to ensure we don't schedule everything on start date if it matches
+  // But logic requires index 0 to be first available slot.
+  // Let's advance date day by day until we find 'index' number of valid slots.
+
+  let currentCheckDate = new Date(startDate);
+  // If index is 0, we want the first valid day >= startDate.
+  // If index is 1, we want the second valid day, etc.
+
+  let validSlotsFound = 0;
+
+  // Safety break to prevent infinite loops
+  let safetyCounter = 0;
+
+  while (validSlotsFound <= index && safetyCounter < 10000) {
+    const dayOfWeek = currentCheckDate.getUTCDay();
+    if (allowedDays.includes(dayOfWeek)) {
+      if (validSlotsFound === index) {
+        date.setTime(currentCheckDate.getTime());
+        break;
+      }
+      validSlotsFound++;
+    }
+    currentCheckDate.setUTCDate(currentCheckDate.getUTCDate() + 1);
+    safetyCounter++;
+  }
+
   const hourWindow = Math.max(1, PLAN_WINDOW_END_HOUR - PLAN_WINDOW_START_HOUR);
   const randomHourOffset = Math.floor(Math.random() * hourWindow);
   const baseMinutes = Math.floor(Math.random() * 60);
@@ -608,6 +657,45 @@ const getPlannedDateForIndex = (startDate: Date, index: number) => {
   date.setUTCHours(PLAN_WINDOW_START_HOUR + randomHourOffset, baseMinutes, 0, 0);
   date.setUTCMinutes(date.getUTCMinutes() + jitterDirection * jitterMinutes);
   return date;
+};
+
+const getPublishedArticlesTable = async (webId: string): Promise<string> => {
+  const articles = await prisma.article.findMany({
+    where: {
+      webId,
+      status: 'PUBLISHED',
+      url: { not: null }
+    },
+    select: {
+      title: true,
+      url: true,
+      plan: {
+        select: {
+          supportingArticle: {
+            select: {
+              keywords: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: 50
+  });
+
+  if (articles.length === 0) {
+    return 'No published articles found.';
+  }
+
+  const header = '| Title | Url | Keywords |\n| --- | --- | --- |';
+  const rows = articles.map((article) => {
+    const keywords = article.plan?.supportingArticle?.keywords
+      ? jsonArrayToStringArray(article.plan.supportingArticle.keywords as Prisma.JsonValue).join(', ')
+      : '';
+    return `| ${article.title} | ${article.url} | ${keywords} |`;
+  });
+
+  return [header, ...rows].join('\n');
 };
 
 const jsonArrayToStringArray = (value: Prisma.JsonValue | null | undefined) => {
@@ -716,7 +804,8 @@ const buildArticleImageJobOptions = (articleId: string, force?: boolean) => ({
 const persistSeoStrategyArtifacts = async (
   webId: string,
   strategy: SeoStrategy,
-  modelName?: string | null
+  modelName?: string | null,
+  publicationSchedule: string[] = []
 ) => {
   const topicClusters = strategy.topic_clusters ?? [];
   const planStartDate = getInitialPlanStartDate();
@@ -802,7 +891,7 @@ const persistSeoStrategyArtifacts = async (
   let planIndex = 0;
   for (const record of clusterRecords) {
     for (const supportingArticleId of record.supportingArticles) {
-      const plannedPublishAt = getPlannedDateForIndex(planStartDate, planIndex);
+      const plannedPublishAt = getPlannedDateForIndex(planStartDate, planIndex, publicationSchedule);
       planIndex += 1;
       await prisma.articlePlan.create({
         data: {
@@ -1036,7 +1125,8 @@ const bootstrap = async () => {
       where: { task: 'strategy' },
       orderBy: { orderIndex: 'asc' }
     });
-    const variables = { businessProfile };
+    const publishedArticlesTable = await getPublishedArticlesTable(job.data.webId);
+    const variables = { businessProfile, publishedArticlesTable };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
       'strategy',
@@ -1060,8 +1150,13 @@ const bootstrap = async () => {
       data: { seoStrategy: strategy as unknown as Prisma.InputJsonValue }
     });
 
+    const web = await prisma.web.findUnique({
+      where: { id: job.data.webId },
+      select: { publicationSchedule: true }
+    });
+
     const modelName = aiModelMap.strategy;
-    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName);
+    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName, web?.publicationSchedule ?? []);
 
   });
 
@@ -1108,8 +1203,10 @@ const bootstrap = async () => {
     const businessProfile = plan.web.analysis?.businessProfile as BusinessProfile | null;
     const pillarKeywords = jsonArrayToStringArray(plan.cluster.pillarKeywords);
     const supportingKeywords = jsonArrayToStringArray(plan.supportingArticle.keywords);
+    const publishedArticlesTable = await getPublishedArticlesTable(plan.webId);
 
     const promptVariables = {
+      publishedArticlesTable,
       topicCluster: {
         pillarPage: plan.cluster.pillarPage,
         pillarKeywords,
@@ -1691,6 +1788,9 @@ const bootstrap = async () => {
 
       if (targetStatus === 'publish') {
         updateData.publishedAt = new Date();
+        if (response.link) {
+          updateData.url = response.link;
+        }
       }
 
       await prisma.article.update({

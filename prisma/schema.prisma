@@ -197,6 +197,7 @@ model Article {
   webId               String
   title               String
   status              ArticleStatus         @default(DRAFT)
+  url                 String?
   markdown            String
   html                String
   wordpressPostId     String?
