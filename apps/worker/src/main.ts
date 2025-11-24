@@ -1294,9 +1294,19 @@ const bootstrap = async () => {
       where: { id: plan.id },
       data: {
         status: ArticlePlanStatus.GENERATED,
-        articleId: article.id
+        articleId: article.id,
+        // Increment regeneration count only after successful article creation
+        // This ensures failed attempts don't count toward the limit
+        regenerationCount: plan.article ? plan.regenerationCount + 1 : plan.regenerationCount
       }
     });
+
+    if (plan.article) {
+      logger.info(
+        { jobId: job.id, planId: plan.id, regenerationCount: plan.regenerationCount + 1 },
+        'Incremented regeneration count after successful regeneration'
+      );
+    }
 
     let publishOptions: { targetStatus: 'draft' | 'publish'; trigger: 'auto' | 'manual' | 'email' } | undefined;
 

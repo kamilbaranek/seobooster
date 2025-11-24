@@ -841,18 +841,13 @@ export class WebsService {
       throw new BadRequestException(`You have reached the regeneration limit (${planConfig.limits.regenerations}) for this article.`);
     }
 
-    // Increment regeneration counter
-    await this.prisma.articlePlan.update({
-      where: { id: planId },
-      data: { regenerationCount: plan.regenerationCount + 1 }
-    });
-
     // Enqueue GenerateArticle job
+    // Note: regenerationCount will be incremented by the worker after successful generation
     await this.jobQueueService.enqueueGenerateArticle(webId, planId);
 
     return {
       success: true,
-      remainingRegenerations: planConfig.limits.regenerations - (plan.regenerationCount + 1)
+      remainingRegenerations: planConfig.limits.regenerations - plan.regenerationCount
     };
   }
 }
