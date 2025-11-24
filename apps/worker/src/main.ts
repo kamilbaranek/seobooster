@@ -462,6 +462,7 @@ const runPromptSteps = async <TOutput = unknown>(
     const variables = {
       ...baseVariables,
       previousStepOutput,
+      stepIndex: i,
       ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v]))
     };
 

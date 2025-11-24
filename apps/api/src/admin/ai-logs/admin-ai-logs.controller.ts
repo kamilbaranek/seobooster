@@ -9,7 +9,7 @@ import { UserRole } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPERADMIN)
 export class AdminAiLogsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   @Get()
   async list(
@@ -34,7 +34,8 @@ export class AdminAiLogsController {
         task: true,
         provider: true,
         model: true,
-        status: true
+        status: true,
+        variables: true
       }
     });
 

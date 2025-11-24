@@ -35,6 +35,7 @@ interface AiLogListItem {
     provider: string;
     model: string;
     status: string;
+    variables?: Record<string, unknown> | null;
 }
 
 interface AiLogDetail extends AiLogListItem {
@@ -83,9 +84,35 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
             name: '{{rawScanOutput}}',
             description:
                 'Raw text / message content z kroku Scan (použij, když je JSON response vypnutý nebo model vrací text).'
+        },
+        {
+            name: '{{previousStepOutput}}',
+            description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
+        },
+        {
+            name: '{{step0Output}}',
+            description: 'Výstup z prvního kroku (krok 0). Použitelné v krocích 1 a výše.'
+        },
+        {
+            name: '{{step1Output}}',
+            description: 'Výstup z druhého kroku (krok 1). Použitelné v krocích 2 a výše.'
         }
     ],
-    strategy: [{ name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' }],
+    strategy: [
+        { name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' },
+        {
+            name: '{{previousStepOutput}}',
+            description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
+        },
+        {
+            name: '{{step0Output}}',
+            description: 'Výstup z prvního kroku (krok 0). Použitelné v krocích 1 a výše.'
+        },
+        {
+            name: '{{step1Output}}',
+            description: 'Výstup z druhého kroku (krok 1). Použitelné v krocích 2 a výše.'
+        }
+    ],
     article: [
         {
             name: '{{business}}',
@@ -935,81 +962,93 @@ const AdminPromptsPage = () => {
                                                     {!logsLoading && logEntries.length === 0 && <p className="text-muted">Žádné záznamy.</p>}
 
                                                     <div className="accordion" id="logsAccordion">
-                                                        {logEntries.map((log) => (
-                                                            <div className="m-0" key={log.id}>
-                                                                <div
-                                                                    className={`d-flex align-items-center collapsible py-3 toggle mb-0 ${openLogId === log.id ? '' : 'collapsed'}`}
-                                                                    onClick={() => toggleLog(log.id)}
-                                                                    style={{ cursor: 'pointer' }}
-                                                                >
-                                                                    <div className="btn btn-sm btn-icon mw-20px btn-active-color-primary me-5">
-                                                                        <i className={`ki-outline ki-minus-square toggle-on text-primary fs-1 ${openLogId === log.id ? '' : 'd-none'}`}></i>
-                                                                        <i className={`ki-outline ki-plus-square toggle-off fs-1 ${openLogId === log.id ? 'd-none' : ''}`}></i>
-                                                                    </div>
-                                                                    <div className="d-flex flex-column">
-                                                                        <h4 className="text-gray-700 fw-bold cursor-pointer mb-0">
-                                                                            {formatDateTime(log.createdAt)}
-                                                                        </h4>
-                                                                        <span className={`badge badge-light-${log.status === 'SUCCESS' ? 'success' : 'danger'} mt-1`}>
-                                                                            {log.status}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className={`collapse ${openLogId === log.id ? 'show' : ''} fs-6 ms-1`}>
-                                                                    <div className="mb-4 text-gray-600 fw-semibold fs-6 ps-10">
-                                                                        {logDetailLoading && openLogId === log.id && !logDetail ? (
-                                                                            <p>Načítám detail...</p>
-                                                                        ) : logDetail && openLogId === log.id ? (
-                                                                            <div className="d-flex flex-column gap-3">
-                                                                                <div>
-                                                                                    <strong>Provider:</strong> {logDetail.provider} / {logDetail.model}
-                                                                                </div>
-                                                                                {logDetail.errorMessage && (
-                                                                                    <div className="alert alert-danger">{logDetail.errorMessage}</div>
+                                                        {logEntries.map((log) => {
+                                                            const stepIndex = log.variables?.stepIndex as number | undefined;
+                                                            return (
+                                                                <div className="m-0" key={log.id}>
+                                                                    <div
+                                                                        className={`d-flex align-items-center collapsible py-3 toggle mb-0 ${openLogId === log.id ? '' : 'collapsed'}`}
+                                                                        onClick={() => toggleLog(log.id)}
+                                                                        style={{ cursor: 'pointer' }}
+                                                                    >
+                                                                        <div className="btn btn-sm btn-icon mw-20px btn-active-color-primary me-5">
+                                                                            <i className={`ki-outline ki-minus-square toggle-on text-primary fs-1 ${openLogId === log.id ? '' : 'd-none'}`}></i>
+                                                                            <i className={`ki-outline ki-plus-square toggle-off fs-1 ${openLogId === log.id ? 'd-none' : ''}`}></i>
+                                                                        </div>
+                                                                        <div className="d-flex flex-column">
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                <h4 className="text-gray-700 fw-bold cursor-pointer mb-0">
+                                                                                    {formatDateTime(log.createdAt)}
+                                                                                </h4>
+                                                                                {typeof stepIndex === 'number' && (
+                                                                                    <span className="badge badge-light-info fw-bold fs-8 px-2 py-1">
+                                                                                        Step {stepIndex + 1}
+                                                                                    </span>
                                                                                 )}
-                                                                                <div>
-                                                                                    <strong>System Prompt:</strong>
-                                                                                    <pre className="bg-light p-2 rounded mt-1 fs-7">{logDetail.systemPrompt}</pre>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <strong>User Prompt:</strong>
-                                                                                    <pre className="bg-light p-2 rounded mt-1 fs-7">{logDetail.userPrompt}</pre>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <div className="d-flex justify-content-between align-items-center mb-1">
-                                                                                        <strong>Response:</strong>
-                                                                                        <div className="d-flex gap-2">
-                                                                                            <button
-                                                                                                className={`btn btn-sm btn-icon btn-active-light-primary ${responseViewMode === 'raw' ? 'active bg-light-primary' : ''} w-auto px-3 py-1`}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setResponseViewMode('raw');
-                                                                                                }}
-                                                                                            >
-                                                                                                RAW
-                                                                                            </button>
-                                                                                            <button
-                                                                                                className={`btn btn-sm btn-icon btn-active-light-primary ${responseViewMode === 'json' ? 'active bg-light-primary' : ''} w-auto px-3 py-1`}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setResponseViewMode('json');
-                                                                                                }}
-                                                                                            >
-                                                                                                JSON
-                                                                                            </button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <pre className="bg-light p-2 rounded mt-1 fs-7 overflow-auto" style={{ maxHeight: '400px' }}>
-                                                                                        {renderResponse(logDetail.responseRaw, responseViewMode)}
-                                                                                    </pre>
-                                                                                </div>
                                                                             </div>
-                                                                        ) : null}
+                                                                            <span className={`badge badge-light-${log.status === 'SUCCESS' ? 'success' : 'danger'} mt-1`}>
+                                                                                {log.status}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
+                                                                    <div className={`collapse ${openLogId === log.id ? 'show' : ''} fs-6 ms-1`}>
+                                                                        <div className="mb-4 text-gray-600 fw-semibold fs-6 ps-10">
+                                                                            {logDetailLoading && openLogId === log.id && !logDetail ? (
+                                                                                <p>Načítám detail...</p>
+                                                                            ) : logDetail && openLogId === log.id ? (
+                                                                                <div className="d-flex flex-column gap-3">
+                                                                                    <div>
+                                                                                        <strong>Provider:</strong> {logDetail.provider} / {logDetail.model}
+                                                                                    </div>
+                                                                                    {logDetail.errorMessage && (
+                                                                                        <div className="alert alert-danger">{logDetail.errorMessage}</div>
+                                                                                    )}
+                                                                                    <div>
+                                                                                        <strong>System Prompt:</strong>
+                                                                                        <pre className="bg-light p-2 rounded mt-1 fs-7">{logDetail.systemPrompt}</pre>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <strong>User Prompt:</strong>
+                                                                                        <pre className="bg-light p-2 rounded mt-1 fs-7">{logDetail.userPrompt}</pre>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                                                                            <strong>Response:</strong>
+                                                                                            <div className="d-flex gap-2">
+                                                                                                <button
+                                                                                                    className={`btn btn-sm btn-icon btn-active-light-primary ${responseViewMode === 'raw' ? 'active bg-light-primary' : ''} w-auto px-3 py-1`}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        e.preventDefault();
+                                                                                                        setResponseViewMode('raw');
+                                                                                                    }}
+                                                                                                >
+                                                                                                    RAW
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    className={`btn btn-sm btn-icon btn-active-light-primary ${responseViewMode === 'json' ? 'active bg-light-primary' : ''} w-auto px-3 py-1`}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        e.preventDefault();
+                                                                                                        setResponseViewMode('json');
+                                                                                                    }}
+                                                                                                >
+                                                                                                    JSON
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <pre className="bg-light p-2 rounded mt-1 fs-7 overflow-auto" style={{ maxHeight: '400px' }}>
+                                                                                            {renderResponse(logDetail.responseRaw, responseViewMode)}
+                                                                                        </pre>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="separator separator-dashed"></div>
                                                                 </div>
-                                                                <div className="separator separator-dashed"></div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )}
