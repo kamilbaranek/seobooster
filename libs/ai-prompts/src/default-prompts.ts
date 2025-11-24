@@ -29,7 +29,7 @@ export const DEFAULT_PROMPTS: PromptTemplates = {
     systemPrompt:
       'You write high quality SEO articles. Always return a single JSON object with ArticleDraft fields (title, outline, bodyMarkdown, keywords, callToAction). Do not use markdown fences.',
     userPrompt:
-      'Business context:\n{{business}}\n\nTopic cluster (pillar, intent, funnel stage, pillar keywords):\n{{topicCluster}}\n\nSupporting article brief (title, keywords, intent, funnel stage, meta description):\n{{supportingArticle}}\n\nWebsite info: {{web}}\nPrimary audience: {{webAudience}}\nWebsite owner: {{webOwner}}\n\nUsing this structured context, write an ArticleDraft JSON. Keep tone professional, reflect the declared funnel stage, weave in the supporting article keywords naturally, and end with a relevant call to action.'
+      'Business context:\n{{business}}\n\nTopic cluster (pillar, intent, funnel stage, pillar keywords):\n{{topicCluster}}\n\nSupporting article brief (title, keywords, intent, funnel stage, meta description):\n{{supportingArticle}}\n\nWebsite info: {{web}}\nPrimary audience: {{webAudience}}\nWebsite owner: {{webOwner}}\n\nUsing this structured context, write an ArticleDraft as a JSON object. Keep tone professional, reflect the declared funnel stage, weave in the supporting article keywords naturally, and end with a relevant call to action.'
   },
   article_image: {
     systemPrompt:
