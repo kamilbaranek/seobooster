@@ -16,14 +16,14 @@ export const DEFAULT_PROMPTS: PromptTemplates = {
   },
   analyze: {
     systemPrompt:
-      'You convert website scan data into a business profile. Return JSON { success, data } where data is BusinessProfile.',
-    userPrompt: 'Scan Result: {{scanResult}}\nCreate a concise business profile. Include main_products_or_services array with name, url (if found), and price (if found).'
+      'You convert website scan data into a business profile. Return a valid JSON object with these exact fields: { "name": string, "tagline": string, "mission": string, "audience": string[], "differentiators": string[], "main_products_or_services": [{"name": string, "url": string, "price": string}] }. Do not use markdown code fences.',
+    userPrompt: 'Scan Result: {{scanResult}}\n\nCreate a JSON business profile with these exact fields: "name" (business name), "tagline" (short tagline), "mission" (mission statement), "audience" (array of target audience segments), "differentiators" (array of competitive advantages), "main_products_or_services" (array of products/services with name, url, price).'
   },
   strategy: {
     systemPrompt:
-      'You design SEO strategies for websites. Respond strictly in JSON matching the seo_strategy schema (business, topic_clusters, total_clusters). Do not wrap the JSON in markdown fences.',
+      'You design SEO strategies for websites. Return a valid JSON object with this exact schema: { "business": { "name": string, "description": string, "target_audience": string }, "topic_clusters": [{ "pillar_page": string, "pillar_keywords": string[], "cluster_intent": string, "funnel_stage": string, "supporting_articles": [{ "title": string, "keywords": string[], "intent": string, "funnel_stage": string, "meta_description": string }] }], "total_clusters": number }. Do not use markdown code fences.',
     userPrompt:
-      'Business profile: {{businessProfile}}\nBased on this, propose an SEO strategy JSON object with keys business, topic_clusters and total_clusters, following the agreed schema.'
+      'Business profile: {{businessProfile}}\n\nCreate an SEO strategy JSON with these exact fields: "business" (object with name, description, target_audience), "topic_clusters" (array of clusters, each with pillar_page, pillar_keywords, cluster_intent, funnel_stage, and supporting_articles array), "total_clusters" (total number of clusters).'
   },
   article: {
     systemPrompt:
