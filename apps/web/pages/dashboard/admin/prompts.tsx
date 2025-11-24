@@ -87,15 +87,27 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         },
         {
             name: '{{previousStepOutput}}',
-            description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
+            description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
+        },
+        {
+            name: '{{previousStepContent}}',
+            description: 'Pouze textový obsah z předchozího kroku (pole content) - nejčastěji používané.'
         },
         {
             name: '{{step0Output}}',
-            description: 'Výstup z prvního kroku (krok 0). Použitelné v krocích 1 a výše.'
+            description: 'Kompletní výstup z prvního kroku (krok 0).'
+        },
+        {
+            name: '{{step0Content}}',
+            description: 'Pouze textový obsah z prvního kroku.'
         },
         {
             name: '{{step1Output}}',
-            description: 'Výstup z druhého kroku (krok 1). Použitelné v krocích 2 a výše.'
+            description: 'Kompletní výstup z druhého kroku (krok 1).'
+        },
+        {
+            name: '{{step1Content}}',
+            description: 'Pouze textový obsah z druhého kroku.'
         }
     ],
     strategy: [
@@ -106,15 +118,27 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         },
         {
             name: '{{previousStepOutput}}',
-            description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
+            description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
+        },
+        {
+            name: '{{previousStepContent}}',
+            description: 'Pouze textový obsah z předchozího kroku (pole content) - nejčastěji používané.'
         },
         {
             name: '{{step0Output}}',
-            description: 'Výstup z prvního kroku (krok 0). Použitelné v krocích 1 a výše.'
+            description: 'Kompletní výstup z prvního kroku (krok 0).'
+        },
+        {
+            name: '{{step0Content}}',
+            description: 'Pouze textový obsah z prvního kroku.'
         },
         {
             name: '{{step1Output}}',
-            description: 'Výstup z druhého kroku (krok 1). Použitelné v krocích 2 a výše.'
+            description: 'Kompletní výstup z druhého kroku (krok 1).'
+        },
+        {
+            name: '{{step1Content}}',
+            description: 'Pouze textový obsah z druhého kroku.'
         }
     ],
     article: [
@@ -180,6 +204,30 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         {
             name: '{{webOwner.email}}',
             description: 'E‑mail vlastníka webu (uživatele).'
+        },
+        {
+            name: '{{previousStepOutput}}',
+            description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
+        },
+        {
+            name: '{{previousStepContent}}',
+            description: 'Pouze textový obsah z předchozího kroku (pole content) - nejčastěji používané.'
+        },
+        {
+            name: '{{step0Output}}',
+            description: 'Kompletní výstup z prvního kroku (krok 0).'
+        },
+        {
+            name: '{{step0Content}}',
+            description: 'Pouze textový obsah z prvního kroku.'
+        },
+        {
+            name: '{{step1Output}}',
+            description: 'Kompletní výstup z druhého kroku (krok 1).'
+        },
+        {
+            name: '{{step1Content}}',
+            description: 'Pouze textový obsah z druhého kroku.'
         }
     ],
     article_image: [
@@ -210,15 +258,27 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         },
         {
             name: '{{previousStepOutput}}',
-            description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
+            description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
+        },
+        {
+            name: '{{previousStepContent}}',
+            description: 'Pouze textový obsah z předchozího kroku (pole content) - nejčastěji používané.'
         },
         {
             name: '{{step0Output}}',
-            description: 'Výstup z prvního kroku (krok 0). Použitelné v krocích 1 a výše.'
+            description: 'Kompletní výstup z prvního kroku (krok 0).'
+        },
+        {
+            name: '{{step0Content}}',
+            description: 'Pouze textový obsah z prvního kroku.'
         },
         {
             name: '{{step1Output}}',
-            description: 'Výstup z druhého kroku (krok 1). Použitelné v krocích 2 a výše.'
+            description: 'Kompletní výstup z druhého kroku (krok 1).'
+        },
+        {
+            name: '{{step1Content}}',
+            description: 'Pouze textový obsah z druhého kroku.'
         }
     ]
 };

@@ -459,11 +459,27 @@ const runPromptSteps = async <TOutput = unknown>(
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+
+    // Extract content from previous step if available
+    const previousStepContent = previousStepOutput && typeof previousStepOutput === 'object' && 'content' in previousStepOutput
+      ? previousStepOutput.content
+      : null;
+
+    // Extract content from all previous steps
+    const stepContents = Object.fromEntries(
+      Object.entries(stepOutputs).map(([k, v]) => {
+        const content = v && typeof v === 'object' && 'content' in v ? v.content : null;
+        return [`step${k}Content`, content];
+      })
+    );
+
     const variables = {
       ...baseVariables,
       previousStepOutput,
+      previousStepContent,
       stepIndex: i,
-      ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v]))
+      ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v])),
+      ...stepContents
     };
 
     const rendered = renderPromptsForTask(task, step, variables);
