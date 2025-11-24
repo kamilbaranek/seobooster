@@ -188,6 +188,8 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
             description: 'Shrnutí firmy (name, description, targetAudience).'
         },
         { name: '{{business.name}}', description: 'Název firmy / projektu.' },
+        { name: '{{business.description}}', description: 'Popis/mise firmy.' },
+        { name: '{{business.targetAudience}}', description: 'Cílové publikum (pole stringů).' },
         { name: '{{web}}', description: 'Informace o webu (url, nickname).' },
         { name: '{{web.url}}', description: 'URL webu.' },
         {
@@ -198,8 +200,14 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         { name: '{{article.title}}', description: 'Název článku / nadpis (H1).' },
         { name: '{{article.summary}}', description: 'Zkrácený obsah článku (první část markdown).' },
         { name: '{{article.keywords}}', description: 'Pole klíčových slov článku (array stringů).' },
-        { name: '{{supportingArticle}}', description: 'Podpůrný článek z SEO strategie (pokud existuje).' },
-        { name: '{{seoCluster}}', description: 'SEO cluster, ke kterému článek patří (pokud existuje).' },
+        {
+            name: '{{supportingArticle}}',
+            description: 'Supporting článek, ke kterému se obrázek vztahuje (pokud existuje).'
+        },
+        {
+            name: '{{seoCluster}}',
+            description: 'SEO topic cluster, do kterého článek patří (pokud existuje).'
+        },
         {
             name: '{{previousStepOutput}}',
             description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
