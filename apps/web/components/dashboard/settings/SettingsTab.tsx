@@ -21,6 +21,19 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     const [language, setLanguage] = useState(project?.language || 'en');
     const [country, setCountry] = useState(project?.country || '');
 
+    // Sync state with project prop changes
+    useEffect(() => {
+        if (project) {
+            setProjectName(project.nickname || '');
+            setBusinessDescription(project.seoStrategies?.[0]?.businessDescription || '');
+            setBusinessAudience(project.seoStrategies?.[0]?.businessTargetAudience || '');
+            setPublicationSchedule(project.publicationSchedule || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+            setTimezone(project.timezone || 'UTC');
+            setLanguage(project.language || 'en');
+            setCountry(project.country || '');
+        }
+    }, [project]);
+
     // WordPress credentials state
     const [wpUsername, setWpUsername] = useState('');
     const [wpPassword, setWpPassword] = useState('');

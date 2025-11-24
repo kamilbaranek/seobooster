@@ -1233,7 +1233,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ projectId }
                 ) : activeTab === 'activity' ? (
                     <ActivityTab />
                 ) : activeTab === 'settings' ? (
-                    <SettingsTab project={project} onUpdate={refetch} />
+                    <SettingsTab project={localProject || project} onUpdate={refetch} />
                 ) : (
                     <div className="card card-flush h-lg-100">
                         <div className="card-body p-9">
