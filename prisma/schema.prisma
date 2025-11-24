@@ -335,6 +335,7 @@ model ArticlePlan {
   articleId           String?              @unique
   plannedPublishAt    DateTime
   status              ArticlePlanStatus    @default(PLANNED)
+  regenerationCount   Int                  @default(0)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 

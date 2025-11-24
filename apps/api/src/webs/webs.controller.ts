@@ -58,6 +58,15 @@ export class WebsController {
     return this.websService.updateArticlePlanDate(user.userId, id, planId, payload);
   }
 
+  @Post(':id/article-plans/:planId/regenerate')
+  regenerateArticle(
+    @CurrentUser() user: AuthenticatedUserPayload,
+    @Param('id') id: string,
+    @Param('planId') planId: string
+  ) {
+    return this.websService.regenerateArticle(user.userId, id, planId);
+  }
+
   @Post()
   create(@CurrentUser() user: AuthenticatedUserPayload, @Body() payload: CreateWebDto) {
     return this.websService.create(user.userId, payload);

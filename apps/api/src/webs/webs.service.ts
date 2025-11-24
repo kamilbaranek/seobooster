@@ -10,6 +10,7 @@ import { BillingService } from '../billing/billing.service';
 import { CreateWebDto } from './dto/create-web.dto';
 import { UpdateWebDto } from './dto/update-web.dto';
 import { UpsertCredentialsDto } from './dto/upsert-credentials.dto';
+import { getPlanById } from '../config/subscription-plans.config';
 
 @Injectable()
 export class WebsService {
@@ -787,6 +788,71 @@ export class WebsService {
       seoStrategy: web.analysis?.seoStrategy ?? null,
       latestArticle: web.articles[0] ?? null,
       rawScanOutput
+    };
+  }
+
+  async regenerateArticle(userId: string, webId: string, planId: string) {
+    // Verify ownership
+    const web = await this.prisma.web.findFirst({
+      where: { id: webId, userId }
+    });
+
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    // Get user with subscriptions
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        subscriptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Get article plan
+    const plan = await this.prisma.articlePlan.findFirst({
+      where: { id: planId, webId }
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Article plan not found');
+    }
+
+    // Check subscription tier (must be TIER2+)
+    const subscription = user.subscriptions[0];
+    if (!subscription || !subscription.planId) {
+      throw new BadRequestException('No active subscription found');
+    }
+
+    const planConfig = getPlanById(subscription.planId);
+    if (!planConfig || planConfig.limits.regenerations === 0) {
+      throw new BadRequestException('Article regeneration is not available on your current plan. Please upgrade to Pro or Agency.');
+    }
+
+    // Check regeneration limit
+    if (plan.regenerationCount >= planConfig.limits.regenerations) {
+      throw new BadRequestException(`You have reached the regeneration limit (${planConfig.limits.regenerations}) for this article.`);
+    }
+
+    // Increment regeneration counter
+    await this.prisma.articlePlan.update({
+      where: { id: planId },
+      data: { regenerationCount: plan.regenerationCount + 1 }
+    });
+
+    // Enqueue GenerateArticle job
+    await this.jobQueueService.enqueueGenerateArticle(webId, planId);
+
+    return {
+      success: true,
+      remainingRegenerations: planConfig.limits.regenerations - (plan.regenerationCount + 1)
     };
   }
 }

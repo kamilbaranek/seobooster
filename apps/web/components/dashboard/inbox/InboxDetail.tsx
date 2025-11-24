@@ -153,6 +153,83 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
             });
         }
     };
+
+    const handleRewrite = async (e: React.MouseEvent) => {
+        e.preventDefault();
+
+        if (!article.webId || !article.id) {
+            Swal.fire({
+                text: "Missing article information to regenerate.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+            return;
+        }
+
+        try {
+            Swal.fire({
+                title: "Regenerate Article",
+                html: "Are you sure you want to regenerate this article? This will create a new version.",
+                icon: "question",
+                showCancelButton: true,
+                buttonsStyling: false,
+                confirmButtonText: "Yes, regenerate it!",
+                cancelButtonText: "No, return",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                    cancelButton: "btn btn-active-light"
+                }
+            }).then(async function (result) {
+                if (result.value) {
+                    try {
+                        const response = await apiFetch<{ success: boolean; remainingRegenerations: number }>(`/webs/${article.webId}/article-plans/${article.id}/regenerate`, {
+                            method: 'POST'
+                        });
+
+                        if (response.success) {
+                            Swal.fire({
+                                text: `Article regeneration started! You have ${response.remainingRegenerations} regenerations remaining.`,
+                                icon: "success",
+                                buttonsStyling: false,
+                                confirmButtonText: "Ok, got it!",
+                                customClass: {
+                                    confirmButton: "btn btn-primary",
+                                }
+                            });
+                        }
+                    } catch (error: any) {
+                        console.error("Failed to regenerate article:", error);
+                        Swal.fire({
+                            text: error.message || "Failed to start article regeneration.",
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary",
+                            }
+                        });
+                    }
+                } else if (result.dismiss === Swal.DismissReason.cancel) {
+                    // Do nothing on cancel
+                }
+            });
+        } catch (error) {
+            console.error("Failed to show regeneration dialog:", error);
+            Swal.fire({
+                text: "Failed to show regeneration dialog.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+        }
+    };
     return (
         <div className="flex-lg-row-fluid ms-lg-7 ms-xl-10">
             {/*begin::Card*/}
@@ -166,9 +243,15 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                         </a>
                         {/*end::Back*/}
                         {/*begin::Rewrite*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Rewrite">
+                        <button
+                            onClick={handleRewrite}
+                            className="btn btn-sm btn-icon btn-light btn-active-light-primary me-2"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Rewrite"
+                        >
                             <i className="ki-outline ki-subtitle fs-2 m-0"></i>
-                        </a>
+                        </button>
                         {/*end::Rewrite*/}
                         {/*begin::New picture*/}
                         {article.articleId && (

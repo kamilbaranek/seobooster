@@ -101,6 +101,10 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
     strategy: [
         { name: '{{businessProfile}}', description: 'JSON profil firmy (výsledek analýzy).' },
         {
+            name: '{{publishedArticlesTable}}',
+            description: 'Markdown tabulka posledních 50 publikovaných článků (Title | Url | Keywords). Pomáhá vyhnout se duplicitě a zlepšit interní linkování.'
+        },
+        {
             name: '{{previousStepOutput}}',
             description: 'Výstup z předchozího kroku (pro multi-step prompty). Obsahuje text vygenerovaný předchozím LLM voláním.'
         },
@@ -114,6 +118,10 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         }
     ],
     article: [
+        {
+            name: '{{publishedArticlesTable}}',
+            description: 'Markdown tabulka posledních 50 publikovaných článků (Title | Url | Keywords). Pomáhá vyhnout se duplicitě a zlepšit interní linkování.'
+        },
         {
             name: '{{business}}',
             description: 'Shrnutí firmy použité pro článek (name, description, targetAudience).'
