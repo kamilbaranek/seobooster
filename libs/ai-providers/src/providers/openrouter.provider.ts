@@ -84,27 +84,55 @@ const STRATEGY_JSON_SCHEMA = {
 
 // Simple pricing map (USD per 1M tokens)
 // This should ideally be fetched from an API or config
-const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
-  'openai/gpt-4o': { prompt: 5, completion: 15 },
-  'openai/gpt-4o-mini': { prompt: 0.15, completion: 0.6 },
-  'openai/gpt-5': { prompt: 10, completion: 30 }, // Estimated pricing
-  'anthropic/claude-3.5-sonnet': { prompt: 3, completion: 15 },
-  'anthropic/claude-3.7-sonnet': { prompt: 6, completion: 24 }, // Estimated pricing
-  'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
-  'google/gemini-flash-1.5': { prompt: 0.075, completion: 0.3 },
-  'google/gemini-pro-1.5': { prompt: 1.25, completion: 5 },
-  'google/gemini-3-pro-preview': { prompt: 2, completion: 8 }, // Estimated pricing
-  'perplexity/llama-3.1-sonar-small-128k-online': { prompt: 0.2, completion: 0.2 },
-  'perplexity/llama-3.1-sonar-large-128k-online': { prompt: 1, completion: 1 },
-  'perplexity/llama-3.1-sonar-huge-128k-online': { prompt: 5, completion: 5 },
-};
-
 export class OpenRouterProvider implements AiProvider {
   name: AiProvider['name'] = 'openrouter';
   private lastRawResponse: unknown;
   private lastMessageContent?: string;
 
-  constructor(private readonly config: OpenRouterProviderConfig) { }
+  private pricingMap: Record<string, { prompt: number; completion: number }> = {};
+  private pricingFetchPromise: Promise<void> | null = null;
+
+  constructor(private readonly config: OpenRouterProviderConfig) {
+    // Fire and forget pricing fetch
+    this.fetchModelPricing().catch(err => {
+      console.error('[OpenRouterProvider] Failed to fetch model pricing:', err);
+    });
+  }
+
+  private async fetchModelPricing() {
+    if (this.pricingFetchPromise) return this.pricingFetchPromise;
+
+    this.pricingFetchPromise = (async () => {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/models');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch models: ${response.statusText}`);
+        }
+
+        const data = await response.json() as { data: Array<{ id: string; pricing: { prompt: string; completion: string } }> };
+
+        if (data?.data) {
+          data.data.forEach(model => {
+            // Pricing is per token, convert to per 1M tokens for consistency with previous logic if needed,
+            // but the previous logic divided by 1M then multiplied by price.
+            // OpenRouter returns price per token (e.g. "0.00000125").
+            // Let's store it as is (per token) and adjust calculation.
+
+            this.pricingMap[model.id] = {
+              prompt: parseFloat(model.pricing.prompt),
+              completion: parseFloat(model.pricing.completion)
+            };
+          });
+          console.log(`[OpenRouterProvider] Loaded pricing for ${Object.keys(this.pricingMap).length} models`);
+        }
+      } catch (error) {
+        console.error('[OpenRouterProvider] Error loading pricing:', error);
+        this.pricingFetchPromise = null; // Allow retry
+      }
+    })();
+
+    return this.pricingFetchPromise;
+  }
 
   getLastRawResponse() {
     return this.lastRawResponse;
@@ -115,9 +143,25 @@ export class OpenRouterProvider implements AiProvider {
   }
 
   private calculateCost(model: string, usage: { prompt_tokens: number; completion_tokens: number }): number {
-    const pricing = MODEL_PRICING[model] || { prompt: 0, completion: 0 };
-    const promptCost = (usage.prompt_tokens / 1000000) * pricing.prompt;
-    const completionCost = (usage.completion_tokens / 1000000) * pricing.completion;
+    // Ensure we have pricing, or try to find a matching model ID (some IDs have variants)
+    let pricing = this.pricingMap[model];
+
+    if (!pricing) {
+      // Try to find by partial match if exact match fails (e.g. "openai/gpt-4o-2024-05-13" vs "openai/gpt-4o")
+      const matchingKey = Object.keys(this.pricingMap).find(key => model.startsWith(key));
+      if (matchingKey) {
+        pricing = this.pricingMap[matchingKey];
+      }
+    }
+
+    if (!pricing) {
+      console.warn(`[OpenRouterProvider] No pricing found for model ${model}, cost will be 0`);
+      return 0;
+    }
+
+    // Pricing from API is per token.
+    const promptCost = usage.prompt_tokens * pricing.prompt;
+    const completionCost = usage.completion_tokens * pricing.completion;
     return promptCost + completionCost;
   }
 

@@ -98,4 +98,61 @@ export class AdminStatsController {
             limit: take
         };
     }
+    @Get('charts')
+    async getChartData() {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // 1. Daily Costs (Last 30 Days)
+        // Prisma doesn't support grouping by date directly in groupBy easily without raw query or post-processing.
+        // For simplicity and DB independence, we'll fetch and post-process for now, or use raw query if performance is key.
+        // Given the scale likely isn't huge yet, fetching costs for last 30 days and aggregating in JS is fine.
+
+        const recentCosts = await (this.prisma as any).aiCost.findMany({
+            where: {
+                createdAt: {
+                    gte: thirtyDaysAgo
+                }
+            },
+            select: {
+                createdAt: true,
+                totalCost: true,
+                model: true
+            }
+        });
+
+        const dailyCosts = new Map<string, number>();
+        const modelCosts = new Map<string, number>();
+
+        recentCosts.forEach((cost: { createdAt: Date; totalCost: number; model: string }) => {
+            // Daily Aggregation
+            const dateKey = cost.createdAt.toISOString().split('T')[0]; // YYYY-MM-DD
+            dailyCosts.set(dateKey, (dailyCosts.get(dateKey) || 0) + cost.totalCost);
+
+            // Model Aggregation
+            modelCosts.set(cost.model, (modelCosts.get(cost.model) || 0) + cost.totalCost);
+        });
+
+        // Fill in missing days with 0
+        const chartData = [];
+        for (let i = 0; i < 30; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateKey = d.toISOString().split('T')[0];
+            chartData.unshift({
+                date: dateKey,
+                cost: dailyCosts.get(dateKey) || 0
+            });
+        }
+
+        // Format Model Data
+        const modelData = Array.from(modelCosts.entries())
+            .map(([model, cost]) => ({ model, cost }))
+            .sort((a, b) => b.cost - a.cost); // Descending order
+
+        return {
+            dailyCosts: chartData,
+            modelCosts: modelData
+        };
+    }
 }

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { apiFetch } from '../../../lib/api-client';
 import Swal from 'sweetalert2';
+import { ApexOptions } from 'apexcharts';
+
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface CostSummary {
     totalCost: number;
@@ -36,6 +40,10 @@ interface ArticleCostsResponse {
 const AdminDashboard = () => {
     const [summary, setSummary] = useState<CostSummary | null>(null);
     const [articles, setArticles] = useState<ArticleCostsResponse | null>(null);
+    const [chartData, setChartData] = useState<{
+        dailyCosts: { date: string; cost: number }[];
+        modelCosts: { model: string; cost: number }[];
+    } | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -45,17 +53,80 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [summaryRes, articlesRes] = await Promise.all([
+            const [summaryRes, articlesRes, chartRes] = await Promise.all([
                 apiFetch<CostSummary>('/admin/stats/costs'),
-                apiFetch<ArticleCostsResponse>('/admin/stats/articles')
+                apiFetch<ArticleCostsResponse>('/admin/stats/articles'),
+                apiFetch<any>('/admin/stats/charts')
             ]);
             setSummary(summaryRes);
             setArticles(articlesRes);
+            if (chartRes) {
+                setChartData(chartRes);
+            }
         } catch (error) {
             console.error('Failed to fetch admin stats:', error);
             Swal.fire('Error', 'Failed to load admin statistics', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Chart Options
+    const dailyCostsOptions: ApexOptions = {
+        chart: {
+            type: 'bar',
+            height: 350,
+            toolbar: { show: false }
+        },
+        plotOptions: {
+            bar: {
+                borderRadius: 4,
+                horizontal: false,
+            }
+        },
+        dataLabels: { enabled: false },
+        xaxis: {
+            categories: chartData?.dailyCosts.map(d => d.date) || [],
+            labels: {
+                formatter: (val) => {
+                    const date = new Date(val);
+                    return `${date.getMonth() + 1}/${date.getDate()}`;
+                }
+            }
+        },
+        yaxis: {
+            labels: {
+                formatter: (val) => `$${val.toFixed(2)}`
+            }
+        },
+        tooltip: {
+            y: {
+                formatter: (val) => `$${val.toFixed(4)}`
+            }
+        },
+        colors: ['#009ef7']
+    };
+
+    const modelCostsOptions: ApexOptions = {
+        chart: {
+            type: 'donut',
+        },
+        labels: chartData?.modelCosts.map(m => m.model) || [],
+        responsive: [{
+            breakpoint: 480,
+            options: {
+                chart: {
+                    width: 200
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }],
+        tooltip: {
+            y: {
+                formatter: (val) => `$${val.toFixed(4)}`
+            }
         }
     };
 
@@ -125,7 +196,7 @@ const AdminDashboard = () => {
                                             {/*begin::Info*/}
                                             <div className="d-flex align-items-center">
                                                 {/*begin::Amount*/}
-                                                <span className="fs-2hx fw-bold text-gray-900 me-2 lh-1 ls-n2">1,836</span>
+                                                <span className="fs-2hx fw-bold text-gray-900 me-2 lh-1 ls-n2">{summary?.costsByWeb.length}</span>
                                                 {/*end::Amount*/}
                                                 {/*begin::Badge*/}
                                                 <span className="badge badge-light-danger fs-base">
@@ -135,7 +206,7 @@ const AdminDashboard = () => {
                                             </div>
                                             {/*end::Info*/}
                                             {/*begin::Subtitle*/}
-                                            <span className="text-gray-500 pt-1 fw-semibold fs-6">Total Sales</span>
+                                            <span className="text-gray-500 pt-1 fw-semibold fs-6">Active Websites</span>
                                             {/*end::Subtitle*/}
                                         </div>
                                         {/*end::Title*/}
@@ -171,7 +242,9 @@ const AdminDashboard = () => {
                                             {/*begin::Statistics*/}
                                             <div className="d-flex align-items-center mb-2">
                                                 {/*begin::Value*/}
-                                                <span className="fs-2hx fw-bold text-gray-800 me-2 lh-1">29,420</span>
+                                                <span className="fs-2hx fw-bold text-gray-800 me-2 lh-1">
+                                                    {summary?.costsByWeb.filter(w => w.totalCost > 0).length}
+                                                </span>
                                                 {/*end::Value*/}
                                                 {/*begin::Label*/}
                                                 <span className="badge badge-light-success fs-base">
@@ -181,7 +254,7 @@ const AdminDashboard = () => {
                                             </div>
                                             {/*end::Statistics*/}
                                             {/*begin::Description*/}
-                                            <span className="fs-6 fw-semibold text-gray-500">Total Online Visitors</span>
+                                            <span className="fs-6 fw-semibold text-gray-500">Active Spenders</span>
                                             {/*end::Description*/}
                                         </div>
                                         {/*end::Statistics*/}
@@ -199,10 +272,12 @@ const AdminDashboard = () => {
                                         {/*begin::Title*/}
                                         <div className="card-title d-flex flex-column">
                                             {/*begin::Amount*/}
-                                            <span className="fs-2hx fw-bold text-gray-900 me-2 lh-1 ls-n2">6.3k</span>
+                                            <span className="fs-2hx fw-bold text-gray-900 me-2 lh-1 ls-n2">
+                                                {summary?.costsByWeb.reduce((acc, curr) => acc + (curr.totalCost > 1 ? 1 : 0), 0)}
+                                            </span>
                                             {/*end::Amount*/}
                                             {/*begin::Subtitle*/}
-                                            <span className="text-gray-500 pt-1 fw-semibold fs-6">Total New Customers</span>
+                                            <span className="text-gray-500 pt-1 fw-semibold fs-6">Sites &gt; $1</span>
                                             {/*end::Subtitle*/}
                                         </div>
                                         {/*end::Title*/}
@@ -211,31 +286,17 @@ const AdminDashboard = () => {
                                     {/*begin::Card body*/}
                                     <div className="card-body d-flex flex-column justify-content-end pe-0">
                                         {/*begin::Title*/}
-                                        <span className="fs-6 fw-bolder text-gray-800 d-block mb-2">Today’s Heroes</span>
+                                        <span className="fs-6 fw-bolder text-gray-800 d-block mb-2">Top Spenders</span>
                                         {/*end::Title*/}
                                         {/*begin::Users group*/}
                                         <div className="symbol-group symbol-hover flex-nowrap">
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Alan Warden">
-                                                <span className="symbol-label bg-warning text-inverse-warning fw-bold">A</span>
-                                            </div>
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Michael Eberon">
-                                                <img alt="Pic" src="/assets/media/avatars/300-11.jpg" />
-                                            </div>
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Susan Redwood">
-                                                <span className="symbol-label bg-primary text-inverse-primary fw-bold">S</span>
-                                            </div>
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Melody Macy">
-                                                <img alt="Pic" src="/assets/media/avatars/300-2.jpg" />
-                                            </div>
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Perry Matthew">
-                                                <span className="symbol-label bg-danger text-inverse-danger fw-bold">P</span>
-                                            </div>
-                                            <div className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title="Barry Walter">
-                                                <img alt="Pic" src="/assets/media/avatars/300-12.jpg" />
-                                            </div>
-                                            <a href="#" className="symbol symbol-35px symbol-circle" data-bs-toggle="modal" data-bs-target="#kt_modal_view_users">
-                                                <span className="symbol-label bg-light text-gray-400 fs-8 fw-bold">+42</span>
-                                            </a>
+                                            {summary?.costsByWeb.slice(0, 5).map((web, idx) => (
+                                                <div key={web.webId} className="symbol symbol-35px symbol-circle" data-bs-toggle="tooltip" title={web.webNickname || web.webUrl}>
+                                                    <span className={`symbol-label bg-${['warning', 'primary', 'danger', 'success', 'info'][idx % 5]} text-inverse-${['warning', 'primary', 'danger', 'success', 'info'][idx % 5]} fw-bold`}>
+                                                        {(web.webNickname || web.webUrl).charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            ))}
                                         </div>
                                         {/*end::Users group*/}
                                     </div>
@@ -250,36 +311,34 @@ const AdminDashboard = () => {
                     {/*end::Col*/}
                     {/*begin::Col*/}
                     <div className="col-xxl-6 mb-5 mb-xl-10">
-                        {/*begin::Maps widget 1*/}
+                        {/*begin::Chart widget 13*/}
                         <div className="card card-flush h-md-100">
                             {/*begin::Header*/}
                             <div className="card-header pt-7">
                                 {/*begin::Title*/}
                                 <h3 className="card-title align-items-start flex-column">
-                                    <span className="card-label fw-bold text-gray-900">World Sales</span>
-                                    <span className="text-gray-500 pt-2 fw-semibold fs-6">Top Selling Countries</span>
+                                    <span className="card-label fw-bold text-gray-900">Daily Costs</span>
+                                    <span className="text-gray-500 pt-2 fw-semibold fs-6">Last 30 Days</span>
                                 </h3>
                                 {/*end::Title*/}
-                                {/*begin::Toolbar*/}
-                                <div className="card-toolbar">
-                                    {/*begin::Menu*/}
-                                    <button className="btn btn-icon btn-color-gray-500 btn-active-color-primary justify-content-end" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end" data-kt-menu-overflow="true">
-                                        <i className="ki-outline ki-dots-square fs-1 text-gray-500 me-n1"></i>
-                                    </button>
-                                    {/*end::Menu*/}
-                                </div>
-                                {/*end::Toolbar*/}
                             </div>
                             {/*end::Header*/}
                             {/*begin::Body*/}
-                            <div className="card-body d-flex flex-center">
-                                {/*begin::Map container*/}
-                                <div id="kt_maps_widget_1_map" className="w-100 h-350px"></div>
-                                {/*end::Map container*/}
+                            <div className="card-body pt-5">
+                                {/*begin::Chart container*/}
+                                {chartData && (
+                                    <Chart
+                                        options={dailyCostsOptions}
+                                        series={[{ name: 'Cost', data: chartData.dailyCosts.map(d => d.cost) }]}
+                                        type="bar"
+                                        height={350}
+                                    />
+                                )}
+                                {/*end::Chart container*/}
                             </div>
                             {/*end::Body*/}
                         </div>
-                        {/*end::Maps widget 1*/}
+                        {/*end::Chart widget 13*/}
                     </div>
                     {/*end::Col*/}
                 </div>
@@ -288,146 +347,6 @@ const AdminDashboard = () => {
                 <div className="row g-5 g-xl-10 g-xl-10">
                     {/*begin::Col*/}
                     <div className="col-xl-4 mb-xl-10">
-                        {/*begin::Engage widget 1*/}
-                        <div className="card h-md-100" dir="ltr">
-                            {/*begin::Body*/}
-                            <div className="card-body d-flex flex-column flex-center">
-                                {/*begin::Heading*/}
-                                <div className="mb-2">
-                                    {/*begin::Title*/}
-                                    <h1 className="fw-semibold text-gray-800 text-center lh-lg">Have you tried
-                                        <br />new
-                                        <span className="fw-bolder">Invoice Manager ?</span></h1>
-                                    {/*end::Title*/}
-                                    {/*begin::Illustration*/}
-                                    <div className="py-10 text-center">
-                                        <img src="/assets/media/svg/illustrations/easy/2.svg" className="theme-light-show w-200px" alt="" />
-                                        <img src="/assets/media/svg/illustrations/easy/2-dark.svg" className="theme-dark-show w-200px" alt="" />
-                                    </div>
-                                    {/*end::Illustration*/}
-                                </div>
-                                {/*end::Heading*/}
-                                {/*begin::Links*/}
-                                <div className="text-center mb-1">
-                                    {/*begin::Link*/}
-                                    <a className="btn btn-sm btn-primary me-2" href="#">Try now</a>
-                                    {/*end::Link*/}
-                                    {/*begin::Link*/}
-                                    <a className="btn btn-sm btn-light" href="#">Learn more</a>
-                                    {/*end::Link*/}
-                                </div>
-                                {/*end::Links*/}
-                            </div>
-                            {/*end::Body*/}
-                        </div>
-                        {/*end::Engage widget 1*/}
-                    </div>
-                    {/*end::Col*/}
-                    {/*begin::Col*/}
-                    <div className="col-xl-4 mb-xl-10">
-                        {/*begin::Chart widget 5*/}
-                        <div className="card card-flush h-md-100">
-                            {/*begin::Header*/}
-                            <div className="card-header flex-nowrap pt-5">
-                                {/*begin::Title*/}
-                                <h3 className="card-title align-items-start flex-column">
-                                    <span className="card-label fw-bold text-gray-900">Top Selling Categories</span>
-                                    <span className="text-gray-500 pt-2 fw-semibold fs-6">8k social visitors</span>
-                                </h3>
-                                {/*end::Title*/}
-                                {/*begin::Toolbar*/}
-                                <div className="card-toolbar">
-                                    {/*begin::Menu*/}
-                                    <button className="btn btn-icon btn-color-gray-500 btn-active-color-primary justify-content-end" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end" data-kt-menu-overflow="true">
-                                        <i className="ki-outline ki-dots-square fs-1 text-gray-500 me-n1"></i>
-                                    </button>
-                                    {/*end::Menu*/}
-                                </div>
-                                {/*end::Toolbar*/}
-                            </div>
-                            {/*end::Header*/}
-                            {/*begin::Body*/}
-                            <div className="card-body pt-5 ps-6">
-                                <div id="kt_charts_widget_5" className="min-h-auto"></div>
-                            </div>
-                            {/*end::Body*/}
-                        </div>
-                        {/*end::Chart widget 5*/}
-                    </div>
-                    {/*end::Col*/}
-                    {/*begin::Col*/}
-                    <div className="col-xl-4 mb-5 mb-xl-10">
-                        {/*begin::List widget 6*/}
-                        <div className="card card-flush h-md-100">
-                            {/*begin::Header*/}
-                            <div className="card-header pt-7">
-                                {/*begin::Title*/}
-                                <h3 className="card-title align-items-start flex-column">
-                                    <span className="card-label fw-bold text-gray-800">Article Costs</span>
-                                    <span className="text-gray-500 mt-1 fw-semibold fs-6">Detailed cost breakdown per article</span>
-                                </h3>
-                                {/*end::Title*/}
-                                {/*begin::Toolbar*/}
-                                <div className="card-toolbar">
-                                    <a href="#" className="btn btn-sm btn-light">View All</a>
-                                </div>
-                                {/*end::Toolbar*/}
-                            </div>
-                            {/*end::Header*/}
-                            {/*begin::Body*/}
-                            <div className="card-body pt-4">
-                                {/*begin::Table container*/}
-                                <div className="table-responsive">
-                                    {/*begin::Table*/}
-                                    <table className="table table-row-dashed align-middle gs-0 gy-4 my-0">
-                                        {/*begin::Table head*/}
-                                        <thead>
-                                            <tr className="fs-7 fw-bold text-gray-500 border-bottom-0">
-                                                <th className="p-0 w-50px pb-1">ARTICLE</th>
-                                                <th className="ps-0 min-w-140px"></th>
-                                                <th className="text-end min-w-140px p-0 pb-1">TOTAL PRICE</th>
-                                            </tr>
-                                        </thead>
-                                        {/*end::Table head*/}
-                                        {/*begin::Table body*/}
-                                        <tbody>
-                                            {articles?.data.map((article) => (
-                                                <tr key={article.articleId}>
-                                                    <td>
-                                                        <div className="symbol symbol-50px me-2">
-                                                            <span className="symbol-label bg-light-primary">
-                                                                <i className="ki-outline ki-document fs-2 text-primary"></i>
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="ps-0">
-                                                        <a href="#" className="text-gray-800 fw-bold text-hover-primary mb-1 fs-6 text-start pe-0">{article.title}</a>
-                                                        <span className="text-gray-500 fw-semibold fs-7 d-block text-start ps-0">
-                                                            {article.webNickname || article.webUrl} • Text: {article.textVersions}, Images: {article.imageVersions}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span className="text-gray-800 fw-bold d-block fs-6 ps-0 text-end">${article.totalCost.toFixed(4)}</span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        {/*end::Table body*/}
-                                    </table>
-                                </div>
-                                {/*end::Table*/}
-                            </div>
-                            {/*end::Body*/}
-                        </div>
-                        {/*end::List widget 6*/}
-                    </div>
-                    {/*end::Col*/}
-                </div>
-                {/*end::Row*/}
-                {/*begin::Row*/}
-                <div className="row g-5 g-xl-10">
-                    {/*begin::Col*/}
-                    <div className="col-xxl-4 mb-xxl-10">
                         {/*begin::List widget 7*/}
                         <div className="card card-flush h-xl-100">
                             {/*begin::Header*/}
@@ -438,11 +357,6 @@ const AdminDashboard = () => {
                                     <span className="text-gray-500 mt-1 fw-semibold fs-6">Aggregated costs per website</span>
                                 </h3>
                                 {/*end::Title*/}
-                                {/*begin::Toolbar*/}
-                                <div className="card-toolbar">
-                                    <a href="#" className="btn btn-sm btn-light">View All</a>
-                                </div>
-                                {/*end::Toolbar*/}
                             </div>
                             {/*end::Header*/}
                             {/*begin::Body*/}
@@ -499,37 +413,95 @@ const AdminDashboard = () => {
                     </div>
                     {/*end::Col*/}
                     {/*begin::Col*/}
-                    <div className="col-xxl-8 mb-5 mb-xl-10">
-                        {/*begin::Chart widget 13*/}
+                    <div className="col-xl-4 mb-xl-10">
+                        {/*begin::Chart widget 5*/}
+                        <div className="card card-flush h-md-100">
+                            {/*begin::Header*/}
+                            <div className="card-header flex-nowrap pt-5">
+                                {/*begin::Title*/}
+                                <h3 className="card-title align-items-start flex-column">
+                                    <span className="card-label fw-bold text-gray-900">Model Usage</span>
+                                    <span className="text-gray-500 pt-2 fw-semibold fs-6">Cost distribution by model</span>
+                                </h3>
+                                {/*end::Title*/}
+                            </div>
+                            {/*end::Header*/}
+                            {/*begin::Body*/}
+                            <div className="card-body pt-5 ps-6">
+                                {chartData && (
+                                    <Chart
+                                        options={modelCostsOptions}
+                                        series={chartData.modelCosts.map(m => m.cost)}
+                                        type="donut"
+                                        height={300}
+                                    />
+                                )}
+                            </div>
+                            {/*end::Body*/}
+                        </div>
+                        {/*end::Chart widget 5*/}
+                    </div>
+                    {/*end::Col*/}
+                    {/*begin::Col*/}
+                    <div className="col-xl-4 mb-5 mb-xl-10">
+                        {/*begin::List widget 6*/}
                         <div className="card card-flush h-md-100">
                             {/*begin::Header*/}
                             <div className="card-header pt-7">
                                 {/*begin::Title*/}
                                 <h3 className="card-title align-items-start flex-column">
-                                    <span className="card-label fw-bold text-gray-900">Sales Statistics</span>
-                                    <span className="text-gray-500 pt-2 fw-semibold fs-6">Top Selling Products</span>
+                                    <span className="card-label fw-bold text-gray-800">Article Costs</span>
+                                    <span className="text-gray-500 mt-1 fw-semibold fs-6">Detailed cost breakdown per article</span>
                                 </h3>
                                 {/*end::Title*/}
-                                {/*begin::Toolbar*/}
-                                <div className="card-toolbar">
-                                    {/*begin::Menu*/}
-                                    <button className="btn btn-icon btn-color-gray-500 btn-active-color-primary justify-content-end" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end" data-kt-menu-overflow="true">
-                                        <i className="ki-outline ki-dots-square fs-1 text-gray-500 me-n1"></i>
-                                    </button>
-                                    {/*end::Menu*/}
-                                </div>
-                                {/*end::Toolbar*/}
                             </div>
                             {/*end::Header*/}
                             {/*begin::Body*/}
-                            <div className="card-body pt-5">
-                                {/*begin::Chart container*/}
-                                <div id="kt_charts_widget_13_chart" className="w-100 h-325px"></div>
-                                {/*end::Chart container*/}
+                            <div className="card-body pt-4">
+                                {/*begin::Table container*/}
+                                <div className="table-responsive">
+                                    <table className="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                        {/*begin::Table head*/}
+                                        <thead>
+                                            <tr className="border-0">
+                                                <th className="p-0 w-50px"></th>
+                                                <th className="p-0 min-w-150px"></th>
+                                                <th className="p-0 min-w-140px"></th>
+                                                <th className="p-0 min-w-110px text-end"></th>
+                                            </tr>
+                                        </thead>
+                                        {/*end::Table head*/}
+                                        {/*begin::Table body*/}
+                                        <tbody>
+                                            {articles?.data.map((article) => (
+                                                <tr key={article.articleId}>
+                                                    <td>
+                                                        <div className="symbol symbol-45px me-2">
+                                                            <span className="symbol-label">
+                                                                <img src="/assets/media/icons/duotune/text/txt009.svg" className="h-50 align-self-center" alt="" />
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="ps-0">
+                                                        <a href="#" className="text-gray-800 fw-bold text-hover-primary mb-1 fs-6 text-start pe-0">{article.title}</a>
+                                                        <span className="text-gray-500 fw-semibold fs-7 d-block text-start ps-0">
+                                                            {article.webNickname || article.webUrl} • Text: {article.textVersions}, Images: {article.imageVersions}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span className="text-gray-800 fw-bold d-block fs-6 ps-0 text-end">${article.totalCost.toFixed(4)}</span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        {/*end::Table body*/}
+                                    </table>
+                                </div>
+                                {/*end::Table*/}
                             </div>
                             {/*end::Body*/}
                         </div>
-                        {/*end::Chart widget 13*/}
+                        {/*end::List widget 6*/}
                     </div>
                     {/*end::Col*/}
                 </div>
@@ -537,7 +509,6 @@ const AdminDashboard = () => {
             </div>
             {/*end::Content container*/}
         </div>
-
     );
 };
 
