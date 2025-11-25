@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../../../lib/api-client';
 import Swal from 'sweetalert2';
@@ -72,136 +71,191 @@ const AdminDashboard = () => {
 
     return (
         <div id="kt_app_content" className="app-content flex-column-fluid">
+            {/*begin::Content container*/}
             <div id="kt_app_content_container" className="app-container container-fluid">
-                {/* Summary Cards */}
-                <div className="row g-5 g-xl-10 mb-5 mb-xl-10">
-                    <div className="col-md-6 col-lg-6 col-xl-6 col-xxl-3 mb-md-5 mb-xl-10">
-                        <div className="card card-flush h-md-50 mb-5 mb-xl-10">
-                            <div className="card-header pt-5">
-                                <div className="card-title d-flex flex-column">
-                                    <div className="d-flex align-items-center">
-                                        <span className="fs-2hx fw-bold text-gray-900 me-2 lh-1 ls-n2">
-                                            ${summary?.totalCost.toFixed(4)}
-                                        </span>
-                                        <span className="badge badge-light-success fs-base">
-                                            <i className="ki-outline ki-arrow-up fs-5 text-success ms-n1"></i> 2.2%
-                                        </span>
+                {/*begin::Row*/}
+                <div className="row g-5 gx-xl-10">
+                    {/*begin::Col*/}
+                    <div className="col-xxl-6 mb-md-5 mb-xl-10">
+                        {/*begin::Row*/}
+                        <div className="row g-5 g-xl-10">
+                            {/*begin::Col*/}
+                            <div className="col-md-6 col-xl-6 mb-xxl-10">
+                                {/*begin::Card widget 8*/}
+                                <div className="card overflow-hidden h-md-50 mb-5 mb-xl-10">
+                                    {/*begin::Card body*/}
+                                    <div className="card-body d-flex justify-content-between flex-column px-0 pb-0">
+                                        {/*begin::Statistics*/}
+                                        <div className="mb-4 px-9">
+                                            {/*begin::Info*/}
+                                            <div className="d-flex align-items-center mb-2">
+                                                {/*begin::Currency*/}
+                                                <span className="fs-4 fw-semibold text-gray-500 align-self-start me-1">$</span>
+                                                {/*end::Currency*/}
+                                                {/*begin::Value*/}
+                                                <span className="fs-2hx fw-bold text-gray-800 me-2 lh-1">
+                                                    {summary?.totalCost.toFixed(4)}
+                                                </span>
+                                                {/*end::Value*/}
+                                            </div>
+                                            {/*end::Info*/}
+                                            {/*begin::Description*/}
+                                            <span className="fs-6 fw-semibold text-gray-500">Total AI Cost</span>
+                                            {/*end::Description*/}
+                                        </div>
+                                        {/*end::Statistics*/}
+                                        {/*begin::Chart*/}
+                                        <div id="kt_card_widget_8_chart" className="min-h-auto" style={{ height: '125px' }}></div>
+                                        {/*end::Chart*/}
                                     </div>
-                                    <span className="text-gray-500 pt-1 fw-semibold fs-6">Total AI Cost</span>
+                                    {/*end::Card body*/}
                                 </div>
+                                {/*end::Card widget 8*/}
                             </div>
-                            <div className="card-body pt-2 pb-4 d-flex flex-wrap align-items-center">
-                                <div className="d-flex flex-center me-5 pt-2">
-                                    <div id="kt_card_widget_17_chart" style={{ minWidth: '70px', minHeight: '70px' }} data-kt-size="70" data-kt-line="11"></div>
-                                </div>
-                                <div className="d-flex flex-column content-justify-center flex-row-fluid">
-                                    <div className="d-flex fw-semibold align-items-center">
-                                        <div className="bullet w-8px h-3px rounded-2 bg-success me-3"></div>
-                                        <div className="text-gray-500 flex-grow-1 me-4">Websites</div>
-                                        <div className="fw-bolder text-gray-700 text-xxl-end">{summary?.costsByWeb.length}</div>
-                                    </div>
-                                </div>
+                            {/*end::Col*/}
+                        </div>
+                        {/*end::Row*/}
+                    </div>
+                    {/*end::Col*/}
+
+                    {/*begin::Col*/}
+                    <div className="col-xl-6 mb-xl-10">
+                        {/*begin::List widget 8*/}
+                        <div className="card card-flush h-xl-100">
+                            {/*begin::Header*/}
+                            <div className="card-header pt-7 mb-5">
+                                {/*begin::Title*/}
+                                <h3 className="card-title align-items-start flex-column">
+                                    <span className="card-label fw-bold text-gray-800">Website Costs</span>
+                                    <span className="text-gray-500 mt-1 fw-semibold fs-6">Aggregated costs per website</span>
+                                </h3>
+                                {/*end::Title*/}
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Website Costs Table */}
-                <div className="card card-flush mb-5 mb-xl-10">
-                    <div className="card-header pt-5">
-                        <h3 className="card-title align-items-start flex-column">
-                            <span className="card-label fw-bold text-gray-900">Website Costs</span>
-                            <span className="text-gray-500 mt-1 fw-semibold fs-6">Aggregated costs per website</span>
-                        </h3>
-                    </div>
-                    <div className="card-body pt-0">
-                        <div className="table-responsive">
-                            <table className="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
-                                <thead>
-                                    <tr className="fw-bold text-muted">
-                                        <th className="min-w-150px">Website</th>
-                                        <th className="min-w-140px">Input Tokens</th>
-                                        <th className="min-w-120px">Output Tokens</th>
-                                        <th className="min-w-100px text-end">Total Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {summary?.costsByWeb.map((web) => (
-                                        <tr key={web.webId}>
-                                            <td>
-                                                <div className="d-flex align-items-center">
-                                                    <div className="d-flex justify-content-start flex-column">
-                                                        <a href="#" className="text-gray-900 fw-bold text-hover-primary mb-1 fs-6">{web.webNickname || web.webUrl}</a>
-                                                        <span className="text-muted fw-semibold text-muted d-block fs-7">{web.webUrl}</span>
+                            {/*end::Header*/}
+                            {/*begin::Body*/}
+                            <div className="card-body pt-0">
+                                {/*begin::Items*/}
+                                <div className="m-0">
+                                    {summary?.costsByWeb.map((web, index) => (
+                                        <React.Fragment key={web.webId}>
+                                            {/*begin::Item*/}
+                                            <div className="d-flex flex-stack">
+                                                {/*begin::Section*/}
+                                                <div className="d-flex flex-stack flex-row-fluid d-grid gap-2">
+                                                    {/*begin::Content*/}
+                                                    <div className="me-5">
+                                                        {/*begin::Title*/}
+                                                        <a href="#" className="text-gray-800 fw-bold text-hover-primary fs-6">{web.webNickname || web.webUrl}</a>
+                                                        {/*end::Title*/}
+                                                        {/*begin::Desc*/}
+                                                        <span className="text-gray-500 fw-semibold fs-7 d-block text-start ps-0">{web.webUrl}</span>
+                                                        {/*end::Desc*/}
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span className="text-gray-900 fw-bold d-block fs-6">{web.inputTokens.toLocaleString()}</span>
-                                            </td>
-                                            <td>
-                                                <span className="text-gray-900 fw-bold d-block fs-6">{web.outputTokens.toLocaleString()}</span>
-                                            </td>
-                                            <td className="text-end">
-                                                <span className="badge badge-light-danger fs-base">${web.totalCost.toFixed(4)}</span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Article Costs Table */}
-                <div className="card card-flush">
-                    <div className="card-header pt-5">
-                        <h3 className="card-title align-items-start flex-column">
-                            <span className="card-label fw-bold text-gray-900">Article Costs</span>
-                            <span className="text-gray-500 mt-1 fw-semibold fs-6">Detailed cost breakdown per article</span>
-                        </h3>
-                    </div>
-                    <div className="card-body pt-0">
-                        <div className="table-responsive">
-                            <table className="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
-                                <thead>
-                                    <tr className="fw-bold text-muted">
-                                        <th className="min-w-200px">Article</th>
-                                        <th className="min-w-150px">Website</th>
-                                        <th className="min-w-100px">Versions</th>
-                                        <th className="min-w-100px text-end">Total Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {articles?.data.map((article) => (
-                                        <tr key={article.articleId}>
-                                            <td>
-                                                <div className="d-flex align-items-center">
-                                                    <div className="d-flex justify-content-start flex-column">
-                                                        <a href="#" className="text-gray-900 fw-bold text-hover-primary mb-1 fs-6">{article.title}</a>
+                                                    {/*end::Content*/}
+                                                    {/*begin::Info*/}
+                                                    <div className="d-flex align-items-center">
+                                                        {/*begin::Number*/}
+                                                        <span className="text-gray-800 fw-bold fs-6 me-3 d-block">${web.totalCost.toFixed(4)}</span>
+                                                        {/*end::Number*/}
+                                                        {/*begin::Label*/}
+                                                        <div className="m-0">
+                                                            {/*begin::Label*/}
+                                                            <span className="badge badge-light-success fs-base">
+                                                                {web.inputTokens + web.outputTokens} tokens
+                                                            </span>
+                                                            {/*end::Label*/}
+                                                        </div>
+                                                        {/*end::Label*/}
                                                     </div>
+                                                    {/*end::Info*/}
                                                 </div>
-                                            </td>
-                                            <td>
-                                                <span className="text-gray-900 fw-bold d-block fs-6">{article.webNickname || article.webUrl}</span>
-                                            </td>
-                                            <td>
-                                                <div className="d-flex flex-column">
-                                                    <span className="text-gray-900 fw-bold fs-6">Text: {article.textVersions}</span>
-                                                    <span className="text-muted fw-semibold fs-7">Images: {article.imageVersions}</span>
-                                                </div>
-                                            </td>
-                                            <td className="text-end">
-                                                <span className="badge badge-light-danger fs-base">${article.totalCost.toFixed(4)}</span>
-                                            </td>
-                                        </tr>
+                                                {/*end::Section*/}
+                                            </div>
+                                            {/*end::Item*/}
+                                            {index < summary.costsByWeb.length - 1 && (
+                                                <div className="separator separator-dashed my-3"></div>
+                                            )}
+                                        </React.Fragment>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                                {/*end::Items*/}
+                            </div>
+                            {/*end::Body*/}
                         </div>
+                        {/*end::List widget 8*/}
                     </div>
+                    {/*end::Col*/}
                 </div>
+                {/*end::Row*/}
+
+                {/*begin::Row*/}
+                <div className="row g-5 g-xl-10">
+                    {/*begin::Col*/}
+                    <div className="col-xl-12 mb-5 mb-xl-10">
+                        {/*begin::List widget 6*/}
+                        <div className="card card-flush h-md-100">
+                            {/*begin::Header*/}
+                            <div className="card-header pt-7">
+                                {/*begin::Title*/}
+                                <h3 className="card-title align-items-start flex-column">
+                                    <span className="card-label fw-bold text-gray-800">Article Costs</span>
+                                    <span className="text-gray-500 mt-1 fw-semibold fs-6">Detailed cost breakdown per article</span>
+                                </h3>
+                                {/*end::Title*/}
+                            </div>
+                            {/*end::Header*/}
+                            {/*begin::Body*/}
+                            <div className="card-body pt-4">
+                                {/*begin::Table container*/}
+                                <div className="table-responsive">
+                                    {/*begin::Table*/}
+                                    <table className="table table-row-dashed align-middle gs-0 gy-4 my-0">
+                                        {/*begin::Table head*/}
+                                        <thead>
+                                            <tr className="fs-7 fw-bold text-gray-500 border-bottom-0">
+                                                <th className="p-0 w-50px pb-1">ARTICLE</th>
+                                                <th className="ps-0 min-w-140px"></th>
+                                                <th className="text-end min-w-140px p-0 pb-1">TOTAL PRICE</th>
+                                            </tr>
+                                        </thead>
+                                        {/*end::Table head*/}
+                                        {/*begin::Table body*/}
+                                        <tbody>
+                                            {articles?.data.map((article) => (
+                                                <tr key={article.articleId}>
+                                                    <td>
+                                                        <div className="symbol symbol-50px me-2">
+                                                            <span className="symbol-label bg-light-primary">
+                                                                <i className="ki-outline ki-document fs-2 text-primary"></i>
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="ps-0">
+                                                        <a href="#" className="text-gray-800 fw-bold text-hover-primary mb-1 fs-6 text-start pe-0">{article.title}</a>
+                                                        <span className="text-gray-500 fw-semibold fs-7 d-block text-start ps-0">
+                                                            {article.webNickname || article.webUrl} • Text: {article.textVersions}, Images: {article.imageVersions}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span className="text-gray-800 fw-bold d-block fs-6 ps-0 text-end">${article.totalCost.toFixed(4)}</span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        {/*end::Table body*/}
+                                    </table>
+                                </div>
+                                {/*end::Table*/}
+                            </div>
+                            {/*end::Body*/}
+                        </div>
+                        {/*end::List widget 6*/}
+                    </div>
+                    {/*end::Col*/}
+                </div>
+                {/*end::Row*/}
             </div>
+            {/*end::Content container*/}
         </div>
     );
 };
