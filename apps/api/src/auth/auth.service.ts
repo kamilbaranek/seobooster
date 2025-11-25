@@ -23,9 +23,11 @@ export class AuthService {
       throw new BadRequestException('Email already registered');
     }
 
-    const existingWeb = await this.prisma.web.findUnique({ where: { url: payload.websiteUrl } });
-    if (existingWeb) {
-      throw new BadRequestException('Website already connected');
+    if (payload.websiteUrl) {
+      const existingWeb = await this.prisma.web.findUnique({ where: { url: payload.websiteUrl } });
+      if (existingWeb) {
+        throw new BadRequestException('Website already connected');
+      }
     }
 
     const passwordHash = await bcrypt.hash(payload.password, 10);
@@ -35,11 +37,11 @@ export class AuthService {
         data: {
           email: payload.email,
           passwordHash,
-          webs: {
+          webs: payload.websiteUrl ? {
             create: {
               url: payload.websiteUrl
             }
-          }
+          } : undefined
         },
         include: {
           webs: true,
