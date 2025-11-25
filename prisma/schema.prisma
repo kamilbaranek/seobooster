@@ -135,6 +135,17 @@ model Web {
   timezone                      String                 @default("UTC")
   language                      String                 @default("en")
   country                       String                 @default("")
+  
+  // Onboarding & Trial
+  trialEndsAt       DateTime?
+  onboardingStep    Int                    @default(0)
+  projectType       String?                // "commercial" | "non_commercial"
+  webAge            String?                // "new" | "history"
+  platform          String?                // "wordpress" | "shopify" | "wix" | "other"
+  businessGoal      String?
+  audience          Json?
+  competitors       Json?
+  conversionGoal    String?
 }
 
 model WebWordpressCategory {

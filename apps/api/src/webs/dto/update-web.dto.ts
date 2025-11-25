@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { IntegrationType, WebStatus } from '@prisma/client';
 
 export class UpdateWebDto {
@@ -46,4 +46,36 @@ export class UpdateWebDto {
   @IsOptional()
   @IsString()
   country?: string;
+
+  @IsOptional()
+  @IsInt()
+  onboardingStep?: number;
+
+  @IsOptional()
+  @IsString()
+  projectType?: string;
+
+  @IsOptional()
+  @IsString()
+  webAge?: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
+
+  @IsOptional()
+  @IsString()
+  businessGoal?: string;
+
+  @IsOptional()
+  @IsObject()
+  audience?: Record<string, any>;
+
+  @IsOptional()
+  @IsObject()
+  competitors?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  conversionGoal?: string;
 }

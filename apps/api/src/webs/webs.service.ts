@@ -41,7 +41,8 @@ export class WebsService {
         integrationType: dto.integrationType ?? IntegrationType.NONE,
         status: WebStatus.PENDING_PAYMENT,
         faviconStatus: AssetStatus.PENDING,
-        screenshotStatus: AssetStatus.PENDING
+        screenshotStatus: AssetStatus.PENDING,
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days trial
       }
     });
 
@@ -139,7 +140,15 @@ export class WebsService {
         publicationSchedule: dto.publicationSchedule ?? web.publicationSchedule,
         timezone: dto.timezone ?? web.timezone,
         language: dto.language ?? web.language,
-        country: dto.country ?? web.country
+        country: dto.country ?? web.country,
+        onboardingStep: dto.onboardingStep ?? web.onboardingStep,
+        projectType: dto.projectType ?? web.projectType,
+        webAge: dto.webAge ?? web.webAge,
+        platform: dto.platform ?? web.platform,
+        businessGoal: dto.businessGoal ?? web.businessGoal,
+        audience: dto.audience ?? web.audience ?? undefined,
+        competitors: dto.competitors ?? web.competitors ?? undefined,
+        conversionGoal: dto.conversionGoal ?? web.conversionGoal
       }
     });
 

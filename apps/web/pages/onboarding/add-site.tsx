@@ -38,7 +38,7 @@ const AddSitePage = () => {
         })
       });
 
-      router.push(`/onboarding/payment?webId=${web.id}`);
+      router.push(`/onboarding/wizard?webId=${web.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nepodařilo se přidat web.');
     } finally {
