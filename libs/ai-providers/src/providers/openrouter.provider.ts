@@ -87,10 +87,13 @@ const STRATEGY_JSON_SCHEMA = {
 const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
   'openai/gpt-4o': { prompt: 5, completion: 15 },
   'openai/gpt-4o-mini': { prompt: 0.15, completion: 0.6 },
+  'openai/gpt-5': { prompt: 10, completion: 30 }, // Estimated pricing
   'anthropic/claude-3.5-sonnet': { prompt: 3, completion: 15 },
+  'anthropic/claude-3.7-sonnet': { prompt: 6, completion: 24 }, // Estimated pricing
   'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
   'google/gemini-flash-1.5': { prompt: 0.075, completion: 0.3 },
   'google/gemini-pro-1.5': { prompt: 1.25, completion: 5 },
+  'google/gemini-3-pro-preview': { prompt: 2, completion: 8 }, // Estimated pricing
   'perplexity/llama-3.1-sonar-small-128k-online': { prompt: 0.2, completion: 0.2 },
   'perplexity/llama-3.1-sonar-large-128k-online': { prompt: 1, completion: 1 },
   'perplexity/llama-3.1-sonar-huge-128k-online': { prompt: 5, completion: 5 },
