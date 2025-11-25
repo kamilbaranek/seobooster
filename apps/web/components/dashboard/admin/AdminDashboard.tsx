@@ -71,6 +71,13 @@ const AdminDashboard = () => {
         }
     };
 
+    const getCssVariableValue = (variableName: string) => {
+        if (typeof window !== 'undefined') {
+            return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+        }
+        return '';
+    };
+
     // Chart Options
     const dailyCostsOptions: ApexOptions = {
         chart: {
@@ -80,8 +87,8 @@ const AdminDashboard = () => {
         },
         plotOptions: {
             bar: {
-                borderRadius: 6,
-                columnWidth: '40%',
+                borderRadius: 4,
+                columnWidth: '70%',
                 horizontal: false,
             }
         },
@@ -92,8 +99,8 @@ const AdminDashboard = () => {
             axisTicks: { show: false },
             labels: {
                 style: {
-                    colors: '#A1A5B7',
-                    fontSize: '10px'
+                    colors: getCssVariableValue('--bs-gray-500'),
+                    fontSize: '12px'
                 },
                 formatter: (val) => {
                     const date = new Date(val);
@@ -104,15 +111,15 @@ const AdminDashboard = () => {
         yaxis: {
             labels: {
                 style: {
-                    colors: '#A1A5B7',
-                    fontSize: '10px'
+                    colors: getCssVariableValue('--bs-gray-500'),
+                    fontSize: '12px'
                 },
                 formatter: (val) => `$${val.toFixed(2)}`
             }
         },
         grid: {
-            borderColor: '#E4E6EF',
-            strokeDashArray: 3,
+            borderColor: getCssVariableValue('--bs-gray-200'),
+            strokeDashArray: 4,
             yaxis: {
                 lines: {
                     show: true
@@ -129,7 +136,7 @@ const AdminDashboard = () => {
                 formatter: (val) => `$${val.toFixed(4)}`
             }
         },
-        colors: ['#009ef7']
+        colors: [getCssVariableValue('--bs-primary')]
     };
 
     const modelCostsOptions: ApexOptions = {
