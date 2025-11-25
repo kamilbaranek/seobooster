@@ -700,8 +700,28 @@ const getPublishedArticlesTable = async (webId: string): Promise<string> => {
   });
 
   if (articles.length === 0) {
+    logger.info({ webId }, 'getPublishedArticlesTable: No articles found with strict filter (PUBLISHED + url). Checking broad filter...');
+
+    // Debug: Check why we didn't find anything
+    const broadArticles = await prisma.article.findMany({
+      where: { webId },
+      select: { id: true, status: true, url: true, title: true },
+      take: 10
+    });
+
+    logger.info(
+      {
+        webId,
+        foundBroad: broadArticles.length,
+        samples: broadArticles
+      },
+      'getPublishedArticlesTable: Broad search results'
+    );
+
     return 'No published articles found.';
   }
+
+  logger.info({ webId, count: articles.length }, 'getPublishedArticlesTable: Found articles');
 
   const header = '| Title | Url | Keywords |\n| --- | --- | --- |';
   const rows = articles.map((article) => {
@@ -1297,11 +1317,11 @@ const bootstrap = async () => {
         articleId: article.id,
         // Increment regeneration count only after successful article creation
         // This ensures failed attempts don't count toward the limit
-        regenerationCount: plan.article ? plan.regenerationCount + 1 : plan.regenerationCount
+        regenerationCount: plan.articleId ? plan.regenerationCount + 1 : plan.regenerationCount
       }
     });
 
-    if (plan.article) {
+    if (plan.articleId) {
       logger.info(
         { jobId: job.id, planId: plan.id, regenerationCount: plan.regenerationCount + 1 },
         'Incremented regeneration count after successful regeneration'
