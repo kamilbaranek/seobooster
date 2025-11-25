@@ -1298,6 +1298,14 @@ const bootstrap = async () => {
       throw new Error('Invalid ArticleDraft: missing bodyMarkdown');
     }
 
+    // Check if this is a regeneration
+    let previousArticle = null;
+    if (plan.articleId) {
+      previousArticle = await prisma.article.findUnique({
+        where: { id: plan.articleId }
+      });
+    }
+
     const html = await renderArticleMarkdown(draft.bodyMarkdown);
 
     const article = await prisma.article.create({
@@ -1306,7 +1314,8 @@ const bootstrap = async () => {
         title: draft.title,
         markdown: draft.bodyMarkdown,
         html,
-        status: 'DRAFT'
+        status: 'DRAFT',
+        featuredImageUrl: previousArticle?.featuredImageUrl
       }
     });
 
@@ -1342,7 +1351,11 @@ const bootstrap = async () => {
       }
     }
 
-    if (plan.web.articleImageGenerationEnabled !== false) {
+    // Generate image only if enabled AND not a regeneration (unless previous article had no image, maybe? 
+    // User requested to skip image generation on regeneration, so we skip it if it's a regeneration)
+    const shouldGenerateImage = plan.web.articleImageGenerationEnabled !== false && !previousArticle;
+
+    if (shouldGenerateImage) {
       await articleImageQueue.add(
         'GenerateArticleImage',
         {
@@ -1355,8 +1368,8 @@ const bootstrap = async () => {
       logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued GenerateArticleImage job');
     } else {
       logger.info(
-        { jobId: job.id, articleId: article.id, webId: plan.webId },
-        'Skipping article image generation because it is disabled for this web'
+        { jobId: job.id, articleId: article.id, webId: plan.webId, isRegeneration: !!previousArticle },
+        'Skipping article image generation (disabled or regeneration)'
       );
 
       if (publishOptions) {
