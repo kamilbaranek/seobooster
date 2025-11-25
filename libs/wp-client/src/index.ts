@@ -10,6 +10,7 @@ export interface WordpressCredentials {
   username: string;
   applicationPassword: string;
   autoPublishMode?: WordpressPublishMode;
+  approvalEmail?: string;
 }
 
 export type WordpressPostStatus = 'draft' | 'publish';

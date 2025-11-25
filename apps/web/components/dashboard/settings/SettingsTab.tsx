@@ -44,6 +44,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     const [wpUsername, setWpUsername] = useState('');
     const [wpPassword, setWpPassword] = useState('');
     const [wpAutoPublishMode, setWpAutoPublishMode] = useState<'draft_only' | 'manual_approval' | 'auto_publish'>('draft_only');
+    const [wpApprovalEmail, setWpApprovalEmail] = useState('');
     const [hasCredentials, setHasCredentials] = useState(false);
     const [editingUsername, setEditingUsername] = useState(false);
     const [editingPassword, setEditingPassword] = useState(false);
@@ -396,6 +397,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                     setWpUsername(response.credentials.username || '');
                     setWpPassword('************'); // Masked
                     setWpAutoPublishMode(response.credentials.autoPublishMode || 'draft_only');
+                    setWpApprovalEmail(response.credentials.approvalEmail || '');
                 }
             } catch (error) {
                 console.error('Failed to fetch credentials:', error);
@@ -484,7 +486,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                         baseUrl: project.url,
                         username: wpUsername,
                         applicationPassword: wpPassword === '************' ? undefined : wpPassword,
-                        autoPublishMode: mode
+                        autoPublishMode: mode,
+                        approvalEmail: wpApprovalEmail
                     }
                 }),
                 headers: { 'Content-Type': 'application/json' }
@@ -494,6 +497,34 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
             Swal.fire('Success', 'Auto-publish mode updated successfully', 'success');
         } catch (error) {
             Swal.fire('Error', 'Failed to update auto-publish mode', 'error');
+        }
+    };
+
+    const handleSaveApprovalEmail = async () => {
+        if (!hasCredentials) {
+            Swal.fire('Error', 'Please configure WordPress credentials first', 'error');
+            return;
+        }
+
+        try {
+            await apiFetch(`/webs/${project.id}/credentials`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    credentials: {
+                        type: 'wordpress_application_password',
+                        baseUrl: project.url,
+                        username: wpUsername,
+                        applicationPassword: wpPassword === '************' ? undefined : wpPassword,
+                        autoPublishMode: wpAutoPublishMode,
+                        approvalEmail: wpApprovalEmail
+                    }
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            Swal.fire('Success', 'Approval email updated successfully', 'success');
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update approval email', 'error');
         }
     };
 
@@ -1011,6 +1042,24 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                         </label>
                                     </div>
                                 </div>
+                                {wpAutoPublishMode === 'manual_approval' && (
+                                    <div className="mt-5">
+                                        <label className="fs-6 fw-semibold mb-2">Approval Email</label>
+                                        <div className="input-group">
+                                            <input
+                                                type="email"
+                                                className="form-control form-control-solid"
+                                                placeholder="Enter email for approval notifications"
+                                                value={wpApprovalEmail}
+                                                onChange={(e) => setWpApprovalEmail(e.target.value)}
+                                            />
+                                            <button className="btn btn-light-primary" type="button" onClick={handleSaveApprovalEmail}>
+                                                Save
+                                            </button>
+                                        </div>
+                                        <div className="form-text">We will send an email to this address when an article is ready for review.</div>
+                                    </div>
+                                )}
                             </div>
                             {/*end::Col*/}
                         </div>
