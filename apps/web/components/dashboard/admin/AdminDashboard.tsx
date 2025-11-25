@@ -80,14 +80,21 @@ const AdminDashboard = () => {
         },
         plotOptions: {
             bar: {
-                borderRadius: 4,
+                borderRadius: 6,
+                columnWidth: '40%',
                 horizontal: false,
             }
         },
         dataLabels: { enabled: false },
         xaxis: {
             categories: chartData?.dailyCosts.map(d => d.date) || [],
+            axisBorder: { show: false },
+            axisTicks: { show: false },
             labels: {
+                style: {
+                    colors: '#A1A5B7',
+                    fontSize: '10px'
+                },
                 formatter: (val) => {
                     const date = new Date(val);
                     return `${date.getMonth() + 1}/${date.getDate()}`;
@@ -96,7 +103,25 @@ const AdminDashboard = () => {
         },
         yaxis: {
             labels: {
+                style: {
+                    colors: '#A1A5B7',
+                    fontSize: '10px'
+                },
                 formatter: (val) => `$${val.toFixed(2)}`
+            }
+        },
+        grid: {
+            borderColor: '#E4E6EF',
+            strokeDashArray: 3,
+            yaxis: {
+                lines: {
+                    show: true
+                }
+            },
+            xaxis: {
+                lines: {
+                    show: false
+                }
             }
         },
         tooltip: {
@@ -311,8 +336,8 @@ const AdminDashboard = () => {
                     {/*end::Col*/}
                     {/*begin::Col*/}
                     <div className="col-xxl-6 mb-5 mb-xl-10">
-                        {/*begin::Chart widget 13*/}
-                        <div className="card card-flush h-md-100">
+                        {/*begin::Chart widget 15*/}
+                        <div className="card card-flush h-xl-100">
                             {/*begin::Header*/}
                             <div className="card-header pt-7">
                                 {/*begin::Title*/}
@@ -321,6 +346,34 @@ const AdminDashboard = () => {
                                     <span className="text-gray-500 pt-2 fw-semibold fs-6">Last 30 Days</span>
                                 </h3>
                                 {/*end::Title*/}
+                                {/*begin::Toolbar*/}
+                                <div className="card-toolbar">
+                                    {/*begin::Menu*/}
+                                    <button className="btn btn-icon btn-color-gray-500 btn-active-color-primary justify-content-end" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end" data-kt-menu-overflow="true">
+                                        <i className="ki-outline ki-dots-square fs-1 text-gray-500 me-n1"></i>
+                                    </button>
+                                    {/*begin::Menu*/}
+                                    <div className="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold w-100px py-4" data-kt-menu="true">
+                                        {/*begin::Menu item*/}
+                                        <div className="menu-item px-3">
+                                            <a href="#" className="menu-link px-3">Remove</a>
+                                        </div>
+                                        {/*end::Menu item*/}
+                                        {/*begin::Menu item*/}
+                                        <div className="menu-item px-3">
+                                            <a href="#" className="menu-link px-3">Mute</a>
+                                        </div>
+                                        {/*end::Menu item*/}
+                                        {/*begin::Menu item*/}
+                                        <div className="menu-item px-3">
+                                            <a href="#" className="menu-link px-3">Settings</a>
+                                        </div>
+                                        {/*end::Menu item*/}
+                                    </div>
+                                    {/*end::Menu*/}
+                                    {/*end::Menu*/}
+                                </div>
+                                {/*end::Toolbar*/}
                             </div>
                             {/*end::Header*/}
                             {/*begin::Body*/}
@@ -332,13 +385,14 @@ const AdminDashboard = () => {
                                         series={[{ name: 'Cost', data: chartData.dailyCosts.map(d => d.cost) }]}
                                         type="bar"
                                         height={350}
+                                        className="min-h-auto ps-4 pe-6 mb-3 h-350px"
                                     />
                                 )}
                                 {/*end::Chart container*/}
                             </div>
                             {/*end::Body*/}
                         </div>
-                        {/*end::Chart widget 13*/}
+                        {/*end::Chart widget 15*/}
                     </div>
                     {/*end::Col*/}
                 </div>
