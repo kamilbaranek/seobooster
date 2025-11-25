@@ -106,7 +106,8 @@ export class AuthService {
         webs: user.webs.map((web) => ({
           id: web.id,
           url: web.url,
-          status: web.status as WebStatus
+          status: web.status as WebStatus,
+          onboardingStep: web.onboardingStep ?? undefined
         })),
         planName: user.subscriptions[0]?.planId ? getPlanById(user.subscriptions[0].planId)?.name : undefined
       }

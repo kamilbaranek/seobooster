@@ -10,7 +10,7 @@ interface AuthResponse {
   user: {
     id: string;
     email: string;
-    webs: Array<{ id: string; url: string; status: string }>;
+    webs: Array<{ id: string; url: string; status: string; onboardingStep?: number }>;
   };
 }
 
@@ -33,7 +33,19 @@ const LoginPage = () => {
         skipAuth: true
       });
       saveToken(data.accessToken);
-      router.push('/dashboard');
+      saveToken(data.accessToken);
+
+      const webs = data.user.webs;
+      if (webs.length === 0) {
+        router.push('/onboarding/wizard');
+      } else {
+        const incompleteWeb = webs.find(w => (w.onboardingStep || 0) < 7);
+        if (incompleteWeb) {
+          router.push(`/onboarding/wizard?webId=${incompleteWeb.id}`);
+        } else {
+          router.push('/dashboard');
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nepodařilo se přihlásit.');
     } finally {

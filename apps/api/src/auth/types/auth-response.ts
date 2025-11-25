@@ -16,6 +16,7 @@ export interface AuthResponse {
       id: string;
       url: string;
       status: WebStatus;
+      onboardingStep?: number;
     }>;
     planName?: string;
   };
