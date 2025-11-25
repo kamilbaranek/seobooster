@@ -363,13 +363,12 @@ const WizardPage = () => {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
                             </form>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div >
-            </DashboardLayout >
+            </DashboardLayout>
         </>
     );
 };
