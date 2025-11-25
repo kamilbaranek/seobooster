@@ -17,6 +17,7 @@ import { AdminAiLogsModule } from './admin/ai-logs/admin-ai-logs.module';
 import { AssetStorageModule } from './storage/asset-storage.module';
 import { ArticlesModule } from './articles/articles.module';
 import { MagicLinksModule } from './magic-links/magic-links.module';
+import { AdminStatsModule } from './admin/stats/admin-stats.module';
 
 @Module({
   imports: [
@@ -80,7 +81,8 @@ import { MagicLinksModule } from './magic-links/magic-links.module';
     AssetStorageModule,
     AssetStorageModule,
     ArticlesModule,
-    MagicLinksModule
+    MagicLinksModule,
+    AdminStatsModule
   ],
   controllers: [AppController],
   providers: [AppService, RolesGuard]

@@ -12,12 +12,21 @@ export interface AiProviderConfig {
   baseUrl?: string;
 }
 
+export interface AiUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  totalCost?: number; // In USD
+  currency?: string;
+}
+
 export interface ScanResult {
   url: string;
   title: string;
   description?: string;
   keywords: string[];
   detectedTechnologies: string[];
+  usage?: AiUsage;
 }
 
 export interface BusinessProfile {
@@ -27,6 +36,7 @@ export interface BusinessProfile {
   audience: string[];
   differentiators: string[];
   main_products_or_services?: BusinessProduct[];
+  usage?: AiUsage;
 }
 
 export interface BusinessProduct {
@@ -55,6 +65,7 @@ export interface SeoStrategy {
     }>;
   }>;
   total_clusters: number;
+  usage?: AiUsage;
 }
 
 export interface ArticleDraft {
@@ -63,6 +74,7 @@ export interface ArticleDraft {
   bodyMarkdown: string;
   keywords: string[];
   callToAction?: string;
+  usage?: AiUsage;
 }
 
 /**
@@ -89,11 +101,7 @@ export interface ChatOptions {
 export interface ChatResult {
   content: string;
   finishReason?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
+  usage?: AiUsage;
 }
 
 export interface AiProvider {
@@ -144,6 +152,7 @@ export interface GeneratedImageResult {
   mimeType: string;
   source?: string;
   suggestedFileName?: string;
+  usage?: AiUsage;
 }
 
 export type PromptOverrides<TTask extends AiTaskType> = {

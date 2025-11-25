@@ -62,7 +62,7 @@ import {
 } from '@seobooster/queue-types';
 import { createLogger } from './logger';
 import { aiProvider, aiModelMap } from './services/ai-orchestrator';
-import type { AiTaskType, ArticleDraft, BusinessProfile, ProviderName, ScanResult, SeoStrategy } from '@seobooster/ai-types';
+import type { AiTaskType, ArticleDraft, BusinessProfile, ProviderName, ScanResult, SeoStrategy, AiUsage } from '@seobooster/ai-types';
 import { DEFAULT_PROMPTS, renderPromptTemplate } from '@seobooster/ai-prompts';
 import { buildAiProviderFromEnv } from '@seobooster/ai-providers';
 import { createAssetStorage, type AssetStorageDriver } from '@seobooster/storage';
@@ -462,13 +462,13 @@ const runPromptSteps = async <TOutput = unknown>(
 
     // Extract content from previous step if available
     const previousStepContent = previousStepOutput && typeof previousStepOutput === 'object' && 'content' in previousStepOutput
-      ? previousStepOutput.content
+      ? (previousStepOutput as { content: unknown }).content
       : null;
 
     // Extract content from all previous steps
     const stepContents = Object.fromEntries(
       Object.entries(stepOutputs).map(([k, v]) => {
-        const content = v && typeof v === 'object' && 'content' in v ? v.content : null;
+        const content = v && typeof v === 'object' && 'content' in v ? (v as { content: unknown }).content : null;
         return [`step${k}Content`, content];
       })
     );
@@ -516,7 +516,10 @@ const runPromptSteps = async <TOutput = unknown>(
       const fullStepOutput = {
         content: finalText,
         rawResponse: rawResponse,
-        parsed: forceJson ? parseJsonContent(finalText) : finalText
+        parsed: forceJson ? parseJsonContent(finalText) : finalText,
+        usage: chatResult.usage,
+        provider: providerName,
+        model: modelName
       };
 
       stepOutputs[i] = fullStepOutput;
@@ -597,6 +600,33 @@ const recordAiCall = async (payload: AiCallLogInput) => {
     });
   } catch (error) {
     logger.error({ error, task: payload.task, webId: payload.webId }, 'Failed to persist AI call log');
+  }
+};
+
+const recordAiCost = async (payload: {
+  webId: string;
+  articleId?: string | null;
+  provider: string;
+  model: string;
+  usage: AiUsage;
+  type: 'TEXT' | 'IMAGE';
+}) => {
+  try {
+    await prisma.aiCost.create({
+      data: {
+        webId: payload.webId,
+        articleId: payload.articleId,
+        provider: payload.provider,
+        model: payload.model,
+        inputTokens: payload.usage.promptTokens,
+        outputTokens: payload.usage.completionTokens,
+        totalCost: payload.usage.totalCost ?? 0,
+        currency: payload.usage.currency ?? 'USD',
+        type: payload.type
+      }
+    });
+  } catch (error) {
+    logger.error({ error, ...payload }, 'Failed to persist AI cost');
   }
 };
 
@@ -1256,7 +1286,7 @@ const bootstrap = async () => {
       where: { task: 'article' },
       orderBy: { orderIndex: 'asc' }
     });
-    const { finalOutput: draft } = await runPromptSteps(
+    const { finalOutput: draft, stepOutputs } = await runPromptSteps(
       'article',
       promptsArray as PromptStep[],
       promptVariables,
@@ -1297,6 +1327,25 @@ const bootstrap = async () => {
         featuredImageUrl: previousArticle?.featuredImageUrl
       }
     });
+
+    // Save AI costs
+    if (stepOutputs) {
+      for (const output of Object.values(stepOutputs)) {
+        const stepOutput = output as { usage?: AiUsage; provider?: string; model?: string };
+        const usage = stepOutput.usage;
+
+        if (usage) {
+          await recordAiCost({
+            webId: plan.webId,
+            articleId: article.id,
+            provider: stepOutput.provider ?? 'unknown',
+            model: stepOutput.model ?? 'unknown',
+            usage,
+            type: 'TEXT'
+          });
+        }
+      }
+    }
 
     await prisma.articlePlan.update({
       where: { id: plan.id },
@@ -1551,10 +1600,40 @@ const bootstrap = async () => {
         variables: finalVariables,
         systemPrompt: renderedPrompts.systemPrompt ?? '',
         userPrompt: renderedPrompts.userPrompt,
-        responseRaw: rawResponse ?? { source: imageResult.source },
+        responseRaw: rawResponse,
         responseParsed: { source: imageResult.source },
         status: 'SUCCESS'
       });
+
+      // Save costs for pre-steps
+      if (stepOutputs) {
+        for (const output of Object.values(stepOutputs)) {
+          const stepOutput = output as { usage?: AiUsage; provider?: string; model?: string };
+          const usage = stepOutput.usage;
+          if (usage) {
+            await recordAiCost({
+              webId: article.webId,
+              articleId: article.id,
+              provider: stepOutput.provider ?? 'unknown',
+              model: stepOutput.model ?? 'unknown',
+              usage,
+              type: 'TEXT'
+            });
+          }
+        }
+      }
+
+      // Save cost for image generation
+      if (imageResult.usage) {
+        await recordAiCost({
+          webId: article.webId,
+          articleId: article.id,
+          provider: providerName,
+          model: modelName,
+          usage: imageResult.usage,
+          type: 'IMAGE'
+        });
+      }
     } catch (error) {
       const rawResponse =
         typeof providerForCall.getLastRawResponse === 'function'

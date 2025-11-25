@@ -12,7 +12,8 @@ import {
   ScanResult,
   SeoStrategy,
   AiTaskType,
-  PromptOverrides
+  PromptOverrides,
+  AiUsage
 } from '@seobooster/ai-types';
 
 interface GoogleAiProviderConfig extends AiProviderConfig {
@@ -43,6 +44,11 @@ type GoogleGenerateContentResponse = {
     };
     finishReason?: string;
   }>;
+  usageMetadata?: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
   error?: {
     code: number;
     message: string;
@@ -74,6 +80,13 @@ type ImagenPredictResponse = {
   };
 };
 
+// Simple pricing map (USD per 1M tokens)
+const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
+  'gemini-1.5-flash': { prompt: 0.075, completion: 0.3 },
+  'gemini-1.5-pro': { prompt: 1.25, completion: 5 },
+  'gemini-1.0-pro': { prompt: 0.5, completion: 1.5 },
+};
+
 export class GoogleAiProvider implements AiProvider {
   readonly name = 'google' as const;
   private lastRawResponse: unknown;
@@ -89,13 +102,23 @@ export class GoogleAiProvider implements AiProvider {
     return this.lastMessageContent;
   }
 
+  private calculateCost(model: string, usage: { promptTokenCount: number; candidatesTokenCount: number }): number {
+    // Try to match model name (e.g. 'gemini-1.5-flash-latest' -> 'gemini-1.5-flash')
+    const pricingKey = Object.keys(MODEL_PRICING).find(key => model.includes(key));
+    const pricing = pricingKey ? MODEL_PRICING[pricingKey] : { prompt: 0, completion: 0 };
+
+    const promptCost = (usage.promptTokenCount / 1000000) * pricing.prompt;
+    const completionCost = (usage.candidatesTokenCount / 1000000) * pricing.completion;
+    return promptCost + completionCost;
+  }
+
   private async callGemini<T>(
     task: AiTaskType,
     systemPrompt: string,
     userPrompt: string,
     forceJsonResponse: boolean,
     fallback: T
-  ): Promise<T> {
+  ): Promise<T & { usage?: AiUsage }> {
     const apiKey = this.config.apiKey;
     const model = this.config.modelMap[task] ?? this.config.model;
     this.lastRawResponse = undefined;
@@ -103,7 +126,7 @@ export class GoogleAiProvider implements AiProvider {
 
     if (!apiKey) {
       this.lastRawResponse = { error: 'missing_api_key' };
-      return fallback;
+      return { ...fallback, usage: undefined };
     }
 
     // Combine system and user prompts for Gemini
@@ -155,9 +178,20 @@ export class GoogleAiProvider implements AiProvider {
       throw new Error(`Google AI API error: ${parsed.error.message} (${parsed.error.status})`);
     }
 
+    let usage: AiUsage | undefined;
+    if (parsed.usageMetadata) {
+      usage = {
+        promptTokens: parsed.usageMetadata.promptTokenCount,
+        completionTokens: parsed.usageMetadata.candidatesTokenCount,
+        totalTokens: parsed.usageMetadata.totalTokenCount,
+        totalCost: this.calculateCost(model, parsed.usageMetadata),
+        currency: 'USD'
+      };
+    }
+
     const candidate = parsed.candidates?.[0];
     if (!candidate?.content?.parts?.[0]?.text) {
-      return fallback;
+      return { ...fallback, usage };
     }
 
     const text = candidate.content.parts[0].text;
@@ -170,13 +204,18 @@ export class GoogleAiProvider implements AiProvider {
         if (cleanText.startsWith('```')) {
           cleanText = cleanText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
         }
-        return JSON.parse(cleanText) as T;
+        const json = JSON.parse(cleanText) as T;
+        if (typeof json === 'object' && json !== null && 'data' in json && 'success' in json) {
+          const structured = json as { success: boolean; data: T };
+          return structured.success ? { ...structured.data, usage } : { ...fallback, usage };
+        }
+        return { ...json, usage };
       } catch (error) {
         throw new Error(`Failed to parse JSON response from Google AI: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 
-    return text as T;
+    return { ...(text as unknown as T), usage };
   }
 
   async scanWebsite(url: string, overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
@@ -370,11 +409,21 @@ export class GoogleAiProvider implements AiProvider {
       sizeBytes: buffer.length
     });
 
+    // Imagen cost calculation (approximate)
+    const usage: AiUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      totalCost: 0.04, // Approx cost per image for Imagen 3
+      currency: 'USD'
+    };
+
     return {
       data: buffer,
       mimeType,
       source: `google:${model}`,
-      suggestedFileName: request.suggestedFileName ?? 'article-image'
+      suggestedFileName: request.suggestedFileName ?? 'article-image',
+      usage
     };
   }
 
@@ -439,11 +488,23 @@ export class GoogleAiProvider implements AiProvider {
     const buffer = Buffer.from(imageData.data, 'base64');
     const mimeType = imageData.mimeType;
 
+    let usage: AiUsage | undefined;
+    if (result.usageMetadata) {
+      usage = {
+        promptTokens: result.usageMetadata.promptTokenCount,
+        completionTokens: result.usageMetadata.candidatesTokenCount,
+        totalTokens: result.usageMetadata.totalTokenCount,
+        totalCost: this.calculateCost(model, result.usageMetadata),
+        currency: 'USD'
+      };
+    }
+
     return {
       data: buffer,
       mimeType,
       source: `google:${model}`,
-      suggestedFileName: request.suggestedFileName ?? 'article-image'
+      suggestedFileName: request.suggestedFileName ?? 'article-image',
+      usage
     };
   }
 
@@ -455,7 +516,7 @@ export class GoogleAiProvider implements AiProvider {
       maxTokens?: number;
       responseFormat?: 'text' | 'json_object';
     }
-  ): Promise<{ content: string; finishReason?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  ): Promise<{ content: string; finishReason?: string; usage?: AiUsage }> {
     const systemMsg = messages.find(m => m.role === 'system')?.content ?? '';
     const userMsg = messages.find(m => m.role === 'user')?.content ?? '';
     const combinedPrompt = systemMsg ? `${systemMsg}\n\n${userMsg}` : userMsg;
@@ -503,10 +564,21 @@ export class GoogleAiProvider implements AiProvider {
     const content = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     this.lastMessageContent = content;
 
+    let usage: AiUsage | undefined;
+    if (result.usageMetadata) {
+      usage = {
+        promptTokens: result.usageMetadata.promptTokenCount,
+        completionTokens: result.usageMetadata.candidatesTokenCount,
+        totalTokens: result.usageMetadata.totalTokenCount,
+        totalCost: this.calculateCost(model, result.usageMetadata),
+        currency: 'USD'
+      };
+    }
+
     return {
       content,
       finishReason: result.candidates?.[0]?.finishReason,
-      usage: undefined
+      usage
     };
   }
 }

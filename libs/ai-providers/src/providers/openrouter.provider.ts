@@ -13,7 +13,8 @@ import {
   ScanResult,
   SeoStrategy,
   AiTaskType,
-  PromptOverrides
+  PromptOverrides,
+  AiUsage
 } from '@seobooster/ai-types';
 
 interface OpenRouterProviderConfig extends AiProviderConfig {
@@ -81,6 +82,20 @@ const STRATEGY_JSON_SCHEMA = {
   additionalProperties: false
 } as const;
 
+// Simple pricing map (USD per 1M tokens)
+// This should ideally be fetched from an API or config
+const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
+  'openai/gpt-4o': { prompt: 5, completion: 15 },
+  'openai/gpt-4o-mini': { prompt: 0.15, completion: 0.6 },
+  'anthropic/claude-3.5-sonnet': { prompt: 3, completion: 15 },
+  'anthropic/claude-3-haiku': { prompt: 0.25, completion: 1.25 },
+  'google/gemini-flash-1.5': { prompt: 0.075, completion: 0.3 },
+  'google/gemini-pro-1.5': { prompt: 1.25, completion: 5 },
+  'perplexity/llama-3.1-sonar-small-128k-online': { prompt: 0.2, completion: 0.2 },
+  'perplexity/llama-3.1-sonar-large-128k-online': { prompt: 1, completion: 1 },
+  'perplexity/llama-3.1-sonar-huge-128k-online': { prompt: 5, completion: 5 },
+};
+
 export class OpenRouterProvider implements AiProvider {
   name: AiProvider['name'] = 'openrouter';
   private lastRawResponse: unknown;
@@ -96,13 +111,20 @@ export class OpenRouterProvider implements AiProvider {
     return this.lastMessageContent;
   }
 
+  private calculateCost(model: string, usage: { prompt_tokens: number; completion_tokens: number }): number {
+    const pricing = MODEL_PRICING[model] || { prompt: 0, completion: 0 };
+    const promptCost = (usage.prompt_tokens / 1000000) * pricing.prompt;
+    const completionCost = (usage.completion_tokens / 1000000) * pricing.completion;
+    return promptCost + completionCost;
+  }
+
   private async requestJson<T>(
     task: AiTaskType,
     systemPrompt: string,
     userPrompt: string,
     forceJsonResponse: boolean,
     fallback: T
-  ): Promise<T> {
+  ): Promise<T & { usage?: AiUsage }> {
     const apiKey = this.config.apiKey;
     const model = this.config.modelMap[task] ?? this.config.model;
     this.lastRawResponse = undefined;
@@ -110,7 +132,7 @@ export class OpenRouterProvider implements AiProvider {
 
     if (!apiKey) {
       this.lastRawResponse = { error: 'missing_api_key' };
-      return fallback;
+      return { ...fallback, usage: undefined };
     }
 
     const body: Record<string, unknown> = {
@@ -170,6 +192,11 @@ export class OpenRouterProvider implements AiProvider {
 
     const completionTyped = completion as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+      };
     };
 
     const content = completionTyped.choices?.[0]?.message?.content;
@@ -186,6 +213,17 @@ export class OpenRouterProvider implements AiProvider {
         `Model ${model} is a research model designed for long-form reports, not structured JSON output. ` +
         `Please use a standard model like 'perplexity/llama-3.1-sonar-small-128k-online' or switch to a different provider.`
       );
+    }
+
+    let usage: AiUsage | undefined;
+    if (completionTyped.usage) {
+      usage = {
+        promptTokens: completionTyped.usage.prompt_tokens,
+        completionTokens: completionTyped.usage.completion_tokens,
+        totalTokens: completionTyped.usage.total_tokens,
+        totalCost: this.calculateCost(model, completionTyped.usage),
+        currency: 'USD'
+      };
     }
 
     const tryParseJson = (text: string): JsonResponse<T> | T => {
@@ -210,7 +248,7 @@ export class OpenRouterProvider implements AiProvider {
               `This may indicate an incompatible model or prompt issue.`
             );
           }
-          return fallback;
+          return { ...fallback, usage };
         }
       } else {
         if (forceJsonResponse) {
@@ -220,15 +258,15 @@ export class OpenRouterProvider implements AiProvider {
             `The model may not support structured output.`
           );
         }
-        return fallback;
+        return { ...fallback, usage };
       }
     }
     if (typeof parsed === 'object' && parsed !== null && 'data' in parsed && 'success' in parsed) {
       const structured = parsed as JsonResponse<T>;
-      return structured.success ? structured.data : fallback;
+      return structured.success ? { ...structured.data, usage } : { ...fallback, usage };
     }
 
-    return parsed as T;
+    return { ...(parsed as T), usage };
   }
 
   async scanWebsite(url: string, overrides?: PromptOverrides<'scan'>): Promise<ScanResult> {
@@ -373,11 +411,21 @@ export class OpenRouterProvider implements AiProvider {
     const buffer = Buffer.from(arrayBuffer);
     this.lastRawResponse = { source: url.toString(), bytes: buffer.length };
 
+    // Pollinations AI is free, so cost is 0
+    const usage: AiUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      currency: 'USD'
+    };
+
     return {
       data: buffer,
       mimeType,
       source: url.toString(),
-      suggestedFileName: request.suggestedFileName ?? 'article-image'
+      suggestedFileName: request.suggestedFileName ?? 'article-image',
+      usage
     };
   }
 
@@ -389,7 +437,7 @@ export class OpenRouterProvider implements AiProvider {
       maxTokens?: number;
       responseFormat?: 'text' | 'json_object';
     }
-  ): Promise<{ content: string; finishReason?: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  ): Promise<{ content: string; finishReason?: string; usage?: AiUsage }> {
     const apiKey = this.config.apiKey;
     const model = options?.model ?? this.config.model;
 
@@ -443,14 +491,21 @@ export class OpenRouterProvider implements AiProvider {
     this.lastRawResponse = data;
     this.lastMessageContent = data.choices[0]?.message?.content;
 
+    let usage: AiUsage | undefined;
+    if (data.usage) {
+      usage = {
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+        totalCost: this.calculateCost(model, data.usage),
+        currency: 'USD'
+      };
+    }
+
     return {
       content: data.choices[0]?.message?.content ?? '',
       finishReason: data.choices[0]?.finish_reason,
-      usage: data.usage ? {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens
-      } : undefined
+      usage
     };
   }
 

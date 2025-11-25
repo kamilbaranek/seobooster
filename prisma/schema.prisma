@@ -112,6 +112,7 @@ model Web {
   aiCallLogs                    AiCallLog[]
   seoStrategies                 SeoStrategy[]
   magicLinks                    MagicLink[]
+  aiCosts                       AiCost[]
 
   faviconUrl                    String?
   faviconSourceUrl              String?
@@ -215,6 +216,7 @@ model Article {
   plan           ArticlePlan?           @relation("ArticlePlanArticle")
   images         ArticleImage[]
   magicLinks     MagicLink[]
+  aiCosts        AiCost[]
   feedbackRating  Int?
   feedbackComment String?
 
@@ -393,4 +395,29 @@ model WebProduct {
   source     String?  @default("business_profile")
 
   @@index([webId])
+}
+
+enum AiCostType {
+  TEXT
+  IMAGE
+}
+
+model AiCost {
+  id           String     @id @default(cuid())
+  web          Web        @relation(fields: [webId], references: [id], onDelete: Cascade)
+  webId        String
+  article      Article?   @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  articleId    String?
+  provider     String
+  model        String
+  inputTokens  Int        @default(0)
+  outputTokens Int        @default(0)
+  totalCost    Float      @default(0)
+  currency     String     @default("USD")
+  type         AiCostType
+  createdAt    DateTime   @default(now())
+
+  @@index([webId])
+  @@index([articleId])
+  @@index([createdAt])
 }
