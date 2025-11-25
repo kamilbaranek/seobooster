@@ -679,8 +679,7 @@ const getPublishedArticlesTable = async (webId: string): Promise<string> => {
   const articles = await prisma.article.findMany({
     where: {
       webId,
-      status: 'PUBLISHED',
-      url: { not: null }
+      status: 'PUBLISHED'
     },
     select: {
       title: true,
@@ -700,35 +699,15 @@ const getPublishedArticlesTable = async (webId: string): Promise<string> => {
   });
 
   if (articles.length === 0) {
-    logger.info({ webId }, 'getPublishedArticlesTable: No articles found with strict filter (PUBLISHED + url). Checking broad filter...');
-
-    // Debug: Check why we didn't find anything
-    const broadArticles = await prisma.article.findMany({
-      where: { webId },
-      select: { id: true, status: true, url: true, title: true },
-      take: 10
-    });
-
-    logger.info(
-      {
-        webId,
-        foundBroad: broadArticles.length,
-        samples: broadArticles
-      },
-      'getPublishedArticlesTable: Broad search results'
-    );
-
     return 'No published articles found.';
   }
-
-  logger.info({ webId, count: articles.length }, 'getPublishedArticlesTable: Found articles');
 
   const header = '| Title | Url | Keywords |\n| --- | --- | --- |';
   const rows = articles.map((article) => {
     const keywords = article.plan?.supportingArticle?.keywords
       ? jsonArrayToStringArray(article.plan.supportingArticle.keywords as Prisma.JsonValue).join(', ')
       : '';
-    return `| ${article.title} | ${article.url} | ${keywords} |`;
+    return `| ${article.title} | ${article.url || ''} | ${keywords} |`;
   });
 
   return [header, ...rows].join('\n');
@@ -1849,7 +1828,14 @@ const bootstrap = async () => {
         updateData.publishedAt = new Date();
         if (response.link) {
           updateData.url = response.link;
+        } else {
+          logger.warn({ jobId: job.id, articleId, response }, 'WordPress publish response missing link');
         }
+      } else if (response.link) {
+        // Even if not publishing (e.g. draft), we might want to know the link, but we only save it to 'url' if published?
+        // The user wants the URL to be saved. If it's a draft, maybe we shouldn't save it to 'url' if 'url' implies public URL.
+        // But for debugging, let's log it.
+        logger.info({ jobId: job.id, articleId, link: response.link }, 'WordPress draft link received');
       }
 
       await prisma.article.update({

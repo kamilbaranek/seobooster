@@ -147,6 +147,11 @@ export const updatePost = (
   payload: WordpressPostPayload
 ): Promise<WordpressPostResponse> => sendRequest(credentials, `/wp-json/wp/v2/posts/${postId}`, 'POST', payload);
 
+export const fetchPost = (
+  credentials: WordpressCredentials,
+  postId: string | number
+): Promise<WordpressPostResponse> => sendRequest(credentials, `/wp-json/wp/v2/posts/${postId}`, 'GET');
+
 export const fetchCategories = (credentials: WordpressCredentials): Promise<WordpressCategory[]> =>
   sendRequest(credentials, '/wp-json/wp/v2/categories?per_page=100', 'GET');
 
