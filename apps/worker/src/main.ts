@@ -1384,16 +1384,27 @@ const bootstrap = async () => {
     const shouldGenerateImage = plan.web.articleImageGenerationEnabled !== false && !previousArticle;
 
     if (shouldGenerateImage) {
+      // Create placeholder image record
+      const imageRecord = await prisma.articleImage.create({
+        data: {
+          articleId: article.id,
+          prompt: 'Generating...', // Placeholder, will be updated by the job
+          status: 'PENDING',
+          isFeatured: true
+        }
+      });
+
       await articleImageQueue.add(
         'GenerateArticleImage',
         {
           articleId: article.id,
+          imageId: imageRecord.id,
           force: false,
           publishOptions
         },
         buildArticleImageJobOptions(article.id)
       );
-      logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued GenerateArticleImage job');
+      logger.info({ jobId: job.id, articleId: article.id, imageId: imageRecord.id }, 'Enqueued GenerateArticleImage job');
     } else {
       logger.info(
         { jobId: job.id, articleId: article.id, webId: plan.webId, isRegeneration: !!previousArticle },
