@@ -1,14 +1,184 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import DashboardLayout from '../../components/dashboard/layout/DashboardLayout';
+import { apiFetch } from '../../lib/api-client';
 
 const WizardPage = () => {
+    const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
-    const [accountType, setAccountType] = useState('personal');
-    const [websiteAge, setWebsiteAge] = useState('2-10');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 8));
-    const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+    // Unified state for all steps
+    const [formData, setFormData] = useState({
+        websiteType: 'personal',
+        websiteAge: '1-1', // Default to 0
+        websiteUrl: '',
+        cmsPlatform: 'wordpress',
+        connectionType: 'application_password',
+        userName: '(Must have Editor privileges)',
+        password: '',
+        projectGoals: [] as string[],
+        targetAudience: '',
+        competitors: ['', '', ''],
+        cta: '',
+        ctaOther: ''
+    });
+
+    // Helper to update state
+    const updateField = (field: string, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const updateCompetitor = (index: number, value: string) => {
+        const newCompetitors = [...formData.competitors];
+        newCompetitors[index] = value;
+        updateField('competitors', newCompetitors);
+    };
+
+    const toggleProjectGoal = (value: string) => {
+        const currentGoals = formData.projectGoals;
+        if (currentGoals.includes(value)) {
+            updateField('projectGoals', currentGoals.filter(g => g !== value));
+        } else {
+            updateField('projectGoals', [...currentGoals, value]);
+        }
+    };
+
+    // Pre-fill data if webId is present
+    useEffect(() => {
+        if (!router.isReady || !router.query.webId) return;
+
+        const fetchWeb = async () => {
+            try {
+                const webId = router.query.webId as string;
+                const [web, credentialsResponse] = await Promise.all([
+                    apiFetch<any>(`/webs/${webId}`),
+                    apiFetch<any>(`/webs/${webId}/credentials`).catch(() => null)
+                ]);
+
+                setFormData(prev => ({
+                    ...prev,
+                    websiteType: web.projectType || 'personal',
+                    websiteAge: web.webAge || '1-1',
+                    websiteUrl: web.url || '',
+                    cmsPlatform: web.platform || 'wordpress',
+                    connectionType: web.integrationType === 'WORDPRESS_APPLICATION_PASSWORD' ? 'application_password' : 'application_password',
+                    userName: credentialsResponse?.credentials?.username || '(Must have Editor privileges)',
+                    password: credentialsResponse?.hasCredentials ? '******' : '',
+                    projectGoals: Array.isArray(web.businessGoal) ? web.businessGoal : (web.businessGoal ? [web.businessGoal] : []),
+                    targetAudience: web.audience?.target || '',
+                    competitors: web.competitors?.urls || ['', '', ''],
+                    cta: ['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : (web.conversionGoal ? 'other' : ''),
+                    ctaOther: !['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : ''
+                }));
+
+                // If we have data, maybe we should advance steps? For now, let's start at 1 but pre-filled.
+            } catch (error) {
+                console.error('Failed to fetch web details:', error);
+            }
+        };
+
+        fetchWeb();
+    }, [router.isReady, router.query.webId]);
+
+    // Validation Logic
+    const isStepValid = () => {
+        // Steps 1-3 are always required
+        if (currentStep === 1) return !!formData.websiteType;
+        if (currentStep === 2) return !!formData.websiteAge && !!formData.cmsPlatform; // URL optional? Assuming yes for now or user can fill later.
+        if (currentStep === 3) return !!formData.connectionType && !!formData.userName; // Password might be empty if not changed? But here it's new.
+
+        // Logic for Steps 4-7 based on Website Age
+        // If Age > 0 ('2-10', '10-50', '50+'), then 4-7 are Optional.
+        // If Age == 0 ('1-1'), then 4-7 are Required.
+        const isNewWebsite = formData.websiteAge === '1-1';
+
+        if (!isNewWebsite) return true; // Optional for older websites
+
+        // Required for new websites
+        if (currentStep === 4) return formData.projectGoals.length > 0;
+        if (currentStep === 5) return !!formData.targetAudience;
+        if (currentStep === 6) return formData.competitors.some(c => !!c); // At least one competitor?
+        if (currentStep === 7) return !!formData.cta;
+
+        return true;
+    };
+
+    const nextStep = () => {
+        if (isStepValid()) {
+            setCurrentStep(prev => Math.min(prev + 1, 8));
+            window.scrollTo(0, 0);
+        } else {
+            alert('Please fill in all required fields.');
+        }
+    };
+
+    const prevStep = () => {
+        setCurrentStep(prev => Math.max(prev - 1, 1));
+        window.scrollTo(0, 0);
+    };
+
+    const handleSubmit = async () => {
+        setIsSubmitting(true);
+        try {
+            let webId = router.query.webId as string;
+
+            // 1. Create Web if not exists
+            if (!webId) {
+                const webPayload = {
+                    url: formData.websiteUrl || `https://placeholder-${Date.now()}.com`, // Fallback if empty
+                    integrationType: formData.connectionType === 'application_password' ? 'WORDPRESS_APPLICATION_PASSWORD' : 'NONE', // Simplify mapping
+                    nickname: formData.websiteUrl,
+                };
+
+                const web = await apiFetch<any>('/webs', {
+                    method: 'POST',
+                    body: JSON.stringify(webPayload),
+                });
+                webId = web.id;
+            }
+
+            // 2. Update Web with details
+            const updatePayload = {
+                onboardingStep: 8,
+                projectType: formData.websiteType,
+                webAge: formData.websiteAge,
+                platform: formData.cmsPlatform,
+                businessGoal: formData.projectGoals,
+                audience: { target: formData.targetAudience },
+                competitors: { urls: formData.competitors },
+                conversionGoal: formData.cta === 'other' ? formData.ctaOther : formData.cta,
+                // Save credentials if provided
+            };
+
+            await apiFetch(`/webs/${webId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(updatePayload),
+            });
+
+            // 3. Save Credentials if WP
+            // Only save if password is NOT masked (******)
+            if (formData.connectionType === 'application_password' && formData.userName && formData.password && formData.password !== '******') {
+                await apiFetch(`/webs/${webId}/credentials`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        username: formData.userName,
+                        applicationPassword: formData.password
+                    }),
+                });
+            }
+
+            // Redirect
+            router.push('/dashboard');
+
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save data. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <>
@@ -97,8 +267,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="personal" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_personal" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_personal">
+                                                            <input type="radio" className="btn-check" name="website_type" value="personal" checked={formData.websiteType === 'personal'} onChange={() => updateField('websiteType', 'personal')} id="kt_create_account_form_website_type_personal" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.websiteType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_website_type_personal">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
@@ -113,8 +283,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="corporate" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_corporate" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${accountType === 'corporate' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_corporate">
+                                                            <input type="radio" className="btn-check" name="website_type" value="corporate" checked={formData.websiteType === 'corporate'} onChange={() => updateField('websiteType', 'corporate')} id="kt_create_account_form_website_type_corporate" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${formData.websiteType === 'corporate' ? 'active' : ''}`} htmlFor="kt_create_account_form_website_type_corporate">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
@@ -162,8 +332,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col">
                                                             {/* begin::Option */}
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${websiteAge === '1-1' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="account_team_size" value="1-1" checked={websiteAge === '1-1'} onChange={() => setWebsiteAge('1-1')} />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '1-1' ? 'active' : ''}`}>
+                                                                <input type="radio" className="btn-check" name="website_age" value="1-1" checked={formData.websiteAge === '1-1'} onChange={() => updateField('websiteAge', '1-1')} />
                                                                 <span className="fw-bold fs-3">0</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -172,8 +342,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col">
                                                             {/* begin::Option */}
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${websiteAge === '2-10' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="account_team_size" value="2-10" checked={websiteAge === '2-10'} onChange={() => setWebsiteAge('2-10')} />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '2-10' ? 'active' : ''}`}>
+                                                                <input type="radio" className="btn-check" name="website_age" value="2-10" checked={formData.websiteAge === '2-10'} onChange={() => updateField('websiteAge', '2-10')} />
                                                                 <span className="fw-bold fs-3">1</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -182,8 +352,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col">
                                                             {/* begin::Option */}
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${websiteAge === '10-50' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="account_team_size" value="10-50" checked={websiteAge === '10-50'} onChange={() => setWebsiteAge('10-50')} />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '10-50' ? 'active' : ''}`}>
+                                                                <input type="radio" className="btn-check" name="website_age" value="10-50" checked={formData.websiteAge === '10-50'} onChange={() => updateField('websiteAge', '10-50')} />
                                                                 <span className="fw-bold fs-3">2-3</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -192,8 +362,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col">
                                                             {/* begin::Option */}
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${websiteAge === '50+' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="account_team_size" value="50+" checked={websiteAge === '50+'} onChange={() => setWebsiteAge('50+')} />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '50+' ? 'active' : ''}`}>
+                                                                <input type="radio" className="btn-check" name="website_age" value="50+" checked={formData.websiteAge === '50+'} onChange={() => updateField('websiteAge', '50+')} />
                                                                 <span className="fw-bold fs-3">4+</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -212,7 +382,7 @@ const WizardPage = () => {
                                                     <label className="form-label mb-3">Website URL</label>
                                                     {/* end::Label */}
                                                     {/* begin::Input */}
-                                                    <input type="text" className="form-control form-control-lg form-control-solid" name="account_name" placeholder="" />
+                                                    <input type="text" className="form-control form-control-lg form-control-solid" name="website_url" placeholder="https://example.com" value={formData.websiteUrl} onChange={(e) => updateField('websiteUrl', e.target.value)} />
                                                     {/* end::Input */}
                                                 </div>
                                                 {/* end::Input group */}
@@ -247,7 +417,7 @@ const WizardPage = () => {
                                                             {/* end:Label */}
                                                             {/* begin:Input */}
                                                             <span className="form-check form-check-custom form-check-solid">
-                                                                <input className="form-check-input" type="radio" name="account_plan" value="1" />
+                                                                <input className="form-check-input" type="radio" name="cms_platform" value="wordpress" checked={formData.cmsPlatform === 'wordpress'} onChange={() => updateField('cmsPlatform', 'wordpress')} />
                                                             </span>
                                                             {/* end:Input */}
                                                         </label>
@@ -273,7 +443,7 @@ const WizardPage = () => {
                                                             {/* end:Label */}
                                                             {/* begin:Input */}
                                                             <span className="form-check form-check-custom form-check-solid">
-                                                                <input className="form-check-input" type="radio" defaultChecked name="account_plan" value="2" />
+                                                                <input className="form-check-input" type="radio" name="cms_platform" value="shopify" checked={formData.cmsPlatform === 'shopify'} onChange={() => updateField('cmsPlatform', 'shopify')} />
                                                             </span>
                                                             {/* end:Input */}
                                                         </label>
@@ -299,7 +469,7 @@ const WizardPage = () => {
                                                             {/* end:Label */}
                                                             {/* begin:Input */}
                                                             <span className="form-check form-check-custom form-check-solid">
-                                                                <input className="form-check-input" type="radio" name="account_plan" value="3" />
+                                                                <input className="form-check-input" type="radio" name="cms_platform" value="wix" checked={formData.cmsPlatform === 'wix'} onChange={() => updateField('cmsPlatform', 'wix')} />
                                                             </span>
                                                             {/* end:Input */}
                                                         </label>
@@ -333,10 +503,10 @@ const WizardPage = () => {
                                                     <label className="form-label required">Connection Type</label>
                                                     {/* end::Label */}
                                                     {/* begin::Input */}
-                                                    <select name="business_type" className="form-select form-select-lg form-select-solid" data-control="select2" data-placeholder="Select..." data-allow-clear="true" data-hide-search="true">
-                                                        <option value="1">Application Password</option>
-                                                        <option value="1">OAuth</option>
-                                                        <option value="2">API Key</option>
+                                                    <select name="connection_type" className="form-select form-select-lg form-select-solid" data-control="select2" data-placeholder="Select..." data-allow-clear="true" data-hide-search="true" value={formData.connectionType} onChange={(e) => updateField('connectionType', e.target.value)}>
+                                                        <option value="application_password">Application Password</option>
+                                                        <option value="oauth">OAuth</option>
+                                                        <option value="api_key">API Key</option>
                                                     </select>
                                                     {/* end::Input */}
                                                 </div>
@@ -347,7 +517,7 @@ const WizardPage = () => {
                                                     <label className="form-label required">User Name</label>
                                                     {/* end::Label */}
                                                     {/* begin::Input */}
-                                                    <input name="business_name" className="form-control form-control-lg form-control-solid" defaultValue="(Must have Editor privileges)" />
+                                                    <input name="user_name" className="form-control form-control-lg form-control-solid" value={formData.userName} onChange={(e) => updateField('userName', e.target.value)} />
                                                     {/* end::Input */}
                                                 </div>
                                                 {/* end::Input group */}
@@ -362,7 +532,7 @@ const WizardPage = () => {
                                                     </label>
                                                     {/* end::Label */}
                                                     {/* begin::Input */}
-                                                    <input name="business_descriptor" className="form-control form-control-lg form-control-solid" defaultValue="" />
+                                                    <input type="password" name="password" className="form-control form-control-lg form-control-solid" value={formData.password} onChange={(e) => updateField('password', e.target.value)} />
                                                     {/* end::Input */}
                                                     {/* begin::Hint */}
                                                     <div className="form-text">Do not enter password to your WP account here, it must be Application Password!</div>
@@ -399,12 +569,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="personal" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_personal" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_personal">
+                                                            <input type="checkbox" className="btn-check" name="project_goals" value="conversions" checked={formData.projectGoals.includes('conversions')} onChange={() => toggleProjectGoal('conversions')} id="kt_create_account_form_goal_conversions" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.projectGoals.includes('conversions') ? 'active' : ''}`} htmlFor="kt_create_account_form_goal_conversions">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Gain Traffic</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Get more conversions</span>
                                                                     <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -415,12 +585,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="corporate" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_corporate" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${accountType === 'corporate' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_corporate">
+                                                            <input type="checkbox" className="btn-check" name="project_goals" value="traffic" checked={formData.projectGoals.includes('traffic')} onChange={() => toggleProjectGoal('traffic')} id="kt_create_account_form_goal_traffic" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.projectGoals.includes('traffic') ? 'active' : ''}`} htmlFor="kt_create_account_form_goal_traffic">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Acquire Customers</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Get more traffic</span>
                                                                     <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -435,8 +605,24 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="brand_awareness" onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_brand_awareness" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_brand_awareness">
+                                                            <input type="checkbox" className="btn-check" name="project_goals" value="acquire_customers" checked={formData.projectGoals.includes('acquire_customers')} onChange={() => toggleProjectGoal('acquire_customers')} id="kt_create_account_form_goal_acquire_customers" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.projectGoals.includes('acquire_customers') ? 'active' : ''}`} htmlFor="kt_create_account_form_goal_acquire_customers">
+                                                                <i className="ki-outline ki-user fs-3x me-5"></i>
+                                                                {/* begin::Info */}
+                                                                <span className="d-block fw-semibold text-start">
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Acquire Customers</span>
+                                                                    <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
+                                                                </span>
+                                                                {/* end::Info */}
+                                                            </label>
+                                                            {/* end::Option */}
+                                                        </div>
+                                                        {/* end::Col */}
+                                                        {/* begin::Col */}
+                                                        <div className="col-lg-6">
+                                                            {/* begin::Option */}
+                                                            <input type="checkbox" className="btn-check" name="project_goals" value="brand_awareness" checked={formData.projectGoals.includes('brand_awareness')} onChange={() => toggleProjectGoal('brand_awareness')} id="kt_create_account_form_goal_brand_awareness" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.projectGoals.includes('brand_awareness') ? 'active' : ''}`} htmlFor="kt_create_account_form_goal_brand_awareness">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
@@ -448,22 +634,6 @@ const WizardPage = () => {
                                                             {/* end::Option */}
                                                         </div>
                                                         {/* end::Col */}
-                                                        {/* begin::Col */}
-                                                        <div className="col-lg-6">
-                                                            {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="magazine" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_magazine" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center`} htmlFor="kt_create_account_form_account_type_magazine">
-                                                                <i className="ki-outline ki-briefcase fs-3x me-5"></i>
-                                                                {/* begin::Info */}
-                                                                <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Magazine</span>
-                                                                    <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
-                                                                </span>
-                                                                {/* end::Info */}
-                                                            </label>
-                                                            {/* end::Option */}
-                                                        </div>
-                                                        {/* end::Col */}
                                                     </div>
                                                     {/* end::Row */}
                                                     {/* begin::Row */}
@@ -471,8 +641,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="other" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_other" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_other">
+                                                            <input type="checkbox" className="btn-check" name="project_goals" value="other" checked={formData.projectGoals.includes('other')} onChange={() => toggleProjectGoal('other')} id="kt_create_account_form_project_goals_other" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.projectGoals.includes('other') ? 'active' : ''}`} htmlFor="kt_create_account_form_project_goals_other">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
@@ -484,16 +654,15 @@ const WizardPage = () => {
                                                             {/* end::Option */}
                                                         </div>
                                                         {/* end::Col */}
-
                                                     </div>
                                                     {/* end::Row */}
-
                                                 </div>
                                                 {/* end::Input group */}
                                             </div>
                                             {/* end::Wrapper */}
                                         </div>
                                         {/* end::Step 4 */}
+                                        {/* begin::Step 5 */}
                                         {/* begin::Step 5 */}
                                         <div className={currentStep === 5 ? 'current' : 'd-none'} data-kt-stepper-element="content">
                                             {/* begin::Wrapper */}
@@ -519,8 +688,8 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="personal" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_personal" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_personal">
+                                                            <input type="radio" className="btn-check" name="target_audience" value="b2b" checked={formData.targetAudience === 'b2b'} onChange={() => updateField('targetAudience', 'b2b')} id="kt_create_account_form_target_audience_b2b" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.targetAudience === 'b2b' ? 'active' : ''}`} htmlFor="kt_create_account_form_target_audience_b2b">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
@@ -535,12 +704,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="corporate" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_corporate" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${accountType === 'corporate' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_corporate">
+                                                            <input type="radio" className="btn-check" name="target_audience" value="b2c" checked={formData.targetAudience === 'b2c'} onChange={() => updateField('targetAudience', 'b2c')} id="kt_create_account_form_target_audience_b2c" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${formData.targetAudience === 'b2c' ? 'active' : ''}`} htmlFor="kt_create_account_form_target_audience_b2c">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Families</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Consumer (B2C)</span>
                                                                     <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -555,12 +724,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="brand_awareness" onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_brand_awareness" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_brand_awareness">
+                                                            <input type="radio" className="btn-check" name="target_audience" value="ecommerce" checked={formData.targetAudience === 'ecommerce'} onChange={() => updateField('targetAudience', 'ecommerce')} id="kt_create_account_form_target_audience_ecommerce" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.targetAudience === 'ecommerce' ? 'active' : ''}`} htmlFor="kt_create_account_form_target_audience_ecommerce">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Professionals</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">E-commerce</span>
                                                                     <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -571,12 +740,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="magazine" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_magazine" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center`} htmlFor="kt_create_account_form_account_type_magazine">
+                                                            <input type="radio" className="btn-check" name="target_audience" value="local_business" checked={formData.targetAudience === 'local_business'} onChange={() => updateField('targetAudience', 'local_business')} id="kt_create_account_form_target_audience_local_business" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${formData.targetAudience === 'local_business' ? 'active' : ''}`} htmlFor="kt_create_account_form_target_audience_local_business">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Hobbyists</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Local Business</span>
                                                                     <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -586,28 +755,6 @@ const WizardPage = () => {
                                                         {/* end::Col */}
                                                     </div>
                                                     {/* end::Row */}
-                                                    {/* begin::Row */}
-                                                    <div className="row">
-                                                        {/* begin::Col */}
-                                                        <div className="col-lg-6">
-                                                            {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="other" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_other" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_other">
-                                                                <i className="ki-outline ki-badge fs-3x me-5"></i>
-                                                                {/* begin::Info */}
-                                                                <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Online audience</span>
-                                                                    <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
-                                                                </span>
-                                                                {/* end::Info */}
-                                                            </label>
-                                                            {/* end::Option */}
-                                                        </div>
-                                                        {/* end::Col */}
-
-                                                    </div>
-                                                    {/* end::Row */}
-
                                                 </div>
                                                 {/* end::Input group */}
                                             </div>
@@ -630,45 +777,35 @@ const WizardPage = () => {
                                                 </div>
                                                 {/* end::Heading */}
                                                 {/* begin::Input group */}
-                                                <div className="d-flex flex-column mb-7 fv-row">
+                                                <div className="fv-row mb-10">
                                                     {/* begin::Label */}
-                                                    <label className="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
-                                                        <span className="">URL</span>
-                                                        <span className="ms-1" data-bs-toggle="tooltip" title="Specify a competitor's url">
-                                                            <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
-                                                        </span>
-                                                    </label>
+                                                    <label className="form-label required">Competitor 1</label>
                                                     {/* end::Label */}
-                                                    <input type="text" className="form-control form-control-solid" placeholder="" name="card_name" defaultValue="www.apple.com" />
+                                                    {/* begin::Input */}
+                                                    <input name="competitor_1" className="form-control form-control-lg form-control-solid" value={formData.competitors[0]} onChange={(e) => updateCompetitor(0, e.target.value)} />
+                                                    {/* end::Input */}
                                                 </div>
                                                 {/* end::Input group */}
                                                 {/* begin::Input group */}
-                                                <div className="d-flex flex-column mb-7 fv-row">
+                                                <div className="fv-row mb-10">
                                                     {/* begin::Label */}
-                                                    <label className="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
-                                                        <span className="">URL</span>
-                                                        <span className="ms-1" data-bs-toggle="tooltip" title="Specify a competitor's url">
-                                                            <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
-                                                        </span>
-                                                    </label>
+                                                    <label className="form-label">Competitor 2</label>
                                                     {/* end::Label */}
-                                                    <input type="text" className="form-control form-control-solid" placeholder="" name="card_name" defaultValue="www.google.com" />
+                                                    {/* begin::Input */}
+                                                    <input name="competitor_2" className="form-control form-control-lg form-control-solid" value={formData.competitors[1]} onChange={(e) => updateCompetitor(1, e.target.value)} />
+                                                    {/* end::Input */}
                                                 </div>
                                                 {/* end::Input group */}
                                                 {/* begin::Input group */}
-                                                <div className="d-flex flex-column mb-7 fv-row">
+                                                <div className="fv-row mb-10">
                                                     {/* begin::Label */}
-                                                    <label className="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
-                                                        <span className="">URL</span>
-                                                        <span className="ms-1" data-bs-toggle="tooltip" title="Specify a competitor's url">
-                                                            <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
-                                                        </span>
-                                                    </label>
+                                                    <label className="form-label">Competitor 3</label>
                                                     {/* end::Label */}
-                                                    <input type="text" className="form-control form-control-solid" placeholder="" name="card_name" defaultValue="www.facebook.com" />
+                                                    {/* begin::Input */}
+                                                    <input name="competitor_3" className="form-control form-control-lg form-control-solid" value={formData.competitors[2]} onChange={(e) => updateCompetitor(2, e.target.value)} />
+                                                    {/* end::Input */}
                                                 </div>
                                                 {/* end::Input group */}
-
                                             </div>
                                             {/* end::Wrapper */}
                                         </div>
@@ -698,12 +835,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="personal" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_personal" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_personal">
+                                                            <input type="radio" className="btn-check" name="cta_action" value="buy_now" checked={formData.cta === 'buy_now'} onChange={() => updateField('cta', 'buy_now')} id="kt_create_account_form_cta_buy_now" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.cta === 'buy_now' ? 'active' : ''}`} htmlFor="kt_create_account_form_cta_buy_now">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Submit an inquiry</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Buy Now</span>
                                                                     <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -714,12 +851,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="corporate" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_corporate" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${accountType === 'corporate' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_corporate">
+                                                            <input type="radio" className="btn-check" name="cta_action" value="sign_up" checked={formData.cta === 'sign_up'} onChange={() => updateField('cta', 'sign_up')} id="kt_create_account_form_cta_sign_up" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center ${formData.cta === 'sign_up' ? 'active' : ''}`} htmlFor="kt_create_account_form_cta_sign_up">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Call you</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Sign Up</span>
                                                                     <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -734,12 +871,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="brand_awareness" onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_brand_awareness" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_brand_awareness">
+                                                            <input type="radio" className="btn-check" name="cta_action" value="contact_us" checked={formData.cta === 'contact_us'} onChange={() => updateField('cta', 'contact_us')} id="kt_create_account_form_cta_contact_us" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.cta === 'contact_us' ? 'active' : ''}`} htmlFor="kt_create_account_form_cta_contact_us">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Read content</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Contact Us</span>
                                                                     <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -750,12 +887,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="magazine" checked={accountType === 'corporate'} onChange={() => setAccountType('corporate')} id="kt_create_account_form_account_type_magazine" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center`} htmlFor="kt_create_account_form_account_type_magazine">
+                                                            <input type="radio" className="btn-check" name="cta_action" value="subscribe" checked={formData.cta === 'subscribe'} onChange={() => updateField('cta', 'subscribe')} id="kt_create_account_form_cta_subscribe" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center`} htmlFor="kt_create_account_form_cta_subscribe">
                                                                 <i className="ki-outline ki-briefcase fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Make a purchase</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Subscribe</span>
                                                                     <span className="text-muted fw-semibold fs-6">Create corporate account to mane users</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -770,28 +907,12 @@ const WizardPage = () => {
                                                         {/* begin::Col */}
                                                         <div className="col-lg-6">
                                                             {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="other" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_other" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_other">
+                                                            <input type="radio" className="btn-check" name="cta_action" value="other" checked={formData.cta === 'other'} onChange={() => updateField('cta', 'other')} id="kt_create_account_form_cta_other" />
+                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${formData.cta === 'other' ? 'active' : ''}`} htmlFor="kt_create_account_form_cta_other">
                                                                 <i className="ki-outline ki-badge fs-3x me-5"></i>
                                                                 {/* begin::Info */}
                                                                 <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Book a service</span>
-                                                                    <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
-                                                                </span>
-                                                                {/* end::Info */}
-                                                            </label>
-                                                            {/* end::Option */}
-                                                        </div>
-                                                        {/* end::Col */}
-                                                        {/* begin::Col */}
-                                                        <div className="col-lg-6">
-                                                            {/* begin::Option */}
-                                                            <input type="radio" className="btn-check" name="account_type" value="other" checked={accountType === 'personal'} onChange={() => setAccountType('personal')} id="kt_create_account_form_account_type_other" />
-                                                            <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary p-7 d-flex align-items-center mb-10 ${accountType === 'personal' ? 'active' : ''}`} htmlFor="kt_create_account_form_account_type_other">
-                                                                <i className="ki-outline ki-badge fs-3x me-5"></i>
-                                                                {/* begin::Info */}
-                                                                <span className="d-block fw-semibold text-start">
-                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Something else</span>
+                                                                    <span className="text-gray-900 fw-bold d-block fs-4 mb-2">Other</span>
                                                                     <span className="text-muted fw-semibold fs-6">If you need more info, please check it out</span>
                                                                 </span>
                                                                 {/* end::Info */}
@@ -802,17 +923,19 @@ const WizardPage = () => {
                                                     </div>
                                                     {/* end::Row */}
                                                     {/* begin::Input group */}
-                                                    <div className="d-flex flex-column mb-7 fv-row">
-                                                        {/* begin::Label */}
-                                                        <label className="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
-                                                            <span className="">Desired User Actions </span>
-                                                            <span className="ms-1" data-bs-toggle="tooltip" title="Specify Desired User Actions">
-                                                                <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
-                                                            </span>
-                                                        </label>
-                                                        {/* end::Label */}
-                                                        <input type="text" className="form-control form-control-solid" placeholder="" name="card_name" defaultValue="Other" />
-                                                    </div>
+                                                    {formData.cta === 'other' && (
+                                                        <div className="d-flex flex-column mb-7 fv-row">
+                                                            {/* begin::Label */}
+                                                            <label className="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
+                                                                <span className="">Desired User Actions </span>
+                                                                <span className="ms-1" data-bs-toggle="tooltip" title="Specify Desired User Actions">
+                                                                    <i className="ki-outline ki-information-5 text-gray-500 fs-6"></i>
+                                                                </span>
+                                                            </label>
+                                                            {/* end::Label */}
+                                                            <input type="text" className="form-control form-control-solid" placeholder="Specify action" name="cta_other" value={formData.ctaOther} onChange={(e) => updateField('ctaOther', e.target.value)} />
+                                                        </div>
+                                                    )}
                                                     {/* end::Input group */}
                                                 </div>
                                                 {/* end::Input group */}
@@ -881,11 +1004,15 @@ const WizardPage = () => {
                                             {/* begin::Wrapper */}
                                             <div>
                                                 {currentStep === 8 ? (
-                                                    <button type="button" className="btn btn-lg btn-primary me-3" data-kt-stepper-action="submit">
-                                                        <span className="indicator-label">Submit
-                                                            <i className="ki-outline ki-arrow-right fs-3 ms-2 me-0"></i></span>
-                                                        <span className="indicator-progress">Please wait...
-                                                            <span className="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                                                    <button type="button" className="btn btn-lg btn-primary me-3" onClick={handleSubmit} disabled={isSubmitting}>
+                                                        <span className="indicator-label">
+                                                            {isSubmitting ? 'Submitting...' : 'Go to Dashboard'}
+                                                            {!isSubmitting && <i className="ki-outline ki-arrow-right fs-3 ms-2 me-0"></i>}
+                                                        </span>
+                                                        {isSubmitting && (
+                                                            <span className="indicator-progress">Please wait...
+                                                                <span className="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                                                        )}
                                                     </button>
                                                 ) : (
                                                     <button type="button" className="btn btn-lg btn-primary" onClick={nextStep}>Continue

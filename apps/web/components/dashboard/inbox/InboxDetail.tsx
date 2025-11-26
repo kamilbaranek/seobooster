@@ -230,6 +230,91 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
             });
         }
     };
+    const [autoPublishMode, setAutoPublishMode] = useState<'draft_only' | 'manual_approval' | 'auto_publish'>('draft_only');
+
+    useEffect(() => {
+        const fetchCredentials = async () => {
+            if (article.webId) {
+                try {
+                    const response = await apiFetch<{ hasCredentials: boolean; credentials?: { autoPublishMode: 'draft_only' | 'manual_approval' | 'auto_publish' } }>(`/webs/${article.webId}/credentials`);
+                    if (response.hasCredentials && response.credentials) {
+                        setAutoPublishMode(response.credentials.autoPublishMode || 'draft_only');
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch credentials:', error);
+                }
+            }
+        };
+        fetchCredentials();
+    }, [article.webId]);
+
+    const handleSend = async (e: React.MouseEvent) => {
+        e.preventDefault();
+
+        if (!article.webId || !article.articleId) {
+            Swal.fire({
+                text: "Missing article information.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+            return;
+        }
+
+        const isAutoPublish = autoPublishMode === 'auto_publish';
+        const actionText = isAutoPublish ? "publish the article immediately" : "send an approval email";
+        const confirmButtonText = isAutoPublish ? "Yes, publish it!" : "Yes, send email!";
+
+        Swal.fire({
+            title: isAutoPublish ? "Publish Article" : "Send for Approval",
+            html: `Are you sure? This will <b>${actionText}</b>.`,
+            icon: "question",
+            showCancelButton: true,
+            buttonsStyling: false,
+            confirmButtonText: confirmButtonText,
+            cancelButtonText: "No, return",
+            customClass: {
+                confirmButton: "btn btn-primary",
+                cancelButton: "btn btn-active-light"
+            }
+        }).then(async function (result) {
+            if (result.value) {
+                try {
+                    const response = await apiFetch<{ queued: boolean; targetStatus: string }>(`/webs/${article.webId}/articles/${article.articleId}/publish`, {
+                        method: 'POST'
+                    });
+
+                    if (response.queued) {
+                        Swal.fire({
+                            text: isAutoPublish ? "Article published successfully!" : "Approval email sent successfully!",
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok, got it!",
+                            customClass: {
+                                confirmButton: "btn btn-primary",
+                            }
+                        });
+                        // Optionally refresh article status here if needed
+                    }
+                } catch (error: any) {
+                    console.error("Failed to publish article:", error);
+                    Swal.fire({
+                        text: error.message || "Failed to process request.",
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary",
+                        }
+                    });
+                }
+            }
+        });
+    };
+
     return (
         <div className="flex-lg-row-fluid ms-lg-7 ms-xl-10">
             {/*begin::Card*/}
@@ -278,7 +363,7 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
                         </a>
                         {/*end::Copy*/}
                         {/*begin::Send*/}
-                        <a href="#" className="btn btn-sm btn-icon btn-light btn-active-light-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Send">
+                        <a href="#" onClick={handleSend} className="btn btn-sm btn-icon btn-light btn-active-light-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Send">
                             <i className="ki-outline ki-send fs-2 m-0"></i>
                         </a>
                         {/*end::Send*/}

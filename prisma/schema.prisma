@@ -142,7 +142,7 @@ model Web {
   projectType       String?                // "commercial" | "non_commercial"
   webAge            String?                // "new" | "history"
   platform          String?                // "wordpress" | "shopify" | "wix" | "other"
-  businessGoal      String?
+  businessGoal      String[]               @default([])
   audience          Json?
   competitors       Json?
   conversionGoal    String?

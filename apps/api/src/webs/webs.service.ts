@@ -417,7 +417,7 @@ export class WebsService {
   async publishArticle(userId: string, webId: string, articleId: string) {
     const web = await this.prisma.web.findFirst({
       where: { id: webId, userId },
-      select: { id: true, integrationType: true }
+      select: { id: true, integrationType: true, credentials: true }
     });
     if (!web) {
       throw new NotFoundException('Website not found');
@@ -431,8 +431,12 @@ export class WebsService {
     if (!article) {
       throw new NotFoundException('Article not found');
     }
-    await this.jobQueueService.enqueuePublishArticle(article.id, 'publish', 'manual');
-    return { queued: true };
+
+    const autoPublishMode = this.resolveAutoPublishMode(web.credentials);
+    const targetStatus = autoPublishMode === 'auto_publish' ? 'publish' : 'draft';
+
+    await this.jobQueueService.enqueuePublishArticle(article.id, targetStatus, 'manual');
+    return { queued: true, targetStatus };
   }
 
   async publishArticles(userId: string, webId: string, articleIds: string[]) {

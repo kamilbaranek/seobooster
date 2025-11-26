@@ -64,8 +64,9 @@ export class UpdateWebDto {
   platform?: string;
 
   @IsOptional()
-  @IsString()
-  businessGoal?: string;
+  @IsArray()
+  @IsString({ each: true })
+  businessGoal?: string[];
 
   @IsOptional()
   @IsObject()
