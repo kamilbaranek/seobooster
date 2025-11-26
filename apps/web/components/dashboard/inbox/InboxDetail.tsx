@@ -22,10 +22,67 @@ interface ArticleImage {
     fileName?: string;
 }
 
-const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
+const InboxDetail: React.FC<InboxDetailProps> = ({ article: initialArticle, onBack }) => {
+    const [article, setArticle] = useState<ArticlePlan>(initialArticle);
     const [images, setImages] = useState<ArticleImage[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+    const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        setArticle(initialArticle);
+        // Default to expanding the active version or the first one
+        if (initialArticle.articleId) {
+            setExpandedVersionId(initialArticle.articleId);
+        } else if (initialArticle.versions && initialArticle.versions.length > 0) {
+            setExpandedVersionId(initialArticle.versions[0].id);
+        }
+    }, [initialArticle]);
+
+    const handleSetVersion = async (versionId: string) => {
+        if (!article.webId || !article.id) return;
+        try {
+            await apiFetch(`/webs/${article.webId}/article-plans/${article.id}/version`, {
+                method: 'PUT',
+                body: JSON.stringify({ articleId: versionId })
+            });
+
+            // Update local state to reflect the change
+            const selectedVersion = article.versions?.find(v => v.id === versionId);
+            if (selectedVersion) {
+                setArticle(prev => ({
+                    ...prev,
+                    articleId: selectedVersion.id,
+                    articleHtml: selectedVersion.html,
+                    articleMarkdown: selectedVersion.markdown,
+                    featuredImageUrl: selectedVersion.featuredImageUrl,
+                    articleCreatedAt: selectedVersion.createdAt,
+                    status: selectedVersion.status // Update status if needed
+                }));
+                setExpandedVersionId(versionId);
+                Swal.fire({
+                    text: "Version set as active successfully!",
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary",
+                    }
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            Swal.fire({
+                text: "Failed to set version as active.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary",
+                }
+            });
+        }
+    };
 
     const fetchImages = async () => {
         if (article.webId && article.articleId) {
@@ -455,81 +512,163 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article, onBack }) => {
 
                     {/*begin::Message accordion*/}
                     <div data-kt-inbox-message="message_wrapper">
-                        {/*begin::Message header*/}
-                        <div className="d-flex flex-wrap gap-2 flex-stack cursor-pointer" data-kt-inbox-message="header">
-                            {/*begin::Actions*/}
-                            <div className="d-flex align-items-center flex-wrap gap-2">
-                                {/*begin::Date*/}
-                                <span className="fw-semibold text-muted text-end me-3">{new Date(article.plannedPublishAt).toLocaleString()}</span>
-                                {/*end::Date*/}
-                                <div className="d-flex">
-                                    {/*begin::Star*/}
-                                    <a href="#" className="btn btn-sm btn-icon btn-clear btn-active-light-primary me-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Star">
-                                        <i className="ki-outline ki-star fs-2 m-0"></i>
-                                    </a>
-                                    {/*end::Star*/}
-                                    {/*begin::Mark as important*/}
-                                    <a href="#" className="btn btn-sm btn-icon btn-clear btn-active-light-primary me-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Mark as important">
-                                        <i className="ki-outline ki-save-2 fs-2 m-0"></i>
-                                    </a>
-                                    {/*end::Mark as important*/}
-                                </div>
-                            </div>
-                            {/*end::Actions*/}
-                        </div>
-                        {/*end::Message header*/}
-                        {/*begin::Message content*/}
-                        <div className="collapse fade show" data-kt-inbox-message="message">
-                            <div className="py-5">
-                                <div className="d-flex align-items-start">
-                                    {/*begin::Image*/}
-                                    {article.featuredImageUrl && (
-                                        <div className="me-7">
-                                            <img
-                                                src={article.featuredImageUrl}
-                                                alt={article.articleTitle}
-                                                className="rounded"
-                                                style={{ width: '200px', height: 'auto' }}
-                                            />
+                        {article.versions && article.versions.length > 0 ? (
+                            article.versions.map((version) => (
+                                <div key={version.id} className="card mb-5 border border-dashed border-gray-300">
+                                    {/*begin::Message header*/}
+                                    <div className="card-header align-items-center px-5 py-3 cursor-pointer" onClick={() => setExpandedVersionId(expandedVersionId === version.id ? null : version.id)}>
+                                        {/*begin::Actions*/}
+                                        <div className="d-flex align-items-center flex-grow-1 gap-2">
+                                            {/*begin::Symbol*/}
+                                            <div className="symbol symbol-35px me-3">
+                                                {version.featuredImageUrl ? (
+                                                    <span className="symbol-label" style={{ backgroundImage: `url(${version.featuredImageUrl})` }}></span>
+                                                ) : (
+                                                    <div className="symbol-label bg-light-primary">
+                                                        <span className="text-primary">V</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/*end::Symbol*/}
+
+                                            <div className="d-flex flex-column">
+                                                <div className="d-flex align-items-center">
+                                                    <span className="fw-bold text-gray-900 me-2">Version {new Date(version.createdAt).toLocaleString()}</span>
+                                                    {article.articleId === version.id && (
+                                                        <span className="badge badge-light-success">Active</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-muted fs-7">{version.status}</span>
+                                            </div>
+                                        </div>
+                                        {/*end::Actions*/}
+
+                                        {/*begin::Toolbar*/}
+                                        <div className="d-flex align-items-center">
+                                            <span className="fw-semibold text-muted me-3 d-none d-sm-block">{new Date(version.createdAt).toLocaleDateString()}</span>
+                                            {article.articleId !== version.id && (
+                                                <button
+                                                    className="btn btn-sm btn-light-primary me-3"
+                                                    onClick={(e) => { e.stopPropagation(); handleSetVersion(version.id); }}
+                                                >
+                                                    Mark as Winner
+                                                </button>
+                                            )}
+                                            <div className={`btn btn-sm btn-icon btn-active-light-primary ${expandedVersionId === version.id ? 'active' : ''}`}>
+                                                <i className={`ki-outline ki-down fs-2 ${expandedVersionId === version.id ? 'rotate-180' : ''}`}></i>
+                                            </div>
+                                        </div>
+                                        {/*end::Toolbar*/}
+                                    </div>
+                                    {/*end::Message header*/}
+
+                                    {/*begin::Message content*/}
+                                    {expandedVersionId === version.id && (
+                                        <div className="card-body p-5">
+                                            <div className="d-flex align-items-start mb-5">
+                                                {/*begin::Image*/}
+                                                {version.featuredImageUrl && (
+                                                    <div className="me-7">
+                                                        <img
+                                                            src={version.featuredImageUrl}
+                                                            alt="Version Image"
+                                                            className="rounded"
+                                                            style={{ width: '200px', height: 'auto' }}
+                                                        />
+                                                    </div>
+                                                )}
+                                                {/*end::Image*/}
+
+                                                {/*begin::Details*/}
+                                                <div className="flex-grow-1">
+                                                    <div className="d-flex flex-column gap-2">
+                                                        <div className="d-flex align-items-center">
+                                                            <span className="text-muted fw-bold me-2">Article Funnel Stage:</span>
+                                                            <span className="fw-semibold text-gray-800">{article.articleFunnelStage}</span>
+                                                        </div>
+                                                        <div className="d-flex align-items-center">
+                                                            <span className="text-muted fw-bold me-2">Article Intent:</span>
+                                                            <span className="fw-semibold text-gray-800">{article.articleIntent}</span>
+                                                        </div>
+                                                        <div className="d-flex align-items-center">
+                                                            <span className="text-muted fw-bold me-2">Cluster Intent:</span>
+                                                            <span className="fw-semibold text-gray-800">{article.clusterIntent}</span>
+                                                        </div>
+                                                        <div className="mt-2">
+                                                            <div className="d-flex flex-wrap gap-2">
+                                                                <span className="text-muted fw-bold d-block mb-2">Keywords:</span>
+                                                                {Array.isArray(article.articleKeywords) && article.articleKeywords.map((keyword: string, index: number) => (
+                                                                    <span key={index} className="badge badge-light-primary">{keyword}</span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/*end::Details*/}
+                                            </div>
+                                            {version.html && (
+                                                <div className="mt-8">
+                                                    <div className="fs-6 text-gray-800" dangerouslySetInnerHTML={{ __html: version.html }}></div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-                                    {/*end::Image*/}
+                                    {/*end::Message content*/}
+                                </div>
+                            ))
+                        ) : (
+                            // Fallback for no versions (legacy or error)
+                            <div className="collapse fade show" data-kt-inbox-message="message">
+                                <div className="py-5">
+                                    <div className="d-flex align-items-start">
+                                        {/*begin::Image*/}
+                                        {article.featuredImageUrl && (
+                                            <div className="me-7">
+                                                <img
+                                                    src={article.featuredImageUrl}
+                                                    alt={article.articleTitle}
+                                                    className="rounded"
+                                                    style={{ width: '200px', height: 'auto' }}
+                                                />
+                                            </div>
+                                        )}
+                                        {/*end::Image*/}
 
-                                    {/*begin::Details*/}
-                                    <div className="flex-grow-1">
-                                        <div className="d-flex flex-column gap-2">
-                                            <div className="d-flex align-items-center">
-                                                <span className="text-muted fw-bold me-2">Article Funnel Stage:</span>
-                                                <span className="fw-semibold text-gray-800">{article.articleFunnelStage}</span>
-                                            </div>
-                                            <div className="d-flex align-items-center">
-                                                <span className="text-muted fw-bold me-2">Article Intent:</span>
-                                                <span className="fw-semibold text-gray-800">{article.articleIntent}</span>
-                                            </div>
-                                            <div className="d-flex align-items-center">
-                                                <span className="text-muted fw-bold me-2">Cluster Intent:</span>
-                                                <span className="fw-semibold text-gray-800">{article.clusterIntent}</span>
-                                            </div>
-                                            <div className="mt-2">
-                                                <div className="d-flex flex-wrap gap-2">
-                                                    <span className="text-muted fw-bold d-block mb-2">Keywords:</span>
-                                                    {Array.isArray(article.articleKeywords) && article.articleKeywords.map((keyword: string, index: number) => (
-                                                        <span key={index} className="badge badge-light-primary">{keyword}</span>
-                                                    ))}
+                                        {/*begin::Details*/}
+                                        <div className="flex-grow-1">
+                                            <div className="d-flex flex-column gap-2">
+                                                <div className="d-flex align-items-center">
+                                                    <span className="text-muted fw-bold me-2">Article Funnel Stage:</span>
+                                                    <span className="fw-semibold text-gray-800">{article.articleFunnelStage}</span>
+                                                </div>
+                                                <div className="d-flex align-items-center">
+                                                    <span className="text-muted fw-bold me-2">Article Intent:</span>
+                                                    <span className="fw-semibold text-gray-800">{article.articleIntent}</span>
+                                                </div>
+                                                <div className="d-flex align-items-center">
+                                                    <span className="text-muted fw-bold me-2">Cluster Intent:</span>
+                                                    <span className="fw-semibold text-gray-800">{article.clusterIntent}</span>
+                                                </div>
+                                                <div className="mt-2">
+                                                    <div className="d-flex flex-wrap gap-2">
+                                                        <span className="text-muted fw-bold d-block mb-2">Keywords:</span>
+                                                        {Array.isArray(article.articleKeywords) && article.articleKeywords.map((keyword: string, index: number) => (
+                                                            <span key={index} className="badge badge-light-primary">{keyword}</span>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
+                                        {/*end::Details*/}
                                     </div>
-                                    {/*end::Details*/}
+                                    {article.articleHtml && (
+                                        <div className="mt-8">
+                                            <div className="fs-6 text-gray-800" dangerouslySetInnerHTML={{ __html: article.articleHtml }}></div>
+                                        </div>
+                                    )}
                                 </div>
-                                {article.articleHtml && (
-                                    <div className="mt-8">
-                                        <div className="fs-6 text-gray-800" dangerouslySetInnerHTML={{ __html: article.articleHtml }}></div>
-                                    </div>
-                                )}
                             </div>
-                        </div>
-                        {/*end::Message content*/}
+                        )}
                     </div>
                     {/*end::Message accordion*/}
                 </div>

@@ -225,6 +225,8 @@ model Article {
 
   approvalTokens ArticleApprovalToken[]
   plan           ArticlePlan?           @relation("ArticlePlanArticle")
+  planVersion    ArticlePlan?           @relation("ArticlePlanVersions", fields: [planId], references: [id])
+  planId         String?
   images         ArticleImage[]
   magicLinks     MagicLink[]
   aiCosts        AiCost[]
@@ -346,6 +348,7 @@ model ArticlePlan {
   supportingArticleId String
   article             Article?             @relation("ArticlePlanArticle", fields: [articleId], references: [id])
   articleId           String?              @unique
+  versions            Article[]            @relation("ArticlePlanVersions")
   plannedPublishAt    DateTime
   status              ArticlePlanStatus    @default(PLANNED)
   regenerationCount   Int                  @default(0)

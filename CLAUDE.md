@@ -39,6 +39,12 @@ npm run build:worker   # Build worker only
 npm run db:validate    # Validate Prisma schema
 npm run db:generate    # Generate Prisma client (runs after npm install)
 npm run db:migrate     # Run migrations (prisma migrate dev)
+
+### Production/Dev Database Sync
+**IMPORTANT:** The DEV environment uses the same database as production. When making schema changes, use the following command to push changes:
+```bash
+export DATABASE_URL="postgresql://postgres.pexyzsguboxixwveerkj:nIkfof-besbu0-qynsyv@aws-1-eu-north-1.pooler.supabase.com:5432/postgres" && export DIRECT_URL="$DATABASE_URL" && npx prisma db push
+```
 ```
 
 ### Superadmin Setup

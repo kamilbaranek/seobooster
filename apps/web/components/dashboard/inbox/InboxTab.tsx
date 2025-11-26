@@ -16,6 +16,15 @@ export interface ArticlePlan {
     featuredImageUrl?: string | null;
     articleHtml?: string | null;
     articleMarkdown?: string | null;
+    articleCreatedAt?: string | null;
+    versions?: Array<{
+        id: string;
+        createdAt: string;
+        status: string;
+        html?: string | null;
+        markdown?: string | null;
+        featuredImageUrl?: string | null;
+    }>;
 }
 
 const getStatusBadgeClass = (status: string) => {
@@ -39,6 +48,58 @@ interface InboxTabProps {
 
 const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
     const [selectedArticle, setSelectedArticle] = React.useState<ArticlePlan | null>(null);
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [itemsPerPage, setItemsPerPage] = React.useState(10);
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [sortConfig, setSortConfig] = React.useState<{ key: keyof ArticlePlan; direction: 'asc' | 'desc' }>({
+        key: 'plannedPublishAt',
+        direction: 'asc'
+    });
+
+    // Filter and Sort Logic
+    const filteredPlans = React.useMemo(() => {
+        let filtered = [...plans];
+
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(plan =>
+                plan.articleTitle.toLowerCase().includes(query) ||
+                plan.articleFunnelStage.toLowerCase().includes(query) ||
+                (plan.clusterName && plan.clusterName.toLowerCase().includes(query))
+            );
+        }
+
+        filtered.sort((a, b) => {
+            if (a[sortConfig.key]! < b[sortConfig.key]!) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortConfig.key]! > b[sortConfig.key]!) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+
+        return filtered;
+    }, [plans, searchQuery, sortConfig]);
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
+    const paginatedPlans = React.useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredPlans.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredPlans, currentPage, itemsPerPage]);
+
+    // Reset page when filters change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, itemsPerPage]);
+
+    const handleSort = (key: keyof ArticlePlan) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
 
     return (
         <div className="d-flex flex-column flex-lg-row">
@@ -251,17 +312,17 @@ const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
                                     <div className="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-125px py-4" data-kt-menu="true">
                                         {/*begin::Menu item*/}
                                         <div className="menu-item px-3">
-                                            <a href="#" className="menu-link px-3" data-kt-inbox-listing-filter="filter_newest">Newest</a>
+                                            <a href="#" className="menu-link px-3" onClick={(e) => { e.preventDefault(); handleSort('plannedPublishAt'); }}>Date</a>
                                         </div>
                                         {/*end::Menu item*/}
                                         {/*begin::Menu item*/}
                                         <div className="menu-item px-3">
-                                            <a href="#" className="menu-link px-3" data-kt-inbox-listing-filter="filter_oldest">Oldest</a>
+                                            <a href="#" className="menu-link px-3" onClick={(e) => { e.preventDefault(); handleSort('articleTitle'); }}>Title</a>
                                         </div>
                                         {/*end::Menu item*/}
                                         {/*begin::Menu item*/}
                                         <div className="menu-item px-3">
-                                            <a href="#" className="menu-link px-3" data-kt-inbox-listing-filter="filter_unread">Unread</a>
+                                            <a href="#" className="menu-link px-3" onClick={(e) => { e.preventDefault(); handleSort('status'); }}>Status</a>
                                         </div>
                                         {/*end::Menu item*/}
                                     </div>
@@ -275,7 +336,14 @@ const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
                                 {/*begin::Search*/}
                                 <div className="d-flex align-items-center position-relative">
                                     <i className="ki-outline ki-magnifier fs-3 position-absolute ms-4"></i>
-                                    <input type="text" data-kt-inbox-listing-filter="search" className="form-control form-control-sm form-control-solid mw-100 min-w-125px min-w-lg-150px min-w-xxl-200px ps-11" placeholder="Search inbox" />
+                                    <input
+                                        type="text"
+                                        data-kt-inbox-listing-filter="search"
+                                        className="form-control form-control-sm form-control-solid mw-100 min-w-125px min-w-lg-150px min-w-xxl-200px ps-11"
+                                        placeholder="Search inbox"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
                                 </div>
                                 {/*end::Search*/}
                                 {/*begin::Toggle*/}
@@ -299,14 +367,14 @@ const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {plans.length === 0 ? (
+                                    {paginatedPlans.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="text-center text-muted py-10">
                                                 No article plans found
                                             </td>
                                         </tr>
                                     ) : (
-                                        plans.map((plan) => (
+                                        paginatedPlans.map((plan) => (
                                             <tr key={plan.id}>
                                                 <td className="ps-9">
                                                     <div className="form-check form-check-sm form-check-custom form-check-solid mt-3">
@@ -374,6 +442,41 @@ const InboxTab: React.FC<InboxTabProps> = ({ plans = [] }) => {
                             </table>
                             {/*end::Table*/}
                         </div>
+                        {/*begin::Pagination*/}
+                        <div className="card-footer d-flex justify-content-between align-items-center py-5">
+                            <div className="d-flex align-items-center">
+                                <select
+                                    className="form-select form-select-sm form-select-solid w-75px me-4"
+                                    value={itemsPerPage}
+                                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                </select>
+                                <span className="text-muted fs-7">
+                                    Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredPlans.length)} to {Math.min(currentPage * itemsPerPage, filteredPlans.length)} of {filteredPlans.length} entries
+                                </span>
+                            </div>
+                            <ul className="pagination">
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <a href="#" className="page-link" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }}>
+                                        <i className="previous"></i>
+                                    </a>
+                                </li>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                    <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                                        <a href="#" className="page-link" onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}>{page}</a>
+                                    </li>
+                                ))}
+                                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                                    <a href="#" className="page-link" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }}>
+                                        <i className="next"></i>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        {/*end::Pagination*/}
                     </div>
                     {/*end::Card*/}
                 </div>

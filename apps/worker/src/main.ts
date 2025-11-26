@@ -1320,6 +1320,7 @@ const bootstrap = async () => {
     const article = await prisma.article.create({
       data: {
         webId: plan.webId,
+        planId: plan.id,
         title: draft.title,
         markdown: draft.bodyMarkdown,
         html,

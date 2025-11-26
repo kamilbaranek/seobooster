@@ -568,7 +568,19 @@ export class WebsService {
             featuredImageUrl: true,
             html: true,
             markdown: true,
-            status: true
+            status: true,
+            createdAt: true
+          }
+        },
+        versions: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            featuredImageUrl: true,
+            html: true,
+            markdown: true,
+            status: true,
+            createdAt: true
           }
         }
       }
@@ -588,8 +600,47 @@ export class WebsService {
       clusterIntent: plan.cluster.clusterIntent,
       featuredImageUrl: plan.article?.featuredImageUrl ?? null,
       articleHtml: plan.article?.html ?? null,
-      articleMarkdown: plan.article?.markdown ?? null
+      articleMarkdown: plan.article?.markdown ?? null,
+      articleCreatedAt: plan.article?.createdAt ?? null,
+      versions: plan.versions.map(v => ({
+        id: v.id,
+        createdAt: v.createdAt,
+        status: v.status,
+        html: v.html,
+        markdown: v.markdown,
+        featuredImageUrl: v.featuredImageUrl
+      }))
     }));
+  }
+
+  async setArticleVersion(userId: string, webId: string, planId: string, articleId: string) {
+    const web = await this.prisma.web.findFirst({ where: { id: webId, userId } });
+    if (!web) {
+      throw new NotFoundException('Website not found');
+    }
+
+    const plan = await this.prisma.articlePlan.findFirst({
+      where: { id: planId, webId }
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Article plan not found');
+    }
+
+    const article = await this.prisma.article.findFirst({
+      where: { id: articleId, webId, planId }
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article version not found');
+    }
+
+    await this.prisma.articlePlan.update({
+      where: { id: planId },
+      data: { articleId: article.id }
+    });
+
+    return { success: true };
   }
 
   async updateArticlePlanDate(userId: string, webId: string, planId: string, payload: { plannedPublishAt: string }) {
