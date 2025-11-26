@@ -540,7 +540,7 @@ export class WebsService {
       where: {
         webId: id,
         status: {
-          in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED, ArticlePlanStatus.GENERATED]
+          in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED, ArticlePlanStatus.GENERATED, ArticlePlanStatus.PUBLISHED]
         }
       },
       orderBy: { plannedPublishAt: 'asc' },
