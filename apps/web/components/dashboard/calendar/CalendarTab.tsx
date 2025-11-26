@@ -132,6 +132,13 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ plans = [], webId }) => {
                             [data-bs-theme="dark"] .fc-theme-standard td {
                                 background-color: #0f1014 !important;
                             }
+                            [data-bs-theme="dark"] .fc-theme-standard .fc-timegrid-slot {
+                                background-color: transparent !important;
+                            }
+                            [data-bs-theme="dark"] .fc-theme-standard .fc-day-today,
+                            [data-bs-theme="dark"] .fc-timegrid-col.fc-day-today {
+                                background-color: rgba(255, 255, 255, 0.05) !important;
+                            }
                             [data-bs-theme="dark"] .fc-col-header-cell {
                                 background-color: #0f1014 !important;
                                 color: #e1e3ea !important;
