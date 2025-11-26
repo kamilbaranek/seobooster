@@ -633,17 +633,32 @@ const recordAiCost = async (payload: {
 const PLAN_WINDOW_START_HOUR = 9;
 const PLAN_WINDOW_END_HOUR = 17;
 
-const getInitialPlanStartDate = () => {
+const getTimezoneOffsetHours = (timeZone: string) => {
+  try {
+    const now = new Date();
+    const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(now.toLocaleString('en-US', { timeZone }));
+    return (tzDate.getTime() - utcDate.getTime()) / 3600000;
+  } catch {
+    return 0;
+  }
+};
+
+const getInitialPlanStartDate = (timezone?: string | null) => {
   const base = new Date();
   base.setUTCDate(base.getUTCDate() + 1);
-  base.setUTCHours(PLAN_WINDOW_START_HOUR, 0, 0, 0);
+
+  const offset = timezone ? getTimezoneOffsetHours(timezone) : 0;
+  const startHourUtc = PLAN_WINDOW_START_HOUR - offset;
+
+  base.setUTCHours(startHourUtc, 0, 0, 0);
   base.setUTCMinutes(0);
   base.setUTCSeconds(0);
   base.setUTCMilliseconds(0);
   return base;
 };
 
-const getPlannedDateForIndex = (startDate: Date, index: number, schedule: string[] = []) => {
+const getPlannedDateForIndex = (startDate: Date, index: number, schedule: string[] = [], timezone?: string | null) => {
   const date = new Date(startDate);
 
   // Default to Mon-Fri if schedule is empty
@@ -695,12 +710,15 @@ const getPlannedDateForIndex = (startDate: Date, index: number, schedule: string
     safetyCounter++;
   }
 
+  const offset = timezone ? getTimezoneOffsetHours(timezone) : 0;
+  const startHourUtc = PLAN_WINDOW_START_HOUR - offset;
+
   const hourWindow = Math.max(1, PLAN_WINDOW_END_HOUR - PLAN_WINDOW_START_HOUR);
   const randomHourOffset = Math.floor(Math.random() * hourWindow);
   const baseMinutes = Math.floor(Math.random() * 60);
   const jitterMinutes = Math.floor(Math.random() * 90);
   const jitterDirection = Math.random() > 0.5 ? 1 : -1;
-  date.setUTCHours(PLAN_WINDOW_START_HOUR + randomHourOffset, baseMinutes, 0, 0);
+  date.setUTCHours(startHourUtc + randomHourOffset, baseMinutes, 0, 0);
   date.setUTCMinutes(date.getUTCMinutes() + jitterDirection * jitterMinutes);
   return date;
 };
@@ -850,10 +868,11 @@ const persistSeoStrategyArtifacts = async (
   webId: string,
   strategy: SeoStrategy,
   modelName?: string | null,
-  publicationSchedule: string[] = []
+  publicationSchedule: string[] = [],
+  timezone?: string | null
 ) => {
   const topicClusters = strategy.topic_clusters ?? [];
-  const planStartDate = getInitialPlanStartDate();
+  const planStartDate = getInitialPlanStartDate(timezone);
 
   const existingStrategies = await prisma.seoStrategy.findMany({
     where: { webId, isActive: true },
@@ -936,7 +955,7 @@ const persistSeoStrategyArtifacts = async (
   let planIndex = 0;
   for (const record of clusterRecords) {
     for (const supportingArticleId of record.supportingArticles) {
-      const plannedPublishAt = getPlannedDateForIndex(planStartDate, planIndex, publicationSchedule);
+      const plannedPublishAt = getPlannedDateForIndex(planStartDate, planIndex, publicationSchedule, timezone);
       planIndex += 1;
       await prisma.articlePlan.create({
         data: {
@@ -1197,12 +1216,11 @@ const bootstrap = async () => {
 
     const web = await prisma.web.findUnique({
       where: { id: job.data.webId },
-      select: { publicationSchedule: true }
+      select: { publicationSchedule: true, timezone: true }
     });
 
     const modelName = aiModelMap.strategy;
-    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName, web?.publicationSchedule ?? []);
-
+    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName, web?.publicationSchedule ?? [], web?.timezone);
   });
 
   createWorker<GenerateArticleJob>(GENERATE_ARTICLE_QUEUE, async (job) => {
@@ -1352,7 +1370,9 @@ const bootstrap = async () => {
       where: { id: plan.id },
       data: {
         status: ArticlePlanStatus.GENERATED,
-        articleId: article.id,
+        // Only update articleId if this is the first generation (not a regeneration)
+        // If it's a regeneration, the new article is created but not set as active
+        articleId: previousArticle ? undefined : article.id,
         // Increment regeneration count only after successful article creation
         // This ensures failed attempts don't count toward the limit
         regenerationCount: plan.articleId ? plan.regenerationCount + 1 : plan.regenerationCount
@@ -1412,13 +1432,18 @@ const bootstrap = async () => {
         'Skipping article image generation (disabled or regeneration)'
       );
 
-      if (publishOptions) {
+      if (publishOptions && !previousArticle) {
         await publishQueue.add('PublishArticle', {
           articleId: article.id,
           targetStatus: publishOptions.targetStatus,
           trigger: publishOptions.trigger
         });
         logger.info({ jobId: job.id, articleId: article.id }, 'Enqueued PublishArticle job directly');
+      } else if (publishOptions && previousArticle) {
+        logger.info(
+          { jobId: job.id, articleId: article.id, webId: plan.webId },
+          'Skipping auto-publish for regenerated article (must be manually selected as winner)'
+        );
       }
     }
 

@@ -21,6 +21,7 @@ interface ArticlePlan {
     featuredImageUrl?: string | null;
     articleHtml?: string | null;
     articleMarkdown?: string | null;
+    autoPublishMode?: string;
 }
 
 interface CalendarTabProps {
@@ -43,7 +44,8 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ plans = [], webId }) => {
             editable: plan.status === 'PLANNED',
             extendedProps: {
                 status: plan.status,
-                description: plan.articleFunnelStage
+                description: plan.articleFunnelStage,
+                autoPublishMode: plan.autoPublishMode
             }
         }));
         setEvents(mapped);
@@ -174,6 +176,19 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ plans = [], webId }) => {
                             dayMaxEventRows={true}
                             moreLinkClick="popover"
                             eventDrop={handleEventDrop}
+                            eventContent={(arg) => {
+                                const isAutoPublish = arg.event.extendedProps.autoPublishMode === 'auto_publish';
+                                return (
+                                    <div className="fc-event-main-frame d-flex flex-column overflow-hidden">
+                                        <div className="fc-event-title-container">
+                                            <div className="fc-event-title fc-sticky text-truncate">
+                                                {isAutoPublish ? '⚡ ' : '📝 '}
+                                                {arg.event.title}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }}
                         />
                     </div>
                     {/*end::Calendar*/}

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { IntegrationType, Prisma, WebWordpressAuthor, WebWordpressCategory } from '@prisma/client';
+import { ArticlePlanStatus, IntegrationType, Prisma, WebWordpressAuthor, WebWordpressCategory } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../crypto/encryption.service';
 import { ArticleListQueryDto } from './dto/article-list-query.dto';
@@ -79,6 +79,9 @@ export class ArticlesService {
       where: {
         web: {
           userId
+        },
+        status: {
+          in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED, ArticlePlanStatus.GENERATED, ArticlePlanStatus.PUBLISHED]
         }
       },
       include: {
@@ -86,13 +89,16 @@ export class ArticlesService {
           select: {
             id: true,
             nickname: true,
-            url: true
+            url: true,
+            credentials: true,
+            integrationType: true
           }
         },
         article: {
           select: {
             title: true,
-            featuredImageUrl: true
+            featuredImageUrl: true,
+            status: true
           }
         },
         supportingArticle: true,
@@ -101,21 +107,41 @@ export class ArticlesService {
       orderBy: { plannedPublishAt: 'asc' }
     });
 
-    return plans.map((plan) => ({
-      id: plan.id,
-      webId: plan.webId,
-      web: plan.web,
-      articleId: plan.articleId,
-      status: plan.status,
-      plannedPublishAt: plan.plannedPublishAt,
-      articleTitle: plan.article?.title ?? plan.supportingArticle.title,
-      articleKeywords: plan.supportingArticle.keywords,
-      articleIntent: plan.supportingArticle.intent,
-      articleFunnelStage: plan.supportingArticle.funnelStage,
-      clusterName: plan.cluster.pillarPage,
-      clusterIntent: plan.cluster.clusterIntent,
-      featuredImageUrl: plan.article?.featuredImageUrl
-    }));
+    return plans.map((plan) => {
+      let autoPublishMode = 'draft_only';
+      if (plan.web.integrationType === IntegrationType.WORDPRESS_APPLICATION_PASSWORD && plan.web.credentials?.encryptedJson) {
+        try {
+          const decrypted = this.encryptionService.decrypt(plan.web.credentials.encryptedJson);
+          const parsed = JSON.parse(decrypted);
+          if (parsed.type === 'wordpress_application_password') {
+            autoPublishMode = parsed.autoPublishMode || 'draft_only';
+          }
+        } catch {
+          // ignore decryption errors
+        }
+      }
+
+      return {
+        id: plan.id,
+        webId: plan.webId,
+        web: {
+          id: plan.web.id,
+          nickname: plan.web.nickname,
+          url: plan.web.url
+        },
+        articleId: plan.articleId,
+        status: plan.article?.status === 'PUBLISHED' ? 'PUBLISHED' : plan.status,
+        plannedPublishAt: plan.plannedPublishAt,
+        articleTitle: plan.article?.title ?? plan.supportingArticle.title,
+        articleKeywords: plan.supportingArticle.keywords,
+        articleIntent: plan.supportingArticle.intent,
+        articleFunnelStage: plan.supportingArticle.funnelStage,
+        clusterName: plan.cluster.pillarPage,
+        clusterIntent: plan.cluster.clusterIntent,
+        featuredImageUrl: plan.article?.featuredImageUrl,
+        autoPublishMode
+      };
+    });
   }
 
   async getArticle(userId: string, webId: string, articleId: string) {

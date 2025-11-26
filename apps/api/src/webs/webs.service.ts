@@ -529,7 +529,8 @@ export class WebsService {
 
   async getArticlePlans(userId: string, id: string) {
     const web = await this.prisma.web.findFirst({
-      where: { id, userId }
+      where: { id, userId },
+      include: { credentials: true }
     });
 
     if (!web) {
@@ -609,7 +610,8 @@ export class WebsService {
         html: v.html,
         markdown: v.markdown,
         featuredImageUrl: v.featuredImageUrl
-      }))
+      })),
+      autoPublishMode: this.resolveAutoPublishMode(web.credentials)
     }));
   }
 

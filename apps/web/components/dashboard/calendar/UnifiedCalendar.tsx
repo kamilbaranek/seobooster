@@ -27,6 +27,7 @@ interface ArticlePlan {
     clusterName: string;
     clusterIntent: string;
     featuredImageUrl?: string | null;
+    autoPublishMode?: string;
 }
 
 interface UnifiedCalendarProps {
@@ -94,7 +95,8 @@ const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({ plans, onUpdate }) =>
                 status: plan.status,
                 description: plan.articleFunnelStage,
                 webName: plan.web.nickname || plan.web.url,
-                webId: plan.webId
+                webId: plan.webId,
+                autoPublishMode: plan.autoPublishMode
             }
         }));
         setEvents(mapped);
@@ -217,14 +219,20 @@ const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({ plans, onUpdate }) =>
                         dayMaxEvents={true}
                         dayMaxEventRows={true}
                         eventDrop={handleEventDrop}
-                        eventContent={(arg) => (
-                            <div className="d-flex flex-column overflow-hidden">
-                                <div className="text-truncate fw-bold">{arg.event.title}</div>
-                                <div className="d-flex align-items-center gap-1 opacity-75" style={{ fontSize: '0.7em' }}>
-                                    <span className="text-truncate">{arg.event.extendedProps.webName}</span>
+                        eventContent={(arg) => {
+                            const isAutoPublish = arg.event.extendedProps.autoPublishMode === 'auto_publish';
+                            return (
+                                <div className="d-flex flex-column overflow-hidden">
+                                    <div className="text-truncate fw-bold">
+                                        {isAutoPublish ? '⚡ ' : '📝 '}
+                                        {arg.event.title}
+                                    </div>
+                                    <div className="d-flex align-items-center gap-1 opacity-75" style={{ fontSize: '0.7em' }}>
+                                        <span className="text-truncate">{arg.event.extendedProps.webName}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        }}
                     />
                 </div>
 
