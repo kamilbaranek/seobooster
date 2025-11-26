@@ -267,12 +267,37 @@ export class WebsService {
       throw new NotFoundException('Website not found');
     }
 
+    let finalCredentials = { ...dto.credentials };
+
+    // Fetch existing credentials to merge if password is missing
+    const existingRecord = await this.prisma.webCredentials.findUnique({
+      where: { webId: id }
+    });
+
+    if (existingRecord) {
+      try {
+        const decryptedExisting = JSON.parse(this.encryptionService.decrypt(existingRecord.encryptedJson));
+        finalCredentials = {
+          ...decryptedExisting,
+          ...dto.credentials
+        };
+        // If new password is undefined/null/empty, keep the old one
+        if (!dto.credentials.applicationPassword && decryptedExisting.applicationPassword) {
+          finalCredentials.applicationPassword = decryptedExisting.applicationPassword;
+        }
+      } catch (error) {
+        // If decryption fails, we can't merge, so we just use the new ones (and log warning if needed)
+        // But for now we just proceed with what we have
+      }
+    }
+
     let encryptedJson: string;
     try {
-      encryptedJson = this.encryptionService.encrypt(JSON.stringify(dto.credentials));
+      encryptedJson = this.encryptionService.encrypt(JSON.stringify(finalCredentials));
     } catch (_error) {
       throw new BadRequestException('Credential encryption is not configured');
     }
+
     await this.prisma.webCredentials.upsert({
       where: { webId: id },
       update: { encryptedJson },
