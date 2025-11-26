@@ -567,7 +567,8 @@ export class WebsService {
             id: true,
             featuredImageUrl: true,
             html: true,
-            markdown: true
+            markdown: true,
+            status: true
           }
         }
       }
@@ -577,7 +578,7 @@ export class WebsService {
       id: plan.id,
       webId: plan.webId,
       articleId: plan.articleId,
-      status: plan.status,
+      status: plan.article?.status === 'PUBLISHED' ? 'PUBLISHED' : plan.status,
       plannedPublishAt: plan.plannedPublishAt,
       articleTitle: plan.supportingArticle.title,
       articleKeywords: plan.supportingArticle.keywords,
