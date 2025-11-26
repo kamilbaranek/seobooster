@@ -513,14 +513,14 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article: initialArticle, onBa
                     {/*begin::Message accordion*/}
                     <div data-kt-inbox-message="message_wrapper">
                         {article.versions && article.versions.length > 0 ? (
-                            article.versions.map((version) => (
-                                <div key={version.id} className="card mb-5 border border-dashed border-gray-300">
+                            article.versions.map((version, index) => (
+                                <div key={version.id} className={`py-5 ${index !== article.versions!.length - 1 ? 'border-bottom border-gray-300 border-bottom-dashed' : ''}`}>
                                     {/*begin::Message header*/}
-                                    <div className="card-header align-items-center px-5 py-3 cursor-pointer" onClick={() => setExpandedVersionId(expandedVersionId === version.id ? null : version.id)}>
-                                        {/*begin::Actions*/}
-                                        <div className="d-flex align-items-center flex-grow-1 gap-2">
-                                            {/*begin::Symbol*/}
-                                            <div className="symbol symbol-35px me-3">
+                                    <div className="d-flex flex-wrap gap-2 flex-stack cursor-pointer" onClick={() => setExpandedVersionId(expandedVersionId === version.id ? null : version.id)}>
+                                        {/*begin::Author*/}
+                                        <div className="d-flex align-items-center">
+                                            {/*begin::Avatar*/}
+                                            <div className="symbol symbol-50 me-4">
                                                 {version.featuredImageUrl ? (
                                                     <span className="symbol-label" style={{ backgroundImage: `url(${version.featuredImageUrl})` }}></span>
                                                 ) : (
@@ -529,23 +529,28 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article: initialArticle, onBa
                                                     </div>
                                                 )}
                                             </div>
-                                            {/*end::Symbol*/}
-
-                                            <div className="d-flex flex-column">
-                                                <div className="d-flex align-items-center">
-                                                    <span className="fw-bold text-gray-900 me-2">Version {new Date(version.createdAt).toLocaleString()}</span>
+                                            {/*end::Avatar*/}
+                                            <div className="pe-5">
+                                                {/*begin::Author details*/}
+                                                <div className="d-flex align-items-center flex-wrap gap-1">
+                                                    <a href="#" className="fw-bold text-gray-900 text-hover-primary">Version {new Date(version.createdAt).toLocaleString()}</a>
                                                     {article.articleId === version.id && (
-                                                        <span className="badge badge-light-success">Active</span>
+                                                        <i className="ki-outline ki-check-circle fs-7 text-success mx-2"></i>
                                                     )}
                                                 </div>
-                                                <span className="text-muted fs-7">{version.status}</span>
+                                                {/*end::Author details*/}
+                                                {/*begin::Message details*/}
+                                                <div className="text-muted fw-semibold mw-450px" data-kt-inbox-message="preview">{version.status}</div>
+                                                {/*end::Message details*/}
                                             </div>
                                         </div>
-                                        {/*end::Actions*/}
+                                        {/*end::Author*/}
 
-                                        {/*begin::Toolbar*/}
-                                        <div className="d-flex align-items-center">
-                                            <span className="fw-semibold text-muted me-3 d-none d-sm-block">{new Date(version.createdAt).toLocaleDateString()}</span>
+                                        {/*begin::Actions*/}
+                                        <div className="d-flex align-items-center flex-wrap gap-2">
+                                            {/*begin::Date*/}
+                                            <span className="fw-semibold text-muted text-end me-3">{new Date(version.createdAt).toLocaleString()}</span>
+                                            {/*end::Date*/}
                                             {article.articleId !== version.id && (
                                                 <button
                                                     className="btn btn-sm btn-light-primary me-3"
@@ -558,59 +563,61 @@ const InboxDetail: React.FC<InboxDetailProps> = ({ article: initialArticle, onBa
                                                 <i className={`ki-outline ki-down fs-2 ${expandedVersionId === version.id ? 'rotate-180' : ''}`}></i>
                                             </div>
                                         </div>
-                                        {/*end::Toolbar*/}
+                                        {/*end::Actions*/}
                                     </div>
                                     {/*end::Message header*/}
 
                                     {/*begin::Message content*/}
                                     {expandedVersionId === version.id && (
-                                        <div className="card-body p-5">
-                                            <div className="d-flex align-items-start mb-5">
-                                                {/*begin::Image*/}
-                                                {version.featuredImageUrl && (
-                                                    <div className="me-7">
-                                                        <img
-                                                            src={version.featuredImageUrl}
-                                                            alt="Version Image"
-                                                            className="rounded"
-                                                            style={{ width: '200px', height: 'auto' }}
-                                                        />
-                                                    </div>
-                                                )}
-                                                {/*end::Image*/}
+                                        <div className="collapse fade show" data-kt-inbox-message="message">
+                                            <div className="py-5">
+                                                <div className="d-flex align-items-start mb-5">
+                                                    {/*begin::Image*/}
+                                                    {version.featuredImageUrl && (
+                                                        <div className="me-7">
+                                                            <img
+                                                                src={version.featuredImageUrl}
+                                                                alt="Version Image"
+                                                                className="rounded"
+                                                                style={{ width: '200px', height: 'auto' }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {/*end::Image*/}
 
-                                                {/*begin::Details*/}
-                                                <div className="flex-grow-1">
-                                                    <div className="d-flex flex-column gap-2">
-                                                        <div className="d-flex align-items-center">
-                                                            <span className="text-muted fw-bold me-2">Article Funnel Stage:</span>
-                                                            <span className="fw-semibold text-gray-800">{article.articleFunnelStage}</span>
-                                                        </div>
-                                                        <div className="d-flex align-items-center">
-                                                            <span className="text-muted fw-bold me-2">Article Intent:</span>
-                                                            <span className="fw-semibold text-gray-800">{article.articleIntent}</span>
-                                                        </div>
-                                                        <div className="d-flex align-items-center">
-                                                            <span className="text-muted fw-bold me-2">Cluster Intent:</span>
-                                                            <span className="fw-semibold text-gray-800">{article.clusterIntent}</span>
-                                                        </div>
-                                                        <div className="mt-2">
-                                                            <div className="d-flex flex-wrap gap-2">
-                                                                <span className="text-muted fw-bold d-block mb-2">Keywords:</span>
-                                                                {Array.isArray(article.articleKeywords) && article.articleKeywords.map((keyword: string, index: number) => (
-                                                                    <span key={index} className="badge badge-light-primary">{keyword}</span>
-                                                                ))}
+                                                    {/*begin::Details*/}
+                                                    <div className="flex-grow-1">
+                                                        <div className="d-flex flex-column gap-2">
+                                                            <div className="d-flex align-items-center">
+                                                                <span className="text-muted fw-bold me-2">Article Funnel Stage:</span>
+                                                                <span className="fw-semibold text-gray-800">{article.articleFunnelStage}</span>
+                                                            </div>
+                                                            <div className="d-flex align-items-center">
+                                                                <span className="text-muted fw-bold me-2">Article Intent:</span>
+                                                                <span className="fw-semibold text-gray-800">{article.articleIntent}</span>
+                                                            </div>
+                                                            <div className="d-flex align-items-center">
+                                                                <span className="text-muted fw-bold me-2">Cluster Intent:</span>
+                                                                <span className="fw-semibold text-gray-800">{article.clusterIntent}</span>
+                                                            </div>
+                                                            <div className="mt-2">
+                                                                <div className="d-flex flex-wrap gap-2">
+                                                                    <span className="text-muted fw-bold d-block mb-2">Keywords:</span>
+                                                                    {Array.isArray(article.articleKeywords) && article.articleKeywords.map((keyword: string, index: number) => (
+                                                                        <span key={index} className="badge badge-light-primary">{keyword}</span>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    {/*end::Details*/}
                                                 </div>
-                                                {/*end::Details*/}
+                                                {version.html && (
+                                                    <div className="mt-8">
+                                                        <div className="fs-6 text-gray-800" dangerouslySetInnerHTML={{ __html: version.html }}></div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {version.html && (
-                                                <div className="mt-8">
-                                                    <div className="fs-6 text-gray-800" dangerouslySetInnerHTML={{ __html: version.html }}></div>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
                                     {/*end::Message content*/}
