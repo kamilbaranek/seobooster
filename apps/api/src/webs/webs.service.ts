@@ -307,6 +307,21 @@ export class WebsService {
       }
     });
 
+    // Update web integration type based on credentials
+    let integrationType: IntegrationType = IntegrationType.NONE;
+    if (finalCredentials.type === 'wordpress_application_password') {
+      integrationType = IntegrationType.WORDPRESS_APPLICATION_PASSWORD;
+    } else if (finalCredentials.type === 'wordpress_oauth') {
+      integrationType = IntegrationType.WORDPRESS_OAUTH;
+    }
+
+    if (integrationType !== IntegrationType.NONE) {
+      await this.prisma.web.update({
+        where: { id },
+        data: { integrationType }
+      });
+    }
+
     return { saved: true };
   }
 
