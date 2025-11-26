@@ -23,7 +23,7 @@ const getStatusBadgeClass = (status: string) => {
         case 'PLANNED': return 'badge-light-info';
         case 'QUEUED': return 'badge-light-warning';
         case 'GENERATED': return 'badge-light-success';
-        case 'PUBLISHED': return 'badge-light-primary';
+        case 'PUBLISHED': return 'badge-light-danger';
         case 'SKIPPED': return 'badge-light-danger';
         default: return 'badge-light-secondary';
     }
