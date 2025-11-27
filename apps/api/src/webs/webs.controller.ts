@@ -109,6 +109,14 @@ export class WebsController {
     return this.websService.getCredentials(user.userId, id);
   }
 
+  @Get(':id/github/repos')
+  @UseGuards(JwtAuthGuard)
+  async listGithubRepos(@Param('id') id: string, @CurrentUser() user: AuthenticatedUserPayload) {
+    // Verify ownership
+    await this.websService.findOne(user.userId, id);
+    return this.websService.listGithubRepos(id);
+  }
+
   @Get('github/callback')
   @Public()
   @UseGuards(AuthGuard('github'))

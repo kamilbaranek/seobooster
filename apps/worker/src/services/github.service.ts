@@ -43,6 +43,24 @@ export class GithubService {
         }
     }
 
+    async listUserRepos(): Promise<{ name: string; full_name: string; private: boolean }[]> {
+        try {
+            const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
+                visibility: 'all',
+                sort: 'updated',
+                per_page: 100
+            });
+            return data.map((repo: any) => ({
+                name: repo.name,
+                full_name: repo.full_name,
+                private: repo.private
+            }));
+        } catch (error) {
+            logger.error({ error }, 'Failed to list GitHub repositories');
+            throw error;
+        }
+    }
+
     async pushFile(
         owner: string,
         repo: string,

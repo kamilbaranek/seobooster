@@ -55,6 +55,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     // GitHub credentials state
     const [githubUsername, setGithubUsername] = useState('');
     const [hasGithub, setHasGithub] = useState(false);
+    const [githubRepos, setGithubRepos] = useState<any[]>([]);
+    const [selectedRepo, setSelectedRepo] = useState<{ value: string, label: string } | null>(null);
+    const [githubFolder, setGithubFolder] = useState('articles');
+    const [githubBranch, setGithubBranch] = useState('main');
+    const [loadingRepos, setLoadingRepos] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -407,6 +412,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                     if (response.credentials.github) {
                         setHasGithub(true);
                         setGithubUsername(response.credentials.github.username || '');
+                        if (response.credentials.github.repo) {
+                            setSelectedRepo({ value: response.credentials.github.repo, label: response.credentials.github.repo });
+                        }
+                        setGithubFolder(response.credentials.github.folder || 'articles');
+                        setGithubBranch(response.credentials.github.branch || 'main');
                     }
                 }
             } catch (error) {
@@ -568,6 +578,59 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [onUpdate]);
+
+    const fetchGithubRepos = async () => {
+        if (!hasGithub) return;
+        setLoadingRepos(true);
+        try {
+            const response = await apiFetch(`/webs/${project.id}/github/repos`) as any[];
+            setGithubRepos(response.map(repo => ({ value: repo.name, label: repo.full_name })));
+        } catch (error) {
+            console.error('Failed to fetch GitHub repos:', error);
+            Swal.fire('Error', 'Failed to fetch GitHub repositories', 'error');
+        } finally {
+            setLoadingRepos(false);
+        }
+    };
+
+    useEffect(() => {
+        if (hasGithub) {
+            fetchGithubRepos();
+        }
+    }, [hasGithub, project.id]);
+
+    const handleSaveGithubSettings = async () => {
+        if (!selectedRepo) {
+            Swal.fire('Error', 'Please select a repository', 'error');
+            return;
+        }
+
+        try {
+            // We need to fetch current credentials first to preserve token
+            const currentCredsResponse = await apiFetch(`/webs/${project.id}/credentials`) as any;
+            const currentToken = currentCredsResponse?.credentials?.github?.token;
+
+            await apiFetch(`/webs/${project.id}/credentials`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    credentials: {
+                        github: {
+                            token: currentToken, // Preserve token
+                            username: githubUsername,
+                            repo: selectedRepo.value,
+                            branch: githubBranch,
+                            folder: githubFolder
+                        }
+                    }
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            Swal.fire('Success', 'GitHub settings saved successfully', 'success');
+        } catch (error) {
+            Swal.fire('Error', 'Failed to save GitHub settings', 'error');
+        }
+    };
 
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1295,6 +1358,60 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                     </button>
                                 </div>
                             </div>
+                            {hasGithub && (
+                                <div className="mt-5 border-top pt-5">
+                                    <div className="row mb-6">
+                                        <label className="col-lg-4 col-form-label fw-semibold fs-6">Repository</label>
+                                        <div className="col-lg-8 fv-row">
+                                            <Select
+                                                options={githubRepos}
+                                                value={selectedRepo}
+                                                onChange={(option) => setSelectedRepo(option)}
+                                                isLoading={loadingRepos}
+                                                placeholder="Select a repository..."
+                                                className="react-select-styled"
+                                                classNamePrefix="react-select"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="row mb-6">
+                                        <label className="col-lg-4 col-form-label fw-semibold fs-6">Folder Path</label>
+                                        <div className="col-lg-8 fv-row">
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-lg form-control-solid"
+                                                placeholder="e.g. content/blog"
+                                                value={githubFolder}
+                                                onChange={(e) => setGithubFolder(e.target.value)}
+                                            />
+                                            <div className="form-text">Path where articles will be saved (default: articles)</div>
+                                        </div>
+                                    </div>
+                                    <div className="row mb-6">
+                                        <label className="col-lg-4 col-form-label fw-semibold fs-6">Branch</label>
+                                        <div className="col-lg-8 fv-row">
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-lg form-control-solid"
+                                                placeholder="main"
+                                                value={githubBranch}
+                                                onChange={(e) => setGithubBranch(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="row">
+                                        <div className="col-lg-8 offset-lg-4">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary"
+                                                onClick={handleSaveGithubSettings}
+                                            >
+                                                Save GitHub Settings
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {/*end::Item*/}
                             <div className="separator separator-dashed my-5"></div>
                             {/*begin::Item*/}

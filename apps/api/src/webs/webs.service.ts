@@ -386,6 +386,44 @@ export class WebsService {
     return { saved: true, username: profile.username };
   }
 
+
+
+  async listGithubRepos(webId: string) {
+    const existingRecord = await this.prisma.webCredentials.findUnique({
+      where: { webId }
+    });
+
+    if (!existingRecord) {
+      throw new Error('No credentials found');
+    }
+
+    let token = '';
+    try {
+      const creds = JSON.parse(this.encryptionService.decrypt(existingRecord.encryptedJson));
+      token = creds.github?.token;
+    } catch (e) {
+      throw new Error('Failed to decrypt credentials');
+    }
+
+    if (!token) {
+      throw new Error('No GitHub token found');
+    }
+
+    const { Octokit } = await import('octokit');
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+      visibility: 'all',
+      sort: 'updated',
+      per_page: 100
+    });
+
+    return data.map((repo: any) => ({
+      name: repo.name,
+      full_name: repo.full_name,
+      private: repo.private
+    }));
+  }
+
   async getCredentials(userId: string, id: string) {
     const record = await this.prisma.webCredentials.findFirst({
       where: {

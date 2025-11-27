@@ -220,6 +220,7 @@ interface GithubCredentials {
   owner: string;
   repo: string;
   branch: string;
+  folder?: string;
 }
 
 const parseGithubCredentials = (encryptedRecord?: string | null): GithubCredentials | null => {
@@ -232,7 +233,8 @@ const parseGithubCredentials = (encryptedRecord?: string | null): GithubCredenti
         token: parsed.github.token,
         owner: parsed.github.owner,
         repo: parsed.github.repo || 'budlikibudliki',
-        branch: parsed.github.branch || 'main'
+        branch: parsed.github.branch || 'main',
+        folder: parsed.github.folder || 'articles'
       };
     }
     return null;
@@ -1500,7 +1502,12 @@ const bootstrap = async () => {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/(^-|-$)/g, '');
-          const filePath = `articles/${slug}.md`;
+
+          // Use configured folder or default to 'articles'
+          const folder = ghCreds.folder || 'articles';
+          // Remove leading/trailing slashes from folder
+          const cleanFolder = folder.replace(/^\/+|\/+$/g, '');
+          const filePath = `${cleanFolder}/${slug}.md`;
 
           await githubService.pushFile(
             ghCreds.owner,
