@@ -22,7 +22,8 @@ const WizardPage = () => {
         targetAudience: '',
         competitors: ['', '', ''],
         cta: '',
-        ctaOther: ''
+        ctaOther: '',
+        additionalInfo: ''
     });
 
     // Helper to update state
@@ -70,7 +71,8 @@ const WizardPage = () => {
                     targetAudience: web.audience?.target || '',
                     competitors: web.competitors?.urls || ['', '', ''],
                     cta: ['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : (web.conversionGoal ? 'other' : ''),
-                    ctaOther: !['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : ''
+                    ctaOther: !['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : '',
+                    additionalInfo: web.additionalInfo || ''
                 }));
 
                 // If we have data, maybe we should advance steps? For now, let's start at 1 but pre-filled.
@@ -149,6 +151,7 @@ const WizardPage = () => {
                 audience: { target: formData.targetAudience },
                 competitors: { urls: formData.competitors },
                 conversionGoal: formData.cta === 'other' ? formData.ctaOther : formData.cta,
+                additionalInfo: formData.additionalInfo
                 // Save credentials if provided
             };
 
@@ -755,6 +758,26 @@ const WizardPage = () => {
                                                         {/* end::Col */}
                                                     </div>
                                                     {/* end::Row */}
+                                                    {/* begin::Input group */}
+                                                    <div className="fv-row mb-10 mt-10">
+                                                        {/* begin::Label */}
+                                                        <label className="form-label">Additional Information</label>
+                                                        {/* end::Label */}
+                                                        {/* begin::Input */}
+                                                        <textarea
+                                                            name="additional_info"
+                                                            className="form-control form-control-lg form-control-solid"
+                                                            rows={4}
+                                                            placeholder="Any other details about your business, audience, or goals..."
+                                                            value={formData.additionalInfo}
+                                                            onChange={(e) => updateField('additionalInfo', e.target.value)}
+                                                        />
+                                                        {/* end::Input */}
+                                                        {/* begin::Hint */}
+                                                        <div className="form-text">This information will be used to better tailor the SEO strategy to your needs.</div>
+                                                        {/* end::Hint */}
+                                                    </div>
+                                                    {/* end::Input group */}
                                                 </div>
                                                 {/* end::Input group */}
                                             </div>

@@ -79,4 +79,8 @@ export class UpdateWebDto {
   @IsOptional()
   @IsString()
   conversionGoal?: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
 }
