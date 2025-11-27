@@ -240,8 +240,13 @@ export class BillingService {
     });
 
     if (!user || user.subscriptions.length === 0) {
-      // No active subscription -> allow 0 or default free limits?
-      // For now, return false to enforce subscription
+      // No active subscription -> allow 1 web (Onboarding flow)
+      if (resource === 'webs') {
+        const webCount = await this.prisma.web.count({
+          where: { userId, status: { not: WebStatus.ERROR } }
+        });
+        return webCount < 1;
+      }
       return false;
     }
 
