@@ -11,11 +11,11 @@ export class UpdateWebDto {
   nickname?: string;
 
   @IsOptional()
-  @IsEnum(WebStatus)
+  @IsEnum(['PENDING_PAYMENT', 'ACTIVE', 'PAUSED', 'CANCELED', 'ARCHIVED'])
   status?: WebStatus;
 
   @IsOptional()
-  @IsEnum(IntegrationType)
+  @IsEnum(['NONE', 'WORDPRESS_APPLICATION_PASSWORD', 'WORDPRESS_OAUTH'])
   integrationType?: IntegrationType;
 
   @IsOptional()

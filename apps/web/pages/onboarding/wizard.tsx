@@ -177,7 +177,8 @@ const WizardPage = () => {
 
         } catch (error) {
             console.error(error);
-            alert('Failed to save data. Please try again.');
+            const message = error instanceof Error ? error.message : 'Failed to save data. Please try again.';
+            alert(message);
         } finally {
             setIsSubmitting(false);
         }

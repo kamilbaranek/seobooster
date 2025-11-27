@@ -6,7 +6,7 @@ export class CreateWebDto {
   url!: string;
 
   @IsOptional()
-  @IsEnum(IntegrationType)
+  @IsEnum(['NONE', 'WORDPRESS_APPLICATION_PASSWORD', 'WORDPRESS_OAUTH'])
   integrationType?: IntegrationType;
 
   @IsOptional()
