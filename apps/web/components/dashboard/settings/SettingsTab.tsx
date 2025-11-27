@@ -599,38 +599,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
         }
     }, [hasGithub, project.id]);
 
-    const handleSaveGithubSettings = async () => {
-        if (!selectedRepo) {
-            Swal.fire('Error', 'Please select a repository', 'error');
-            return;
-        }
 
-        try {
-            // We need to fetch current credentials first to preserve token
-            const currentCredsResponse = await apiFetch(`/webs/${project.id}/credentials`) as any;
-            const currentToken = currentCredsResponse?.credentials?.github?.token;
-
-            await apiFetch(`/webs/${project.id}/credentials`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    credentials: {
-                        github: {
-                            token: currentToken, // Preserve token
-                            username: githubUsername,
-                            repo: selectedRepo.value,
-                            branch: githubBranch,
-                            folder: githubFolder
-                        }
-                    }
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            Swal.fire('Success', 'GitHub settings saved successfully', 'success');
-        } catch (error) {
-            Swal.fire('Error', 'Failed to save GitHub settings', 'error');
-        }
-    };
 
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -649,6 +618,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                 }),
                 headers: { 'Content-Type': 'application/json' },
             });
+
+            // Save GitHub settings if connected and repo selected
+            if (hasGithub && selectedRepo) {
+                // We need to fetch current credentials first to preserve token
+                const currentCredsResponse = await apiFetch(`/webs/${project.id}/credentials`) as any;
+                const currentToken = currentCredsResponse?.credentials?.github?.token;
+
+                await apiFetch(`/webs/${project.id}/credentials`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        credentials: {
+                            github: {
+                                token: currentToken, // Preserve token
+                                username: githubUsername,
+                                repo: selectedRepo.value,
+                                branch: githubBranch,
+                                folder: githubFolder
+                            }
+                        }
+                    }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
             onUpdate();
             Swal.fire({
                 text: "Project settings have been saved!",
@@ -1449,17 +1442,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                             />
                                         </div>
                                     </div>
-                                    <div className="row">
-                                        <div className="col-lg-8 offset-lg-4">
-                                            <button
-                                                type="button"
-                                                className="btn btn-primary"
-                                                onClick={handleSaveGithubSettings}
-                                            >
-                                                Save GitHub Settings
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                             {/*end::Item*/}
@@ -1488,12 +1470,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                     {/*begin::Card footer*/}
                     <div className="card-footer d-flex justify-content-end py-6 px-9">
                         <button className="btn btn-light btn-active-light-primary me-2" type="button">Discard</button>
-                        <button className="btn btn-primary" type="button">Save Changes</button>
+                        <button className="btn btn-primary" type="button" onClick={handleSaveSettings}>Save Changes</button>
                     </div>
                     {/*end::Card footer*/}
                 </div>
                 {/*end::Content*/}
-            </div>
+            </div >
             {/*end::Connected Accounts*/}
 
             {/*begin::Deactivate Web*/}
