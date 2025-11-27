@@ -384,7 +384,42 @@ type PromptConfig = {
   provider?: string | null;
   model?: string | null;
   forceJsonResponse?: boolean | null;
+  condition?: string | null;
 } | null;
+
+const evaluateCondition = (condition: string, variables: Record<string, unknown>): boolean => {
+  try {
+    // Simple check for existence/truthiness
+    if (!condition.includes(' ') && !condition.includes('!')) {
+      return !!variables[condition];
+    }
+
+    // Simple check for falsiness
+    if (condition.startsWith('!') && !condition.includes(' ')) {
+      const key = condition.slice(1);
+      return !variables[key];
+    }
+
+    // Simple equality check: key == value
+    if (condition.includes('==')) {
+      const [key, value] = condition.split('==').map(s => s.trim());
+      // Remove quotes from value if present
+      const cleanValue = value.replace(/^['"]|['"]$/g, '');
+      return String(variables[key]) === cleanValue;
+    }
+
+    // Simple inequality check: key != value
+    if (condition.includes('!=')) {
+      const [key, value] = condition.split('!=').map(s => s.trim());
+      const cleanValue = value.replace(/^['"]|['"]$/g, '');
+      return String(variables[key]) !== cleanValue;
+    }
+
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
 
 const renderPromptsForTask = (
   task: AiTaskType,
@@ -440,7 +475,8 @@ const ensurePromptSteps = (task: AiTaskType, promptSteps: PromptStep[]): PromptS
       userPrompt: defaults.userPrompt,
       forceJsonResponse: true,
       provider: null,
-      model: null
+      model: null,
+      condition: null
     }
   ];
 };
@@ -481,6 +517,10 @@ const runPromptSteps = async <TOutput = unknown>(
       ...Object.fromEntries(Object.entries(stepOutputs).map(([k, v]) => [`step${k}Output`, v])),
       ...stepContents
     };
+
+    if (step.condition && !evaluateCondition(step.condition, variables)) {
+      continue;
+    }
 
     const rendered = renderPromptsForTask(task, step, variables);
     const providerSelection = resolveProviderForTask(task, step);
@@ -869,31 +909,54 @@ const persistSeoStrategyArtifacts = async (
   strategy: SeoStrategy,
   modelName?: string | null,
   publicationSchedule: string[] = [],
-  timezone?: string | null
+  timezone?: string | null,
+  appendMode: boolean = false
 ) => {
   const topicClusters = strategy.topic_clusters ?? [];
-  const planStartDate = getInitialPlanStartDate(timezone);
+  let planStartDate = getInitialPlanStartDate(timezone);
 
-  const existingStrategies = await prisma.seoStrategy.findMany({
-    where: { webId, isActive: true },
-    select: { id: true }
-  });
-
-  if (existingStrategies.length > 0) {
-    const strategyIds = existingStrategies.map((item) => item.id);
-    await prisma.articlePlan.updateMany({
+  if (appendMode) {
+    const lastPlan = await prisma.articlePlan.findFirst({
       where: {
-        strategyId: { in: strategyIds },
+        webId,
         status: { in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED] }
       },
-      data: { status: ArticlePlanStatus.SKIPPED }
+      orderBy: { plannedPublishAt: 'desc' }
+    });
+
+    if (lastPlan) {
+      // Start scheduling after the last planned article
+      // We add 1 day to the last planned date to start the next slot
+      // But getPlannedDateForIndex uses index 0 as the first slot from startDate.
+      // So if we set planStartDate to lastPlan.plannedPublishAt, index 0 might be same day if schedule allows.
+      // Let's set it to lastPlan.plannedPublishAt + 1 day just to be safe and simple.
+      const nextDay = new Date(lastPlan.plannedPublishAt);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      planStartDate = nextDay;
+    }
+  } else {
+    // Only deactivate old strategies if NOT appending
+    const existingStrategies = await prisma.seoStrategy.findMany({
+      where: { webId, isActive: true },
+      select: { id: true }
+    });
+
+    if (existingStrategies.length > 0) {
+      const strategyIds = existingStrategies.map((item) => item.id);
+      await prisma.articlePlan.updateMany({
+        where: {
+          strategyId: { in: strategyIds },
+          status: { in: [ArticlePlanStatus.PLANNED, ArticlePlanStatus.QUEUED] }
+        },
+        data: { status: ArticlePlanStatus.SKIPPED }
+      });
+    }
+
+    await prisma.seoStrategy.updateMany({
+      where: { webId, isActive: true },
+      data: { isActive: false }
     });
   }
-
-  await prisma.seoStrategy.updateMany({
-    where: { webId, isActive: true },
-    data: { isActive: false }
-  });
 
   const storedStrategy = await prisma.seoStrategy.create({
     data: {
@@ -1112,7 +1175,8 @@ const bootstrap = async () => {
 
   createWorker<AnalyzeBusinessJob>(ANALYZE_BUSINESS_QUEUE, async (job) => {
     const analysis = await prisma.webAnalysis.findUnique({
-      where: { webId: job.data.webId }
+      where: { webId: job.data.webId },
+      include: { web: true }
     });
     if (!analysis || !analysis.scanResult) {
       logger.warn({ webId: job.data.webId }, 'Missing scan result for analysis');
@@ -1125,7 +1189,14 @@ const bootstrap = async () => {
       where: { task: 'analyze' },
       orderBy: { orderIndex: 'asc' }
     });
-    const variables = { url: scan.url, scanResult: scan, rawScanOutput: job.data.rawScanOutput ?? null };
+    const variables = {
+      url: scan.url,
+      scanResult: scan,
+      rawScanOutput: job.data.rawScanOutput ?? null,
+      additionalInfo: analysis.web.additionalInfo ?? null,
+      businessGoal: analysis.web.businessGoal ?? [],
+      conversionGoal: analysis.web.conversionGoal ?? null
+    };
 
     const { finalOutput: profile } = await runPromptSteps<BusinessProfile>(
       'analyze',
@@ -1176,7 +1247,8 @@ const bootstrap = async () => {
 
   createWorker<CreateSeoStrategyJob>(CREATE_SEO_STRATEGY_QUEUE, async (job) => {
     const analysis = await prisma.webAnalysis.findUnique({
-      where: { webId: job.data.webId }
+      where: { webId: job.data.webId },
+      include: { web: true }
     });
     if (!analysis || !analysis.businessProfile) {
       logger.warn({ webId: job.data.webId }, 'Missing business profile for SEO strategy');
@@ -1190,7 +1262,15 @@ const bootstrap = async () => {
       orderBy: { orderIndex: 'asc' }
     });
     const publishedArticlesTable = await getPublishedArticlesTable(job.data.webId);
-    const variables = { businessProfile, publishedArticlesTable };
+    const variables = {
+      businessProfile,
+      publishedArticlesTable,
+      additionalInfo: analysis.web.additionalInfo ?? null,
+      businessGoal: analysis.web.businessGoal ?? [],
+      conversionGoal: analysis.web.conversionGoal ?? null,
+      competitors: analysis.web.competitors ?? null,
+      audience: analysis.web.audience ?? null
+    };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
       'strategy',
@@ -1220,7 +1300,7 @@ const bootstrap = async () => {
     });
 
     const modelName = aiModelMap.strategy;
-    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName, web?.publicationSchedule ?? [], web?.timezone);
+    await persistSeoStrategyArtifacts(job.data.webId, strategy, modelName, web?.publicationSchedule ?? [], web?.timezone, job.data.appendMode);
   });
 
   createWorker<GenerateArticleJob>(GENERATE_ARTICLE_QUEUE, async (job) => {

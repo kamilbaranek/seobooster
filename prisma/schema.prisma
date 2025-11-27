@@ -148,6 +148,7 @@ model Web {
   audience          Json?
   competitors       Json?
   conversionGoal    String?
+  additionalInfo    String?                // Custom text from onboarding
 }
 
 model WebWordpressCategory {
@@ -258,6 +259,7 @@ model AiPromptConfig {
   provider          String?
   model             String?
   forceJsonResponse Boolean  @default(true)
+  condition         String?  // JSON logic or simple expression
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

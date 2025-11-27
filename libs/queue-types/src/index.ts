@@ -21,6 +21,7 @@ export type AnalyzeBusinessJob = {
 export type CreateSeoStrategyJob = {
   webId: string;
   debug?: boolean;
+  appendMode?: boolean;
 };
 
 export type GenerateArticleJob = {
