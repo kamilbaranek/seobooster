@@ -372,7 +372,7 @@ const WizardPage = () => {
                                                         <div className="col">
                                                             {/* begin::Option */}
                                                             <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '1-1' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="website_age" value="1-1" checked={formData.websiteAge === '1-1'} onChange={() => updateField('websiteAge', '1-1')} />
+                                                                <input type="radio" className="btn-check" name="website_age" value="0" checked={formData.websiteAge === '1-1'} onChange={() => updateField('websiteAge', '1-1')} />
                                                                 <span className="fw-bold fs-3">0</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -382,7 +382,7 @@ const WizardPage = () => {
                                                         <div className="col">
                                                             {/* begin::Option */}
                                                             <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '2-10' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="website_age" value="2-10" checked={formData.websiteAge === '2-10'} onChange={() => updateField('websiteAge', '2-10')} />
+                                                                <input type="radio" className="btn-check" name="website_age" value="1" checked={formData.websiteAge === '2-10'} onChange={() => updateField('websiteAge', '2-10')} />
                                                                 <span className="fw-bold fs-3">1</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -392,7 +392,7 @@ const WizardPage = () => {
                                                         <div className="col">
                                                             {/* begin::Option */}
                                                             <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '10-50' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="website_age" value="10-50" checked={formData.websiteAge === '10-50'} onChange={() => updateField('websiteAge', '10-50')} />
+                                                                <input type="radio" className="btn-check" name="website_age" value="2-3" checked={formData.websiteAge === '10-50'} onChange={() => updateField('websiteAge', '10-50')} />
                                                                 <span className="fw-bold fs-3">2-3</span>
                                                             </label>
                                                             {/* end::Option */}
@@ -402,7 +402,7 @@ const WizardPage = () => {
                                                         <div className="col">
                                                             {/* begin::Option */}
                                                             <label className={`btn btn-outline btn-outline-dashed btn-active-light-primary w-100 p-4 ${formData.websiteAge === '50+' ? 'active' : ''}`}>
-                                                                <input type="radio" className="btn-check" name="website_age" value="50+" checked={formData.websiteAge === '50+'} onChange={() => updateField('websiteAge', '50+')} />
+                                                                <input type="radio" className="btn-check" name="website_age" value="4+" checked={formData.websiteAge === '50+'} onChange={() => updateField('websiteAge', '50+')} />
                                                                 <span className="fw-bold fs-3">4+</span>
                                                             </label>
                                                             {/* end::Option */}
