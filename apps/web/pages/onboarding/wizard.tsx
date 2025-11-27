@@ -166,8 +166,11 @@ const WizardPage = () => {
                 await apiFetch(`/webs/${webId}/credentials`, {
                     method: 'PUT',
                     body: JSON.stringify({
-                        username: formData.userName,
-                        applicationPassword: formData.password
+                        credentials: {
+                            type: 'wordpress_application_password',
+                            username: formData.userName,
+                            applicationPassword: formData.password
+                        }
                     }),
                 });
             }
