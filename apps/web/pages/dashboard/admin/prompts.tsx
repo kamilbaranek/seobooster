@@ -343,7 +343,7 @@ const AdminPromptsPage = () => {
     const [logDetailError, setLogDetailError] = useState<string | null>(null);
 
     // New state for tabs, accordion, and multi-step prompts
-    const [activeTab, setActiveTab] = useState<'general' | 'log'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'settings' | 'log'>('general');
     const [openLogId, setOpenLogId] = useState<string | null>(null);
     const [responseViewMode, setResponseViewMode] = useState<'raw' | 'json'>('json');
     const [promptSteps, setPromptSteps] = useState<PromptDto[]>([]);
@@ -875,6 +875,30 @@ const AdminPromptsPage = () => {
                                             </li>
                                             <li className="nav-item">
                                                 <a
+                                                    className={`nav-link text-active-primary d-flex align-items-center pb-4 ${activeTab === 'general' ? 'active' : ''}`}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveTab('general');
+                                                    }}
+                                                    href="#"
+                                                >
+                                                    <i className="ki-outline ki-home fs-4 me-1"></i>General
+                                                </a>
+                                            </li>
+                                            <li className="nav-item">
+                                                <a
+                                                    className={`nav-link text-active-primary d-flex align-items-center pb-4 ${activeTab === 'settings' ? 'active' : ''}`}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveTab('settings');
+                                                    }}
+                                                    href="#"
+                                                >
+                                                    <i className="ki-outline ki-setting-2 fs-4 me-1"></i>Settings
+                                                </a>
+                                            </li>
+                                            <li className="nav-item">
+                                                <a
                                                     className={`nav-link text-active-primary d-flex align-items-center pb-4 ${activeTab === 'log' ? 'active' : ''}`}
                                                     onClick={(e) => {
                                                         e.preventDefault();
@@ -902,81 +926,7 @@ const AdminPromptsPage = () => {
                                                             )}
                                                             <p className="text-gray-600">{selectedMeta?.description}</p>
 
-                                                            {/* Settings */}
-                                                            <div className="row g-5">
-                                                                <div className="col-md-6">
-                                                                    <label className="form-label">AI poskytovatel</label>
-                                                                    <select
-                                                                        className="form-select form-select-solid"
-                                                                        value={providerChoice}
-                                                                        onChange={(event) => setProviderChoice(event.target.value)}
-                                                                    >
-                                                                        {PROVIDER_OPTIONS.map((option) => (
-                                                                            <option key={option.value} value={option.value}>
-                                                                                {option.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                                <div className="col-md-6">
-                                                                    <label className="form-label">Model</label>
-                                                                    <select
-                                                                        className="form-select form-select-solid"
-                                                                        value={modelChoice}
-                                                                        onChange={(event) => setModelChoice(event.target.value)}
-                                                                        disabled={
-                                                                            providerChoice === 'default' ||
-                                                                            (providerChoice === 'openrouter'
-                                                                                ? openrouterModels.length === 0 && !modelsLoading
-                                                                                : !(MODEL_OPTIONS[providerChoice] ?? []).length)
-                                                                        }
-                                                                    >
-                                                                        <option value="">Dědit z výchozího nastavení</option>
-                                                                        {(providerChoice === 'openrouter'
-                                                                            ? openrouterModels
-                                                                            : MODEL_OPTIONS[providerChoice] ?? []
-                                                                        ).map((option) => (
-                                                                            <option key={option.value} value={option.value}>
-                                                                                {option.label}
-                                                                            </option>
-                                                                        ))}
-                                                                        {modelChoice &&
-                                                                            !(providerChoice === 'openrouter'
-                                                                                ? openrouterModels
-                                                                                : MODEL_OPTIONS[providerChoice] ?? []
-                                                                            ).some((option) => option.value === modelChoice) && (
-                                                                                <option value={modelChoice}>{modelChoice}</option>
-                                                                            )}
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="form-check form-switch form-check-custom form-check-solid my-3">
-                                                                <input
-                                                                    className="form-check-input"
-                                                                    type="checkbox"
-                                                                    checked={forceJsonResponse}
-                                                                    onChange={(event) => setForceJsonResponse(event.target.checked)}
-                                                                    id="forceJson"
-                                                                />
-                                                                <label className="form-check-label" htmlFor="forceJson">
-                                                                    Vynutit JSON response
-                                                                </label>
-                                                            </div>
-
-                                                            <div>
-                                                                <label className="form-label">Podmínka spuštění (volitelné)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    className="form-control form-control-solid mb-3"
-                                                                    value={condition}
-                                                                    onChange={(event) => setCondition(event.target.value)}
-                                                                    placeholder="např. !webAge nebo type==commercial"
-                                                                />
-                                                                <div className="text-muted fs-7 mb-5">
-                                                                    Pokud je vyplněno, krok se provede pouze při splnění podmínky.
-                                                                </div>
-                                                            </div>
+                                                            {/* Settings moved to Settings tab */}
 
                                                             {/* Prompts */}
                                                             <div>
@@ -1034,25 +984,7 @@ const AdminPromptsPage = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Conditional Logic Docs */}
-                                                            <div className="mt-5">
-                                                                <h3 className="fs-5 fw-bold text-gray-900 mb-3">Podmíněná logika</h3>
-                                                                <div className="text-gray-600 fs-6">
-                                                                    <p>Do pole <strong>Podmínka spuštění</strong> můžete zadat výraz, který musí být pravdivý, aby se tento krok provedl. Podporované operátory:</p>
-                                                                    <ul className="list-disc ms-5">
-                                                                        <li><code>variableName</code> - proměnná existuje a je pravdivá (není null, false, 0, "")</li>
-                                                                        <li><code>!variableName</code> - proměnná neexistuje nebo je nepravdivá</li>
-                                                                        <li><code>variable==value</code> - hodnota proměnné se rovná řetězci "value"</li>
-                                                                        <li><code>variable!=value</code> - hodnota proměnné se nerovná řetězci "value"</li>
-                                                                    </ul>
-                                                                    <p className="mt-2">Příklady:</p>
-                                                                    <ul className="list-disc ms-5">
-                                                                        <li><code>targetAudience</code> (spustit pokud je definováno cílové publikum)</li>
-                                                                        <li><code>!webAge</code> (spustit pokud není znám věk webu)</li>
-                                                                        <li><code>type==commercial</code> (spustit pouze pro komerční weby)</li>
-                                                                    </ul>
-                                                                </div>
-                                                            </div>
+                                                            {/* Conditional Logic Docs moved to Settings tab */}
 
                                                             {/* Preview Result */}
                                                             {previewData && (
@@ -1074,6 +1006,121 @@ const AdminPromptsPage = () => {
                                                             )}
                                                         </div>
                                                     )}
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'settings' && (
+                                                <div className="tab-pane fade show active">
+                                                    <div className="d-flex flex-column gap-5">
+                                                        {/* Settings */}
+                                                        <div className="row g-5">
+                                                            <div className="col-md-6">
+                                                                <label className="form-label">AI poskytovatel</label>
+                                                                <select
+                                                                    className="form-select form-select-solid"
+                                                                    value={providerChoice}
+                                                                    onChange={(event) => setProviderChoice(event.target.value)}
+                                                                >
+                                                                    {PROVIDER_OPTIONS.map((option) => (
+                                                                        <option key={option.value} value={option.value}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                            <div className="col-md-6">
+                                                                <label className="form-label">Model</label>
+                                                                <select
+                                                                    className="form-select form-select-solid"
+                                                                    value={modelChoice}
+                                                                    onChange={(event) => setModelChoice(event.target.value)}
+                                                                    disabled={
+                                                                        providerChoice === 'default' ||
+                                                                        (providerChoice === 'openrouter'
+                                                                            ? openrouterModels.length === 0 && !modelsLoading
+                                                                            : !(MODEL_OPTIONS[providerChoice] ?? []).length)
+                                                                    }
+                                                                >
+                                                                    <option value="">Dědit z výchozího nastavení</option>
+                                                                    {(providerChoice === 'openrouter'
+                                                                        ? openrouterModels
+                                                                        : MODEL_OPTIONS[providerChoice] ?? []
+                                                                    ).map((option) => (
+                                                                        <option key={option.value} value={option.value}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                    {modelChoice &&
+                                                                        !(providerChoice === 'openrouter'
+                                                                            ? openrouterModels
+                                                                            : MODEL_OPTIONS[providerChoice] ?? []
+                                                                        ).some((option) => option.value === modelChoice) && (
+                                                                            <option value={modelChoice}>{modelChoice}</option>
+                                                                        )}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="form-check form-switch form-check-custom form-check-solid my-3">
+                                                            <input
+                                                                className="form-check-input"
+                                                                type="checkbox"
+                                                                checked={forceJsonResponse}
+                                                                onChange={(event) => setForceJsonResponse(event.target.checked)}
+                                                                id="forceJson"
+                                                            />
+                                                            <label className="form-check-label" htmlFor="forceJson">
+                                                                Vynutit JSON response
+                                                            </label>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="form-label">Podmínka spuštění (volitelné)</label>
+                                                            <input
+                                                                type="text"
+                                                                className="form-control form-control-solid mb-3"
+                                                                value={condition}
+                                                                onChange={(event) => setCondition(event.target.value)}
+                                                                placeholder="např. !webAge nebo type==commercial"
+                                                            />
+                                                            <div className="text-muted fs-7 mb-5">
+                                                                Pokud je vyplněno, krok se provede pouze při splnění podmínky.
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Actions */}
+                                                        <div className="d-flex gap-3 my-4">
+                                                            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                                                                {saving ? 'Ukládám…' : 'Uložit'}
+                                                            </button>
+                                                            <button className="btn btn-light" onClick={handleReset} disabled={!canReset || saving}>
+                                                                Reset
+                                                            </button>
+                                                        </div>
+
+                                                        {successMessage && <div className="alert alert-success">{successMessage}</div>}
+                                                        {error && <div className="alert alert-danger">{error}</div>}
+
+                                                        {/* Conditional Logic Docs */}
+                                                        <div className="mt-5">
+                                                            <h3 className="fs-5 fw-bold text-gray-900 mb-3">Podmíněná logika</h3>
+                                                            <div className="text-gray-600 fs-6">
+                                                                <p>Do pole <strong>Podmínka spuštění</strong> můžete zadat výraz, který musí být pravdivý, aby se tento krok provedl. Podporované operátory:</p>
+                                                                <ul className="list-disc ms-5">
+                                                                    <li><code>variableName</code> - proměnná existuje a je pravdivá (není null, false, 0, "")</li>
+                                                                    <li><code>!variableName</code> - proměnná neexistuje nebo je nepravdivá</li>
+                                                                    <li><code>variable==value</code> - hodnota proměnné se rovná řetězci "value"</li>
+                                                                    <li><code>variable!=value</code> - hodnota proměnné se nerovná řetězci "value"</li>
+                                                                </ul>
+                                                                <p className="mt-2">Příklady:</p>
+                                                                <ul className="list-disc ms-5">
+                                                                    <li><code>targetAudience</code> (spustit pokud je definováno cílové publikum)</li>
+                                                                    <li><code>!webAge</code> (spustit pokud není znám věk webu)</li>
+                                                                    <li><code>type==commercial</code> (spustit pouze pro komerční weby)</li>
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
 
