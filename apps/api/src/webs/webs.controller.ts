@@ -10,9 +10,13 @@ import {
   Put,
   UseGuards,
   UseInterceptors,
-  UploadedFile
+  UploadedFile,
+  Req,
+  Query,
+  Res
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthenticatedUserPayload } from '../auth/types/auth-response';
@@ -22,6 +26,10 @@ import { UpdateWebDto } from './dto/update-web.dto';
 import { UpsertCredentialsDto } from './dto/upsert-credentials.dto';
 import { UpdateArticlePlanDto } from './dto/update-article-plan.dto';
 import { PublishBatchDto } from './dto/publish-batch.dto';
+import { User } from '@prisma/client';
+import { GithubAuthGuard } from '../auth/guards/github-auth.guard';
+import { Response } from 'express';
+import { Public } from '../auth/public.decorator';
 
 @Controller('webs')
 @UseGuards(JwtAuthGuard)
@@ -101,13 +109,41 @@ export class WebsController {
     return this.websService.getCredentials(user.userId, id);
   }
 
+  @Get('github/callback')
+  @Public()
+  @UseGuards(AuthGuard('github'))
+  async githubCallback(@Req() req: any, @Res() res: Response) {
+    // req.user contains the profile and tokens from GithubStrategy
+    // req.query.state contains the webId
+    const { user } = req;
+    const webId = req.query.state as string;
+
+    if (!user || !webId) {
+      return res.send('<script>window.opener.postMessage({ type: "GITHUB_CONNECTED", success: false }, "*"); window.close();</script>');
+    }
+
+    try {
+      await this.websService.updateGithubCredentials(webId, user.accessToken, user.githubProfile);
+      return res.send('<script>window.opener.postMessage({ type: "GITHUB_CONNECTED", success: true }, "*"); window.close();</script>');
+    } catch (error) {
+      return res.send('<script>window.opener.postMessage({ type: "GITHUB_CONNECTED", success: false }, "*"); window.close();</script>');
+    }
+  }
+
+  @Get(':id/github/connect')
+  @UseGuards(GithubAuthGuard)
+  async connectGithub() {
+    // Initiates the OAuth flow
+  }
+
   @Put(':id/credentials')
+  @UseGuards(JwtAuthGuard)
   upsertCredentials(
-    @CurrentUser() user: AuthenticatedUserPayload,
+    @CurrentUser() user: User,
     @Param('id') id: string,
-    @Body() payload: UpsertCredentialsDto
+    @Body() dto: UpsertCredentialsDto
   ) {
-    return this.websService.upsertCredentials(user.userId, id, payload);
+    return this.websService.upsertCredentials(user.id, id, dto);
   }
 
   @Delete(':id/credentials')

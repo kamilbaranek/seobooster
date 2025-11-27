@@ -23,6 +23,26 @@ export class GithubService {
         }
     }
 
+    async ensureRepoExists(owner: string, repo: string): Promise<void> {
+        try {
+            await this.octokit.rest.repos.get({ owner, repo });
+        } catch (error: any) {
+            if (error.status === 404) {
+                // Create repo
+                await this.octokit.rest.repos.createForAuthenticatedUser({
+                    name: repo,
+                    private: true, // Default to private for backups
+                    auto_init: true // Initialize with README so we have a main branch
+                });
+                logger.info({ owner, repo }, 'Created GitHub repository');
+                // Wait a bit for initialization
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                throw error;
+            }
+        }
+    }
+
     async pushFile(
         owner: string,
         repo: string,

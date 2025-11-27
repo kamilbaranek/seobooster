@@ -3,6 +3,7 @@ import Swal from 'sweetalert2';
 import Select from 'react-select';
 import { countryOptions } from '../../../lib/countryOptions';
 import { apiFetch } from '../../../lib/api-client';
+import { getToken } from '../../../lib/auth-storage';
 
 interface SettingsTabProps {
     project: any;
@@ -52,12 +53,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     const [newPassword, setNewPassword] = useState('');
 
     // GitHub credentials state
-    const [githubToken, setGithubToken] = useState('');
-    const [githubOwner, setGithubOwner] = useState('');
-    const [githubRepo, setGithubRepo] = useState('');
-    const [githubBranch, setGithubBranch] = useState('main');
+    const [githubUsername, setGithubUsername] = useState('');
     const [hasGithub, setHasGithub] = useState(false);
-    const [editingGithub, setEditingGithub] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -409,10 +406,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
 
                     if (response.credentials.github) {
                         setHasGithub(true);
-                        setGithubToken('************');
-                        setGithubOwner(response.credentials.github.owner || '');
-                        setGithubRepo(response.credentials.github.repo || '');
-                        setGithubBranch(response.credentials.github.branch || 'main');
+                        setGithubUsername(response.credentials.github.username || '');
                     }
                 }
             } catch (error) {
@@ -544,38 +538,36 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
         }
     };
 
-    const handleSaveGithub = async () => {
-        if (!githubOwner || !githubRepo) {
-            Swal.fire('Error', 'Owner and Repository are required', 'error');
-            return;
-        }
+    const handleConnectGithub = () => {
+        const token = getToken();
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3333/api';
+        const width = 600;
+        const height = 700;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
 
-        try {
-            await apiFetch(`/webs/${project.id}/credentials`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    credentials: {
-                        github: {
-                            token: githubToken === '************' ? undefined : githubToken,
-                            owner: githubOwner,
-                            repo: githubRepo,
-                            branch: githubBranch
-                        }
-                    }
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            setHasGithub(true);
-            setEditingGithub(false);
-            if (githubToken !== '************') {
-                setGithubToken('************');
-            }
-            Swal.fire('Success', 'GitHub settings saved', 'success');
-        } catch (error) {
-            Swal.fire('Error', 'Failed to save GitHub settings', 'error');
-        }
+        window.open(
+            `${apiUrl}/webs/${project.id}/github/connect?token=${token}`,
+            'Connect GitHub',
+            `width=${width},height=${height},top=${top},left=${left}`
+        );
     };
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'GITHUB_CONNECTED') {
+                if (event.data.success) {
+                    setHasGithub(true);
+                    Swal.fire('Success', 'GitHub connected successfully', 'success');
+                    onUpdate(); // Refresh project data
+                } else {
+                    Swal.fire('Error', 'Failed to connect GitHub', 'error');
+                }
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [onUpdate]);
 
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1289,7 +1281,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                     <div className="d-flex flex-column">
                                         <a href="#" className="fs-5 text-gray-900 text-hover-primary fw-bold">Github</a>
                                         <div className="fs-6 fw-semibold text-gray-500">
-                                            {hasGithub ? 'Connected to ' + githubOwner + '/' + githubRepo : 'Connect your repository for backups'}
+                                            {hasGithub ? 'Connected as ' + githubUsername : 'Connect your repository for backups'}
                                         </div>
                                     </div>
                                 </div>
@@ -1297,62 +1289,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                     <button
                                         type="button"
                                         className={`btn btn-sm ${hasGithub ? 'btn-light-primary' : 'btn-light'}`}
-                                        onClick={() => setEditingGithub(!editingGithub)}
+                                        onClick={handleConnectGithub}
                                     >
-                                        {hasGithub ? 'Configure' : 'Connect'}
+                                        {hasGithub ? 'Re-Connect' : 'Connect'}
                                     </button>
                                 </div>
                             </div>
-                            {editingGithub && (
-                                <div className="mt-5 p-5 border border-dashed border-gray-300 rounded">
-                                    <div className="mb-3">
-                                        <label className="form-label required">Personal Access Token</label>
-                                        <input
-                                            type="password"
-                                            className="form-control form-control-solid"
-                                            placeholder="ghp_..."
-                                            value={githubToken}
-                                            onChange={(e) => setGithubToken(e.target.value)}
-                                        />
-                                        <div className="form-text">Token with 'repo' scope is required.</div>
-                                    </div>
-                                    <div className="row mb-3">
-                                        <div className="col-md-6">
-                                            <label className="form-label required">Owner</label>
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-solid"
-                                                placeholder="e.g. facebook"
-                                                value={githubOwner}
-                                                onChange={(e) => setGithubOwner(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label className="form-label required">Repository</label>
-                                            <input
-                                                type="text"
-                                                className="form-control form-control-solid"
-                                                placeholder="e.g. react"
-                                                value={githubRepo}
-                                                onChange={(e) => setGithubRepo(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="mb-3">
-                                        <label className="form-label">Branch</label>
-                                        <input
-                                            type="text"
-                                            className="form-control form-control-solid"
-                                            placeholder="main"
-                                            value={githubBranch}
-                                            onChange={(e) => setGithubBranch(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="d-flex justify-content-end">
-                                        <button type="button" className="btn btn-primary btn-sm" onClick={handleSaveGithub}>Save GitHub Settings</button>
-                                    </div>
-                                </div>
-                            )}
                             {/*end::Item*/}
                             <div className="separator separator-dashed my-5"></div>
                             {/*begin::Item*/}

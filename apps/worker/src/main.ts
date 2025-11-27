@@ -227,11 +227,11 @@ const parseGithubCredentials = (encryptedRecord?: string | null): GithubCredenti
   try {
     const plaintext = decryptWordpressCredentials(encryptedRecord);
     const parsed = JSON.parse(plaintext) as { github?: GithubCredentials };
-    if (parsed?.github?.token && parsed?.github?.owner && parsed?.github?.repo) {
+    if (parsed?.github?.token && parsed?.github?.owner) {
       return {
         token: parsed.github.token,
         owner: parsed.github.owner,
-        repo: parsed.github.repo,
+        repo: parsed.github.repo || 'budlikibudliki',
         branch: parsed.github.branch || 'main'
       };
     }
@@ -1494,6 +1494,8 @@ const bootstrap = async () => {
       if (ghCreds) {
         try {
           const githubService = new GithubService(ghCreds.token);
+          await githubService.ensureRepoExists(ghCreds.owner, ghCreds.repo);
+
           const slug = article.title
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')

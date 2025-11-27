@@ -334,6 +334,58 @@ export class WebsService {
     return { saved: true };
   }
 
+  async updateGithubCredentials(webId: string, token: string, profile: any) {
+    // Fetch existing credentials
+    const existingRecord = await this.prisma.webCredentials.findUnique({
+      where: { webId }
+    });
+
+    let finalCredentials: Record<string, unknown> = {};
+
+    if (existingRecord) {
+      try {
+        finalCredentials = JSON.parse(this.encryptionService.decrypt(existingRecord.encryptedJson));
+      } catch (error) {
+        // Ignore decryption error
+      }
+    }
+
+    // Update GitHub section
+    finalCredentials.github = {
+      token,
+      owner: profile.username,
+      // We don't know the repo yet, user might need to select it or we default to something?
+      // Actually, the requirement says "connect ... dialog ... no filling".
+      // But we need a repo to push to.
+      // If we just connect, we have the token. We can list repos or create one.
+      // For now, let's store the token and username.
+      // The user might need to select the repo in the UI afterwards?
+      // OR we can default to a repo name like 'seobooster-backup'.
+      // Let's store what we have.
+      username: profile.username,
+      profileUrl: profile.profileUrl,
+      // Clear repo/branch if they were set manually? Or keep them?
+      // If we keep them, they might be invalid for the new user.
+      // Let's keep them if they exist, user can change them.
+      // Default to budlikibudliki if not set
+      repo: (finalCredentials.github as any)?.repo || 'budlikibudliki',
+      branch: (finalCredentials.github as any)?.branch || 'main'
+    };
+
+    const encryptedJson = this.encryptionService.encrypt(JSON.stringify(finalCredentials));
+
+    await this.prisma.webCredentials.upsert({
+      where: { webId },
+      update: { encryptedJson },
+      create: {
+        webId,
+        encryptedJson
+      }
+    });
+
+    return { saved: true, username: profile.username };
+  }
+
   async getCredentials(userId: string, id: string) {
     const record = await this.prisma.webCredentials.findFirst({
       where: {
