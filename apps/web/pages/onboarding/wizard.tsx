@@ -46,13 +46,34 @@ const WizardPage = () => {
         }
     };
 
-    // Pre-fill data if webId is present
+    // Pre-fill data if webId is present OR if user has an existing web (resume onboarding)
     useEffect(() => {
-        if (!router.isReady || !router.query.webId) return;
+        if (!router.isReady) return;
 
-        const fetchWeb = async () => {
+        const initWeb = async () => {
+            let webId = router.query.webId as string;
+
+            // If no webId in URL, check if user already has a web (e.g. from failed onboarding)
+            if (!webId) {
+                try {
+                    const webs = await apiFetch<any[]>('/webs');
+                    if (webs && webs.length > 0) {
+                        // Use the most recent web
+                        webId = webs[0].id;
+                        // Optionally update URL without reload to reflect state
+                        router.replace({
+                            pathname: router.pathname,
+                            query: { ...router.query, webId }
+                        }, undefined, { shallow: true });
+                    }
+                } catch (e) {
+                    console.error('Failed to check existing webs:', e);
+                }
+            }
+
+            if (!webId) return;
+
             try {
-                const webId = router.query.webId as string;
                 const [web, credentialsResponse] = await Promise.all([
                     apiFetch<any>(`/webs/${webId}`),
                     apiFetch<any>(`/webs/${webId}/credentials`).catch(() => null)
@@ -74,14 +95,12 @@ const WizardPage = () => {
                     ctaOther: !['buy_now', 'sign_up', 'contact_us'].includes(web.conversionGoal) ? web.conversionGoal : '',
                     additionalInfo: web.additionalInfo || ''
                 }));
-
-                // If we have data, maybe we should advance steps? For now, let's start at 1 but pre-filled.
             } catch (error) {
                 console.error('Failed to fetch web details:', error);
             }
         };
 
-        fetchWeb();
+        initWeb();
     }, [router.isReady, router.query.webId]);
 
     // Validation Logic
@@ -161,18 +180,31 @@ const WizardPage = () => {
             });
 
             // 3. Save Credentials if WP
-            // Only save if password is NOT masked (******)
-            if (formData.connectionType === 'application_password' && formData.userName && formData.password && formData.password !== '******') {
-                await apiFetch(`/webs/${webId}/credentials`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        credentials: {
-                            type: 'wordpress_application_password',
-                            username: formData.userName,
-                            applicationPassword: formData.password
-                        }
-                    }),
-                });
+            // Save if we have a username. If password is '******', we don't send it (or send undefined/null to let backend handle merge).
+            // But here we are in the wizard, likely setting it up for the first time OR updating.
+            // If connectionType is WP and we have a username...
+            if (formData.connectionType === 'application_password' && formData.userName) {
+                const isPasswordMasked = formData.password === '******';
+                // If password is NOT masked, we must have it to save.
+                // If password IS masked, we can save just the username (backend should support partial update or we just send what we have).
+                // However, the backend upsertCredentials expects `applicationPassword` in the body.
+                // Let's check the backend DTO/Service.
+                // Service `upsertCredentials`:
+                // if (!dto.credentials.applicationPassword && decryptedExisting.applicationPassword) { ... keep old ... }
+                // So we can send `applicationPassword: undefined` or just omit it.
+
+                if (!isPasswordMasked || (isPasswordMasked && formData.userName)) {
+                    await apiFetch(`/webs/${webId}/credentials`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            credentials: {
+                                type: 'wordpress_application_password',
+                                username: formData.userName,
+                                applicationPassword: isPasswordMasked ? undefined : formData.password
+                            }
+                        }),
+                    });
+                }
             }
 
             // Redirect

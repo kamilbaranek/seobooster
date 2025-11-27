@@ -42,7 +42,8 @@ export class WebsService {
         status: WebStatus.PENDING_PAYMENT,
         faviconStatus: AssetStatus.PENDING,
         screenshotStatus: AssetStatus.PENDING,
-        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days trial
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days trial
+        publicationSchedule: dto.publicationSchedule ?? ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
       }
     });
 
@@ -148,7 +149,8 @@ export class WebsService {
         businessGoal: dto.businessGoal ?? web.businessGoal,
         audience: dto.audience ?? web.audience ?? undefined,
         competitors: dto.competitors ?? web.competitors ?? undefined,
-        conversionGoal: dto.conversionGoal ?? web.conversionGoal
+        conversionGoal: dto.conversionGoal ?? web.conversionGoal,
+        additionalInfo: dto.additionalInfo ?? web.additionalInfo
       }
     });
 

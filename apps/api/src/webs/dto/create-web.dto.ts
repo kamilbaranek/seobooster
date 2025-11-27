@@ -12,5 +12,9 @@ export class CreateWebDto {
   @IsOptional()
   @IsString()
   nickname?: string;
+
+  @IsOptional()
+  @IsString({ each: true })
+  publicationSchedule?: string[];
 }
 
