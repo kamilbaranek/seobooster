@@ -111,6 +111,14 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
             description: 'Platforma webu (wordpress / shopify / ...).'
         },
         {
+            name: '{{targetAudience}}',
+            description: 'Cílová skupina z onboardingu (např. "b2b", "b2c").'
+        },
+        {
+            name: '{{competitorUrls}}',
+            description: 'Seznam URL konkurentů z onboardingu (pole stringů).'
+        },
+        {
             name: '{{previousStepOutput}}',
             description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
         },
@@ -164,6 +172,14 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         {
             name: '{{platform}}',
             description: 'Platforma webu (wordpress / shopify / ...).'
+        },
+        {
+            name: '{{targetAudience}}',
+            description: 'Cílová skupina z onboardingu (např. "b2b", "b2c").'
+        },
+        {
+            name: '{{competitorUrls}}',
+            description: 'Seznam URL konkurentů z onboardingu (pole stringů).'
         },
         {
             name: '{{competitors}}',

@@ -1243,7 +1243,11 @@ const bootstrap = async () => {
       webAge: analysis.web.webAge ?? null,
       projectType: analysis.web.projectType ?? null,
       type: analysis.web.projectType ?? null, // alias for backward compatibility
-      platform: analysis.web.platform ?? null
+      platform: analysis.web.platform ?? null,
+      targetAudience: (analysis.web.audience as any)?.target ?? null,
+      competitorUrls: (analysis.web.competitors as any)?.urls ?? [],
+      audience: analysis.web.audience ?? null,
+      competitors: analysis.web.competitors ?? null
     };
 
     const { finalOutput: profile } = await runPromptSteps<BusinessProfile>(
@@ -1321,7 +1325,9 @@ const bootstrap = async () => {
       webAge: analysis.web.webAge ?? null,
       projectType: analysis.web.projectType ?? null,
       type: analysis.web.projectType ?? null, // alias for backward compatibility
-      platform: analysis.web.platform ?? null
+      platform: analysis.web.platform ?? null,
+      targetAudience: (analysis.web.audience as any)?.target ?? null,
+      competitorUrls: (analysis.web.competitors as any)?.urls ?? []
     };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
