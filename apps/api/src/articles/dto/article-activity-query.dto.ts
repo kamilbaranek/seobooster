@@ -1,4 +1,5 @@
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class ArticleActivityQueryDto {
   @IsOptional()
@@ -6,6 +7,7 @@ export class ArticleActivityQueryDto {
   status?: 'all' | 'published' | 'generated';
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(50)
