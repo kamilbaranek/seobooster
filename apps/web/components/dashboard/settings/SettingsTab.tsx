@@ -580,7 +580,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
     }, [onUpdate]);
 
     const fetchGithubRepos = async () => {
-        if (!hasGithub) return;
+        if (!hasGithub || !project?.id) return;
         setLoadingRepos(true);
         try {
             const response = await apiFetch(`/webs/${project.id}/github/repos`) as any[];
@@ -597,7 +597,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
         if (hasGithub) {
             fetchGithubRepos();
         }
-    }, [hasGithub, project.id]);
+    }, [hasGithub, project?.id]);
 
 
 
