@@ -84,6 +84,7 @@ import type {
   WordpressPostResponse
 } from '@seobooster/wp-client';
 import { EmailService, getArticleGeneratedEmail } from '@seobooster/email';
+import { GithubService } from './services/github.service';
 import { randomBytes } from 'crypto';
 const logger = createLogger('worker');
 const formatUnknownError = (error: unknown) =>
@@ -212,6 +213,33 @@ const normalizePublishMode = (value: unknown): WordpressPublishMode => {
     return value;
   }
   return 'draft_only';
+};
+
+interface GithubCredentials {
+  token: string;
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
+const parseGithubCredentials = (encryptedRecord?: string | null): GithubCredentials | null => {
+  if (!encryptedRecord || !encryptionKey) return null;
+  try {
+    const plaintext = decryptWordpressCredentials(encryptedRecord);
+    const parsed = JSON.parse(plaintext) as { github?: GithubCredentials };
+    if (parsed?.github?.token && parsed?.github?.owner && parsed?.github?.repo) {
+      return {
+        token: parsed.github.token,
+        owner: parsed.github.owner,
+        repo: parsed.github.repo,
+        branch: parsed.github.branch || 'main'
+      };
+    }
+    return null;
+  } catch (error) {
+    logger.warn({ error }, 'Unable to parse GitHub credentials');
+    return null;
+  }
 };
 
 const parseWordpressCredentials = (encryptedRecord?: string | null): WordpressCredentials | null => {
@@ -1456,6 +1484,39 @@ const bootstrap = async () => {
             usage,
             type: 'TEXT'
           });
+        }
+      }
+    }
+
+    // Trigger GitHub Backup
+    if (plan.web.credentials?.encryptedJson) {
+      const ghCreds = parseGithubCredentials(plan.web.credentials.encryptedJson);
+      if (ghCreds) {
+        try {
+          const githubService = new GithubService(ghCreds.token);
+          const slug = article.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+          const filePath = `articles/${slug}.md`;
+
+          await githubService.pushFile(
+            ghCreds.owner,
+            ghCreds.repo,
+            ghCreds.branch,
+            filePath,
+            article.markdown,
+            `Update article: ${article.title}`
+          );
+          logger.info(
+            { jobId: job.id, articleId: article.id, repo: `${ghCreds.owner}/${ghCreds.repo}` },
+            'Article backed up to GitHub'
+          );
+        } catch (error) {
+          logger.error(
+            { jobId: job.id, articleId: article.id, error: error instanceof Error ? error.message : String(error) },
+            'Failed to backup article to GitHub'
+          );
         }
       }
     }

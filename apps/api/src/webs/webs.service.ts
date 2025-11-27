@@ -285,6 +285,15 @@ export class WebsService {
         if (!dto.credentials.applicationPassword && decryptedExisting.applicationPassword) {
           finalCredentials.applicationPassword = decryptedExisting.applicationPassword;
         }
+
+        // Preserve GitHub token if not provided
+        if (finalCredentials.github && decryptedExisting.github) {
+          const newGithub = finalCredentials.github as Record<string, unknown>;
+          const oldGithub = decryptedExisting.github as Record<string, unknown>;
+          if (!newGithub.token && oldGithub.token) {
+            newGithub.token = oldGithub.token;
+          }
+        }
       } catch (error) {
         // If decryption fails, we can't merge, so we just use the new ones (and log warning if needed)
         // But for now we just proceed with what we have
