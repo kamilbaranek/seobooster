@@ -18,4 +18,8 @@ export class UpdatePromptDto {
   @IsOptional()
   @IsBoolean()
   forceJsonResponse?: boolean;
+
+  @IsOptional()
+  @IsString()
+  condition?: string;
 }

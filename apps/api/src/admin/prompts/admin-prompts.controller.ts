@@ -178,7 +178,8 @@ export class AdminPromptsController {
           userPrompt: item.userPrompt,
           provider: item.provider ?? null,
           model: item.model ?? null,
-          forceJsonResponse: item.forceJsonResponse ?? true
+          forceJsonResponse: item.forceJsonResponse ?? true,
+          condition: item.condition ?? null
         }))
       });
 
