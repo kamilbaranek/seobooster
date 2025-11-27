@@ -182,7 +182,10 @@ export class WebsService {
       }
     }
 
-    if (web.status !== WebStatus.ACTIVE && updated.status === WebStatus.ACTIVE) {
+    if (
+      (web.status !== WebStatus.ACTIVE && updated.status === WebStatus.ACTIVE) ||
+      (web.onboardingStep !== 8 && updated.onboardingStep === 8 && updated.status !== WebStatus.ERROR && updated.status !== WebStatus.PAUSED)
+    ) {
       await this.jobQueueService.enqueueScanWebsite(updated.id);
     }
 
