@@ -1369,8 +1369,58 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ project, onUpdate }) => {
                                                 onChange={(option) => setSelectedRepo(option)}
                                                 isLoading={loadingRepos}
                                                 placeholder="Select a repository..."
-                                                className="react-select-styled"
+                                                className="react-select-container"
                                                 classNamePrefix="react-select"
+                                                styles={{
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        minHeight: '44px',
+                                                        borderRadius: '0.475rem',
+                                                        borderColor: 'var(--bs-gray-300)',
+                                                        backgroundColor: 'var(--bs-body-bg)',
+                                                        boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(80, 165, 241, 0.25)' : 'none',
+                                                        '&:hover': {
+                                                            borderColor: 'var(--bs-gray-400)'
+                                                        }
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 9999,
+                                                        backgroundColor: 'var(--bs-body-bg)',
+                                                        borderRadius: '0.475rem',
+                                                        border: '1px solid var(--bs-gray-300)',
+                                                        boxShadow: '0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075)'
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        padding: '0.5rem 0'
+                                                    }),
+                                                    option: (base, state) => ({
+                                                        ...base,
+                                                        backgroundColor: state.isSelected
+                                                            ? 'var(--bs-primary)'
+                                                            : state.isFocused
+                                                                ? 'var(--bs-gray-100)'
+                                                                : 'transparent',
+                                                        color: state.isSelected ? 'var(--bs-primary-inverse)' : 'var(--bs-gray-700)',
+                                                        cursor: 'pointer',
+                                                        '&:active': {
+                                                            backgroundColor: 'var(--bs-primary)'
+                                                        }
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        color: 'var(--bs-gray-700)'
+                                                    }),
+                                                    input: (base) => ({
+                                                        ...base,
+                                                        color: 'var(--bs-gray-700)'
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        color: 'var(--bs-gray-500)'
+                                                    })
+                                                }}
                                             />
                                         </div>
                                     </div>
