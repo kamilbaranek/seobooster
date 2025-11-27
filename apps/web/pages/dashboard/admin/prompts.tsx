@@ -19,6 +19,7 @@ interface PromptDto {
     model?: string | null;
     isCustom?: boolean;
     forceJsonResponse?: boolean | null;
+    condition?: string | null;
 }
 
 interface PreviewResponse {
@@ -327,6 +328,7 @@ const AdminPromptsPage = () => {
     const [providerChoice, setProviderChoice] = useState('default');
     const [modelChoice, setModelChoice] = useState('');
     const [forceJsonResponse, setForceJsonResponse] = useState(true);
+    const [condition, setCondition] = useState('');
     const [openrouterModels, setOpenrouterModels] = useState<Array<{ value: string; label: string }>>([]);
     const [modelsLoading, setModelsLoading] = useState(false);
     const [modelsError, setModelsError] = useState<string | null>(null);
@@ -448,6 +450,7 @@ const AdminPromptsPage = () => {
                     setProviderChoice(firstStep.provider ?? 'default');
                     setModelChoice(firstStep.model ?? '');
                     setForceJsonResponse(firstStep.forceJsonResponse ?? true);
+                    setCondition(firstStep.condition ?? '');
                 }
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Nepodařilo se načíst detail promptu.');
@@ -535,7 +538,8 @@ const AdminPromptsPage = () => {
                     userPrompt,
                     provider: providerChoice === 'default' ? null : providerChoice,
                     model: modelChoice || null,
-                    forceJsonResponse
+                    forceJsonResponse,
+                    condition: condition || null
                 };
             }
 
@@ -546,7 +550,8 @@ const AdminPromptsPage = () => {
                     userPrompt: step.userPrompt,
                     provider: step.provider,
                     model: step.model,
-                    forceJsonResponse: step.forceJsonResponse
+                    forceJsonResponse: step.forceJsonResponse,
+                    condition: step.condition
                 })))
             });
             setSuccessMessage('Prompty uloženy.');
@@ -574,6 +579,7 @@ const AdminPromptsPage = () => {
             setProviderChoice('default');
             setModelChoice('');
             setForceJsonResponse(true);
+            setCondition('');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Nepodařilo se resetovat prompt.');
         } finally {
@@ -608,7 +614,8 @@ const AdminPromptsPage = () => {
             userPrompt: '',
             provider: null,
             model: null,
-            forceJsonResponse: true
+            forceJsonResponse: true,
+            condition: null
         };
         setPromptSteps([...promptSteps, newStep]);
         setSelectedStepIndex(promptSteps.length);
@@ -617,6 +624,7 @@ const AdminPromptsPage = () => {
         setProviderChoice('default');
         setModelChoice('');
         setForceJsonResponse(true);
+        setCondition('');
     };
 
     const handleRemoveStep = async (index: number) => {
@@ -661,6 +669,7 @@ const AdminPromptsPage = () => {
             setProviderChoice(newSelectedStep.provider ?? 'default');
             setModelChoice(newSelectedStep.model ?? '');
             setForceJsonResponse(newSelectedStep.forceJsonResponse ?? true);
+            setCondition(newSelectedStep.condition ?? '');
         }
 
         // Save to database
@@ -672,7 +681,8 @@ const AdminPromptsPage = () => {
                     userPrompt: step.userPrompt,
                     provider: step.provider,
                     model: step.model,
-                    forceJsonResponse: step.forceJsonResponse
+                    forceJsonResponse: step.forceJsonResponse,
+                    condition: step.condition
                 })))
             });
             setSuccessMessage('Step deleted successfully.');
@@ -705,7 +715,8 @@ const AdminPromptsPage = () => {
                 userPrompt,
                 provider: providerChoice === 'default' ? null : providerChoice,
                 model: modelChoice || null,
-                forceJsonResponse
+                forceJsonResponse,
+                condition: condition || null
             };
             setPromptSteps(updatedSteps);
         }
@@ -719,6 +730,7 @@ const AdminPromptsPage = () => {
             setProviderChoice(selectedStep.provider ?? 'default');
             setModelChoice(selectedStep.model ?? '');
             setForceJsonResponse(selectedStep.forceJsonResponse ?? true);
+            setCondition(selectedStep.condition ?? '');
         }
     };
 
@@ -952,6 +964,20 @@ const AdminPromptsPage = () => {
                                                                 </label>
                                                             </div>
 
+                                                            <div>
+                                                                <label className="form-label">Podmínka spuštění (volitelné)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="form-control form-control-solid mb-3"
+                                                                    value={condition}
+                                                                    onChange={(event) => setCondition(event.target.value)}
+                                                                    placeholder="např. !webAge nebo type==commercial"
+                                                                />
+                                                                <div className="text-muted fs-7 mb-5">
+                                                                    Pokud je vyplněno, krok se provede pouze při splnění podmínky.
+                                                                </div>
+                                                            </div>
+
                                                             {/* Prompts */}
                                                             <div>
                                                                 <label className="form-label">System prompt</label>
@@ -1005,6 +1031,26 @@ const AdminPromptsPage = () => {
                                                                             ))}
                                                                         </tbody>
                                                                     </table>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Conditional Logic Docs */}
+                                                            <div className="mt-5">
+                                                                <h3 className="fs-5 fw-bold text-gray-900 mb-3">Podmíněná logika</h3>
+                                                                <div className="text-gray-600 fs-6">
+                                                                    <p>Do pole <strong>Podmínka spuštění</strong> můžete zadat výraz, který musí být pravdivý, aby se tento krok provedl. Podporované operátory:</p>
+                                                                    <ul className="list-disc ms-5">
+                                                                        <li><code>variableName</code> - proměnná existuje a je pravdivá (není null, false, 0, "")</li>
+                                                                        <li><code>!variableName</code> - proměnná neexistuje nebo je nepravdivá</li>
+                                                                        <li><code>variable==value</code> - hodnota proměnné se rovná řetězci "value"</li>
+                                                                        <li><code>variable!=value</code> - hodnota proměnné se nerovná řetězci "value"</li>
+                                                                    </ul>
+                                                                    <p className="mt-2">Příklady:</p>
+                                                                    <ul className="list-disc ms-5">
+                                                                        <li><code>targetAudience</code> (spustit pokud je definováno cílové publikum)</li>
+                                                                        <li><code>!webAge</code> (spustit pokud není znám věk webu)</li>
+                                                                        <li><code>type==commercial</code> (spustit pouze pro komerční weby)</li>
+                                                                    </ul>
                                                                 </div>
                                                             </div>
 
