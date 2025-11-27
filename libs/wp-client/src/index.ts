@@ -202,7 +202,7 @@ const sanitizeHeader = (str: string) => {
   return str
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x00-\x7F]/g, '');
+    .replace(/[^\x20-\x7E]/g, '');
 };
 
 export const uploadMedia = (

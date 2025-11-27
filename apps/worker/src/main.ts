@@ -683,12 +683,11 @@ const getPlannedDateForIndex = (startDate: Date, index: number, schedule: string
     allowedDays.push(0, 1, 2, 3, 4, 5, 6);
   }
 
-  let daysAdded = 0;
   // Start checking from the next day to ensure we don't schedule everything on start date if it matches
   // But logic requires index 0 to be first available slot.
   // Let's advance date day by day until we find 'index' number of valid slots.
 
-  let currentCheckDate = new Date(startDate);
+  const currentCheckDate = new Date(startDate);
   // If index is 0, we want the first valid day >= startDate.
   // If index is 1, we want the second valid day, etc.
 
@@ -1102,7 +1101,7 @@ const bootstrap = async () => {
       }
     });
 
-    if (!Boolean(job.data.debug)) {
+    if (!job.data.debug) {
       await analyzeQueue.add('AnalyzeBusiness', {
         webId: web.id,
         rawScanOutput: rawScanText ?? null
@@ -1169,7 +1168,7 @@ const bootstrap = async () => {
       }
     }
 
-    if (!Boolean(job.data.debug)) {
+    if (!job.data.debug) {
       await strategyQueue.add('CreateSeoStrategy', { webId: job.data.webId });
     }
   });

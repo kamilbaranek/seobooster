@@ -1,4 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
+import { resolve } from 'path';
+import { existsSync, readdirSync } from 'fs';
 import { AppService } from './app.service';
 
 @Controller()
@@ -12,9 +14,6 @@ export class AppController {
 
   @Get('debug-assets')
   getDebugAssets() {
-    const { resolve } = require('path');
-    const { existsSync, readdirSync } = require('fs');
-
     const resolveProjectRoot = () => {
       if (process.env.PROJECT_ROOT) {
         return process.env.PROJECT_ROOT;
