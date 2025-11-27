@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ArticlePlanStatus, IntegrationType, Prisma, WebWordpressAuthor, WebWordpressCategory } from '@prisma/client';
+import { ArticlePlanStatus, ArticleStatus, IntegrationType, Prisma, WebWordpressAuthor, WebWordpressCategory } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../crypto/encryption.service';
 import { ArticleListQueryDto } from './dto/article-list-query.dto';
+import { ArticleActivityQueryDto } from './dto/article-activity-query.dto';
 import { ArticleMetadataDto } from './dto/article-metadata.dto';
 import { WordpressDefaultsDto } from './dto/wordpress-defaults.dto';
 import { JobQueueService } from '../queues/queues.service';
@@ -142,6 +143,100 @@ export class ArticlesService {
         autoPublishMode
       };
     });
+  }
+
+  async listArticleActivity(userId: string, query: ArticleActivityQueryDto) {
+    const take = Math.min(query.limit ?? 4, 50);
+    const statusFilter = query.status ?? 'all';
+
+    const plans = await this.prisma.articlePlan.findMany({
+      where: {
+        web: { userId },
+        status: {
+          in: [
+            ArticlePlanStatus.PLANNED,
+            ArticlePlanStatus.QUEUED,
+            ArticlePlanStatus.GENERATED,
+            ArticlePlanStatus.PUBLISHED
+          ]
+        }
+      },
+      include: {
+        web: {
+          select: { id: true, url: true, nickname: true }
+        },
+        article: {
+          select: {
+            id: true,
+            title: true,
+            markdown: true,
+            status: true,
+            createdAt: true,
+            publishedAt: true
+          }
+        },
+        supportingArticle: {
+          select: {
+            title: true
+          }
+        }
+      }
+    });
+
+    const items = plans.map((plan) => {
+      const history: { status: 'PLANNED' | 'GENERATED' | 'PUBLISHED'; at: Date }[] = [
+        { status: 'PLANNED', at: plan.plannedPublishAt }
+      ];
+
+      const article = plan.article;
+      if (article) {
+        history.push({ status: 'GENERATED', at: article.createdAt });
+        if (article.publishedAt) {
+          history.push({ status: 'PUBLISHED', at: article.publishedAt });
+        } else if (article.status === ArticleStatus.PUBLISHED) {
+          // fallback if publishedAt chybí
+          history.push({ status: 'PUBLISHED', at: article.createdAt });
+        }
+      } else if (plan.status === ArticlePlanStatus.PUBLISHED) {
+        // bezpečnostní fallback
+        history.push({ status: 'PUBLISHED', at: plan.plannedPublishAt });
+      }
+
+      // seřaď podle času
+      history.sort((a, b) => a.at.getTime() - b.at.getTime());
+      const current = history[history.length - 1];
+
+      return {
+        articleId: article?.id ?? null,
+        webId: plan.webId,
+        webUrl: plan.web.url,
+        webNickname: plan.web.nickname ?? plan.web.url,
+        title: article?.title ?? plan.supportingArticle.title,
+        titlePreview: this.buildTitlePreview(article?.title ?? plan.supportingArticle.title),
+        currentStatus: current.status,
+        currentStatusAt: current.at,
+        history
+      };
+    });
+
+    const filtered = items.filter((item) => {
+      if (statusFilter === 'published') return item.currentStatus === 'PUBLISHED';
+      if (statusFilter === 'generated') return item.currentStatus === 'GENERATED';
+      return true;
+    });
+
+    const sorted = filtered.sort(
+      (a, b) => b.currentStatusAt.getTime() - a.currentStatusAt.getTime()
+    );
+
+    return sorted.slice(0, take).map((item) => ({
+      ...item,
+      currentStatusAt: item.currentStatusAt.toISOString(),
+      history: item.history.map((h) => ({
+        status: h.status,
+        at: h.at.toISOString()
+      }))
+    }));
   }
 
   async getArticle(userId: string, webId: string, articleId: string) {
@@ -473,5 +568,11 @@ export class ArticlesService {
     } catch (_error) {
       throw new BadRequestException('WordPress credentials cannot be decrypted.');
     }
+  }
+
+  private buildTitlePreview(title: string) {
+    const words = title.trim().split(/\s+/).slice(0, 8);
+    const preview = words.join(' ');
+    return title.length > preview.length ? `${preview}…` : preview;
   }
 }
