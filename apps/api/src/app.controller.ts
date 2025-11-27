@@ -27,7 +27,7 @@ export class AppController {
       process.env.ASSET_STORAGE_LOCAL_PATH ?? './storage/website-assets'
     );
 
-    let files = [];
+    let files: string[] = [];
     let error = null;
     try {
       if (existsSync(assetPath)) {
