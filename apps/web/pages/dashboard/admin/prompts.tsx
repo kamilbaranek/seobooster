@@ -873,18 +873,7 @@ const AdminPromptsPage = () => {
                                                     <i className="ki-outline ki-home fs-4 me-1"></i>General
                                                 </a>
                                             </li>
-                                            <li className="nav-item">
-                                                <a
-                                                    className={`nav-link text-active-primary d-flex align-items-center pb-4 ${activeTab === 'general' ? 'active' : ''}`}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        setActiveTab('general');
-                                                    }}
-                                                    href="#"
-                                                >
-                                                    <i className="ki-outline ki-home fs-4 me-1"></i>General
-                                                </a>
-                                            </li>
+
                                             <li className="nav-item">
                                                 <a
                                                     className={`nav-link text-active-primary d-flex align-items-center pb-4 ${activeTab === 'settings' ? 'active' : ''}`}
