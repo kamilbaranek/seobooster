@@ -66,6 +66,8 @@ model User {
   id               String   @id @default(cuid())
   email            String   @unique
   passwordHash     String
+  resetToken       String?  @unique
+  resetTokenExpires DateTime?
   role             UserRole @default(USER)
   stripeCustomerId String?  @unique
   createdAt        DateTime @default(now())

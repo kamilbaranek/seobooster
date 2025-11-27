@@ -52,3 +52,28 @@ export const getArticleGeneratedEmail = (
     html
   };
 };
+
+export const getPasswordResetEmail = (link: string) => {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Reset Your Password</h2>
+      <p>You have requested to reset your password. Click the link below to set a new password:</p>
+      
+      <div style="margin: 30px 0;">
+        <a href="${link}" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
+      </div>
+
+      <p>If you didn't request this, you can safely ignore this email.</p>
+
+      <hr style="margin-top: 40px; border: none; border-top: 1px solid #eaeaea;" />
+      <p style="color: #666; font-size: 12px;">
+        This link will expire in 1 hour.
+      </p>
+    </div>
+  `;
+
+  return {
+    subject: 'Reset Your Password',
+    html
+  };
+};

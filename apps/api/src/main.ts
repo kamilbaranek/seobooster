@@ -35,8 +35,9 @@ console.log(`API starting with PROJECT_ROOT: ${projectRoot}`);
 const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
   const webOrigin = process.env.WEB_APP_URL ?? 'http://localhost:3000';
+  const origins = webOrigin.split(',').map((origin) => origin.trim());
   app.enableCors({
-    origin: webOrigin,
+    origin: origins,
     credentials: false
   });
 
