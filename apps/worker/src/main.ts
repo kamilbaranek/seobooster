@@ -389,28 +389,43 @@ type PromptConfig = {
 
 const evaluateCondition = (condition: string, variables: Record<string, unknown>): boolean => {
   try {
+    // Handle OR logic (||) - lowest precedence
+    if (condition.includes('||')) {
+      const parts = condition.split('||');
+      return parts.some(part => evaluateCondition(part.trim(), variables));
+    }
+
+    // Handle AND logic (&&) - higher precedence
+    if (condition.includes('&&')) {
+      const parts = condition.split('&&');
+      return parts.every(part => evaluateCondition(part.trim(), variables));
+    }
+
+    // Base cases (existing logic)
+    const trimmedCondition = condition.trim();
+
     // Simple check for existence/truthiness
-    if (!condition.includes(' ') && !condition.includes('!')) {
-      return !!variables[condition];
+    if (!trimmedCondition.includes(' ') && !trimmedCondition.includes('!') && !trimmedCondition.includes('=')) {
+      return !!variables[trimmedCondition];
     }
 
     // Simple check for falsiness
-    if (condition.startsWith('!') && !condition.includes(' ')) {
-      const key = condition.slice(1);
+    if (trimmedCondition.startsWith('!') && !trimmedCondition.includes(' ') && !trimmedCondition.includes('=')) {
+      const key = trimmedCondition.slice(1);
       return !variables[key];
     }
 
     // Simple equality check: key == value
-    if (condition.includes('==')) {
-      const [key, value] = condition.split('==').map(s => s.trim());
+    if (trimmedCondition.includes('==')) {
+      const [key, value] = trimmedCondition.split('==').map(s => s.trim());
       // Remove quotes from value if present
       const cleanValue = value.replace(/^['"]|['"]$/g, '');
       return String(variables[key]) === cleanValue;
     }
 
     // Simple inequality check: key != value
-    if (condition.includes('!=')) {
-      const [key, value] = condition.split('!=').map(s => s.trim());
+    if (trimmedCondition.includes('!=')) {
+      const [key, value] = trimmedCondition.split('!=').map(s => s.trim());
       const cleanValue = value.replace(/^['"]|['"]$/g, '');
       return String(variables[key]) !== cleanValue;
     }

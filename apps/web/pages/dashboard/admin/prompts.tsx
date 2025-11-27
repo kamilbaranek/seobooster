@@ -1100,12 +1100,15 @@ const AdminPromptsPage = () => {
                                                                     <li><code>!variableName</code> - proměnná neexistuje nebo je nepravdivá</li>
                                                                     <li><code>variable==value</code> - hodnota proměnné se rovná řetězci "value"</li>
                                                                     <li><code>variable!=value</code> - hodnota proměnné se nerovná řetězci "value"</li>
+                                                                    <li><code>A && B</code> - logický AND (obě podmínky musí platit)</li>
+                                                                    <li><code>A || B</code> - logický OR (alespoň jedna podmínka musí platit)</li>
                                                                 </ul>
                                                                 <p className="mt-2">Příklady:</p>
                                                                 <ul className="list-disc ms-5">
                                                                     <li><code>targetAudience</code> (spustit pokud je definováno cílové publikum)</li>
                                                                     <li><code>!webAge</code> (spustit pokud není znám věk webu)</li>
                                                                     <li><code>type==commercial</code> (spustit pouze pro komerční weby)</li>
+                                                                    <li><code>type==commercial && !webAge</code> (komerční web bez známého věku)</li>
                                                                 </ul>
                                                             </div>
                                                         </div>
