@@ -1238,14 +1238,14 @@ const bootstrap = async () => {
       scanResult: scan,
       rawScanOutput: job.data.rawScanOutput ?? null,
       additionalInfo: analysis.web.additionalInfo ?? null,
-      businessGoal: analysis.web.businessGoal ?? [],
+      businessGoal: (analysis.web.businessGoal ?? []).join(', '),
       conversionGoal: analysis.web.conversionGoal ?? null,
       webAge: analysis.web.webAge ?? null,
       projectType: analysis.web.projectType ?? null,
       type: analysis.web.projectType ?? null, // alias for backward compatibility
       platform: analysis.web.platform ?? null,
       targetAudience: (analysis.web.audience as any)?.target ?? null,
-      competitorUrls: (analysis.web.competitors as any)?.urls ?? [],
+      competitorUrls: ((analysis.web.competitors as any)?.urls ?? []).join(', '),
       audience: analysis.web.audience ?? null,
       competitors: analysis.web.competitors ?? null
     };
@@ -1318,7 +1318,7 @@ const bootstrap = async () => {
       businessProfile,
       publishedArticlesTable,
       additionalInfo: analysis.web.additionalInfo ?? null,
-      businessGoal: analysis.web.businessGoal ?? [],
+      businessGoal: (analysis.web.businessGoal ?? []).join(', '),
       conversionGoal: analysis.web.conversionGoal ?? null,
       competitors: analysis.web.competitors ?? null,
       audience: analysis.web.audience ?? null,
@@ -1327,7 +1327,7 @@ const bootstrap = async () => {
       type: analysis.web.projectType ?? null, // alias for backward compatibility
       platform: analysis.web.platform ?? null,
       targetAudience: (analysis.web.audience as any)?.target ?? null,
-      competitorUrls: (analysis.web.competitors as any)?.urls ?? []
+      competitorUrls: ((analysis.web.competitors as any)?.urls ?? []).join(', ')
     };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
