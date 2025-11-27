@@ -1239,7 +1239,11 @@ const bootstrap = async () => {
       rawScanOutput: job.data.rawScanOutput ?? null,
       additionalInfo: analysis.web.additionalInfo ?? null,
       businessGoal: analysis.web.businessGoal ?? [],
-      conversionGoal: analysis.web.conversionGoal ?? null
+      conversionGoal: analysis.web.conversionGoal ?? null,
+      webAge: analysis.web.webAge ?? null,
+      projectType: analysis.web.projectType ?? null,
+      type: analysis.web.projectType ?? null, // alias for backward compatibility
+      platform: analysis.web.platform ?? null
     };
 
     const { finalOutput: profile } = await runPromptSteps<BusinessProfile>(
@@ -1313,7 +1317,11 @@ const bootstrap = async () => {
       businessGoal: analysis.web.businessGoal ?? [],
       conversionGoal: analysis.web.conversionGoal ?? null,
       competitors: analysis.web.competitors ?? null,
-      audience: analysis.web.audience ?? null
+      audience: analysis.web.audience ?? null,
+      webAge: analysis.web.webAge ?? null,
+      projectType: analysis.web.projectType ?? null,
+      type: analysis.web.projectType ?? null, // alias for backward compatibility
+      platform: analysis.web.platform ?? null
     };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(

@@ -87,6 +87,30 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
                 'Raw text / message content z kroku Scan (použij, když je JSON response vypnutý nebo model vrací text).'
         },
         {
+            name: '{{additionalInfo}}',
+            description: 'Dodatečné informace o webu zadané uživatelem.'
+        },
+        {
+            name: '{{businessGoal}}',
+            description: 'Obchodní cíle webu (pole stringů).'
+        },
+        {
+            name: '{{conversionGoal}}',
+            description: 'Konverzní cíl webu.'
+        },
+        {
+            name: '{{webAge}}',
+            description: 'Stáří webu (new / history).'
+        },
+        {
+            name: '{{projectType}}',
+            description: 'Typ projektu (commercial / non_commercial). Alias: {{type}}.'
+        },
+        {
+            name: '{{platform}}',
+            description: 'Platforma webu (wordpress / shopify / ...).'
+        },
+        {
             name: '{{previousStepOutput}}',
             description: 'Kompletní výstup z předchozího kroku (objekt s content, rawResponse, parsed).'
         },
@@ -116,6 +140,38 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         {
             name: '{{publishedArticlesTable}}',
             description: 'Markdown tabulka posledních 50 publikovaných článků (Title | Url | Keywords). Pomáhá vyhnout se duplicitě a zlepšit interní linkování.'
+        },
+        {
+            name: '{{additionalInfo}}',
+            description: 'Dodatečné informace o webu zadané uživatelem.'
+        },
+        {
+            name: '{{businessGoal}}',
+            description: 'Obchodní cíle webu (pole stringů).'
+        },
+        {
+            name: '{{conversionGoal}}',
+            description: 'Konverzní cíl webu.'
+        },
+        {
+            name: '{{webAge}}',
+            description: 'Stáří webu (new / history).'
+        },
+        {
+            name: '{{projectType}}',
+            description: 'Typ projektu (commercial / non_commercial). Alias: {{type}}.'
+        },
+        {
+            name: '{{platform}}',
+            description: 'Platforma webu (wordpress / shopify / ...).'
+        },
+        {
+            name: '{{competitors}}',
+            description: 'Seznam konkurentů (pokud je k dispozici).'
+        },
+        {
+            name: '{{audience}}',
+            description: 'Cílové publikum (z analýzy).'
         },
         {
             name: '{{previousStepOutput}}',
@@ -232,19 +288,6 @@ const VARIABLE_DOCS: Record<TaskKey, Array<{ name: string; description: string }
         }
     ],
     article_image: [
-        {
-            name: '{{business}}',
-            description: 'Shrnutí firmy (name, description, targetAudience).'
-        },
-        { name: '{{business.name}}', description: 'Název firmy / projektu.' },
-        { name: '{{business.description}}', description: 'Popis/mise firmy.' },
-        { name: '{{business.targetAudience}}', description: 'Cílové publikum (pole stringů).' },
-        { name: '{{web}}', description: 'Informace o webu (url, nickname).' },
-        { name: '{{web.url}}', description: 'URL webu.' },
-        {
-            name: '{{web.nickname}}',
-            description: 'Interní název / přezdívka webu (pokud je nastavená).'
-        },
         { name: '{{article}}', description: 'Informace o článku (title, summary, keywords).' },
         { name: '{{article.title}}', description: 'Název článku / nadpis (H1).' },
         { name: '{{article.summary}}', description: 'Zkrácený obsah článku (první část markdown).' },
