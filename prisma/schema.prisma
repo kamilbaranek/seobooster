@@ -72,6 +72,8 @@ model User {
   stripeCustomerId String?  @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  googleId         String?  @unique
+  avatarUrl        String?
 
   subscriptions Subscription[]
   webs          Web[]

@@ -54,7 +54,11 @@ const LoginPage = () => {
   };
 
   const handleSocialLogin = (provider: string) => {
-    // TODO: Implement social login
+    if (provider === 'Google') {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3333/api';
+      window.location.href = `${apiBaseUrl}/auth/google`;
+      return;
+    }
     alert(`${provider} login bude implementován později`);
   };
 

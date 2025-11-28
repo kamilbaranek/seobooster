@@ -142,6 +142,52 @@ export class AuthService {
     });
   }
 
+  async validateGoogleUser(details: { email: string; firstName: string; lastName: string; picture: string; googleId: string }): Promise<AuthResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: details.email },
+      include: {
+        webs: true,
+        subscriptions: {
+          where: { status: SubscriptionStatus.ACTIVE },
+          take: 1,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (user) {
+      // Link googleId if not present
+      if (!user.googleId) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { googleId: details.googleId, avatarUrl: details.picture }
+        });
+      }
+      return this.buildAuthResponse(user);
+    }
+
+    // Create new user
+    const newUser = await this.prisma.user.create({
+      data: {
+        email: details.email,
+        googleId: details.googleId,
+        avatarUrl: details.picture,
+        passwordHash: '', // No password for Google users
+        role: UserRole.USER,
+      },
+      include: {
+        webs: true,
+        subscriptions: {
+          where: { status: SubscriptionStatus.ACTIVE },
+          take: 1,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    return this.buildAuthResponse(newUser);
+  }
+
   private buildAuthResponse(
     user: User & {
       webs: Web[];

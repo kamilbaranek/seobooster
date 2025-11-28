@@ -1,4 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Req, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -26,5 +28,19 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() payload: { token: string; password: string }): Promise<void> {
     return this.authService.resetPassword(payload.token, payload.password);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(@Req() _req: Request) {
+    // Guard redirects to Google
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
+    const authResponse = await this.authService.validateGoogleUser(req.user);
+    const frontendUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?token=${authResponse.accessToken}`);
   }
 }
