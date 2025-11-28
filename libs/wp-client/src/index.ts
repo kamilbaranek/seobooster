@@ -51,6 +51,8 @@ export interface UploadMediaOptions {
   mimeType: string;
   title?: string;
   altText?: string;
+  description?: string;
+  caption?: string;
 }
 
 export interface WordpressCategory {
@@ -211,6 +213,21 @@ export const uploadMedia = (
   options: UploadMediaOptions
 ): Promise<WordpressMediaResponse> => {
   const url = new URL('/wp-json/wp/v2/media', credentials.baseUrl);
+
+  // Add metadata as query parameters
+  if (options.title) {
+    url.searchParams.append('title', options.title);
+  }
+  if (options.altText) {
+    url.searchParams.append('alt_text', options.altText);
+  }
+  if (options.description) {
+    url.searchParams.append('description', options.description);
+  }
+  if (options.caption) {
+    url.searchParams.append('caption', options.caption);
+  }
+
   const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
   const body = toBuffer(binary);
   const safeFilename = sanitizeHeader(options.filename);
@@ -221,12 +238,6 @@ export const uploadMedia = (
     'Content-Length': String(body.byteLength),
     'Content-Disposition': `attachment; filename="${safeFilename}"`
   };
-  if (options.title) {
-    headers['X-WP-Title'] = sanitizeHeader(options.title);
-  }
-  if (options.altText) {
-    headers['X-WP-Alt-Text'] = sanitizeHeader(options.altText);
-  }
 
   return new Promise<WordpressMediaResponse>((resolve, reject) => {
     const req = transport(

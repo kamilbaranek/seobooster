@@ -893,6 +893,16 @@ type DownloadedImage = {
   filename: string;
 };
 
+const slugify = (text: string) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+    .replace(/\-\-+/g, '-'); // Replace multiple - with single -
+};
+
 const downloadFeaturedImageBinary = async (
   publicUrl: string | null | undefined,
   localPath: string | null
@@ -1790,13 +1800,17 @@ const bootstrap = async () => {
       'ArticleImage record updated with generation details'
     );
 
+    const projectName = article.web.nickname ?? article.web.url;
+    const projectSlug = slugify(projectName);
+    const titleSlug = slugify(article.title);
+
     let imageResult;
     try {
       imageResult = await providerForCall.generateImage(
         {
           prompt: renderedPrompts.userPrompt,
           size: 'landscape',
-          suggestedFileName: `${article.id} - featured`
+          suggestedFileName: `${projectSlug}-${titleSlug}`
         },
         {
           task: 'article_image',
@@ -2003,7 +2017,9 @@ const bootstrap = async () => {
               filename: downloaded.filename,
               mimeType: downloaded.mimeType,
               title: article.title,
-              altText: article.title
+              altText: article.title,
+              description: article.title,
+              caption: article.title
             });
             featuredMediaId = media.id;
             featuredMediaSourceUrl = media.source_url;
