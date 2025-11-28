@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import AppNavbar from "./AppNavbar";
 import type { DashboardWeb } from "./DashboardLayout";
 
@@ -95,12 +96,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({ webs }) => {
                   Přidej první web pro personalizovanou strategii
                 </div>
               )}
-              <a
-                href="/onboarding/add-site"
+              <Link
+                href="/onboarding/wizard?new=true"
                 className="btn btn-icon border border-200 bg-gray-100 btn-color-gray-600 btn-active-primary ms-2 ms-lg-6"
               >
                 <i className="ki-outline ki-plus fs-3" />
-              </a>
+              </Link>
             </div>
           </div>
           <AppNavbar />

@@ -54,7 +54,8 @@ const WizardPage = () => {
             let webId = router.query.webId as string;
 
             // If no webId in URL, check if user already has a web (e.g. from failed onboarding)
-            if (!webId) {
+            // BUT if 'new=true' is present, we want to start fresh, so skip this check.
+            if (!webId && router.query.new !== 'true') {
                 try {
                     const webs = await apiFetch<any[]>('/webs');
                     if (webs && webs.length > 0) {

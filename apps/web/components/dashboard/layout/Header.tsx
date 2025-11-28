@@ -103,9 +103,9 @@ const Header = () => {
                                     </Link>
                                 );
                             })}
-                            <a href="#" className="btn btn-icon border border-200 bg-gray-100 btn-color-gray-600 btn-active-primary ms-2 ms-lg-6">
+                            <Link href="/onboarding/wizard?new=true" className="btn btn-icon border border-200 bg-gray-100 btn-color-gray-600 btn-active-primary ms-2 ms-lg-6">
                                 <i className="ki-outline ki-plus fs-3"></i>
-                            </a>
+                            </Link>
                         </div>
                     </div>
                     {/*begin::Navbar*/}
