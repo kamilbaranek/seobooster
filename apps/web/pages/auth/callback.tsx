@@ -24,13 +24,13 @@ const AuthCallback = () => {
             saveToken(token);
 
             // Fetch user details to decide where to redirect
-            apiFetch<AuthResponse['user']>('/auth/me')
-                .then((user) => {
-                    const webs = user.webs;
+            apiFetch<{ webs: any[] }>('/me')
+                .then((data) => {
+                    const webs = data.webs;
                     if (webs.length === 0) {
                         router.push('/onboarding/wizard');
                     } else {
-                        const incompleteWeb = webs.find(w => (w.onboardingStep || 0) < 7);
+                        const incompleteWeb = webs.find((w: any) => (w.onboardingStep || 0) < 7);
                         if (incompleteWeb) {
                             router.push(`/onboarding/wizard?webId=${incompleteWeb.id}`);
                         } else {
