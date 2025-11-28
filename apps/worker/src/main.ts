@@ -731,7 +731,7 @@ const getTimezoneOffsetHours = (timeZone: string) => {
 
 const getInitialPlanStartDate = (timezone?: string | null) => {
   const base = new Date();
-  base.setUTCDate(base.getUTCDate() + 1);
+  // base.setUTCDate(base.getUTCDate() + 1); // Removed to allow immediate scheduling
 
   const offset = timezone ? getTimezoneOffsetHours(timezone) : 0;
   const startHourUtc = PLAN_WINDOW_START_HOUR - offset;
@@ -1238,14 +1238,14 @@ const bootstrap = async () => {
       scanResult: scan,
       rawScanOutput: job.data.rawScanOutput ?? null,
       additionalInfo: analysis.web.additionalInfo ?? null,
-      businessGoal: (analysis.web.businessGoal ?? []).join(', '),
+      businessGoal: analysis.web.businessGoal ?? [],
       conversionGoal: analysis.web.conversionGoal ?? null,
       webAge: analysis.web.webAge ?? null,
       projectType: analysis.web.projectType ?? null,
       type: analysis.web.projectType ?? null, // alias for backward compatibility
       platform: analysis.web.platform ?? null,
       targetAudience: (analysis.web.audience as any)?.target ?? null,
-      competitorUrls: ((analysis.web.competitors as any)?.urls ?? []).join(', '),
+      competitorUrls: (analysis.web.competitors as any)?.urls ?? [],
       audience: analysis.web.audience ?? null,
       competitors: analysis.web.competitors ?? null
     };
@@ -1318,7 +1318,7 @@ const bootstrap = async () => {
       businessProfile,
       publishedArticlesTable,
       additionalInfo: analysis.web.additionalInfo ?? null,
-      businessGoal: (analysis.web.businessGoal ?? []).join(', '),
+      businessGoal: analysis.web.businessGoal ?? [],
       conversionGoal: analysis.web.conversionGoal ?? null,
       competitors: analysis.web.competitors ?? null,
       audience: analysis.web.audience ?? null,
@@ -1327,7 +1327,7 @@ const bootstrap = async () => {
       type: analysis.web.projectType ?? null, // alias for backward compatibility
       platform: analysis.web.platform ?? null,
       targetAudience: (analysis.web.audience as any)?.target ?? null,
-      competitorUrls: ((analysis.web.competitors as any)?.urls ?? []).join(', ')
+      competitorUrls: (analysis.web.competitors as any)?.urls ?? []
     };
 
     const { finalOutput: strategy } = await runPromptSteps<SeoStrategy>(
@@ -1548,6 +1548,8 @@ const bootstrap = async () => {
       where: { id: plan.id },
       data: {
         status: ArticlePlanStatus.GENERATED,
+        // Update the planned date to now, so it reflects the actual generation time
+        plannedPublishAt: new Date(),
         // Only update articleId if this is the first generation (not a regeneration)
         // If it's a regeneration, the new article is created but not set as active
         articleId: previousArticle ? undefined : article.id,

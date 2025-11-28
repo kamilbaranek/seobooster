@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { EventDropArg, EventInput } from '@fullcalendar/core';
+import { EventResizeDoneArg } from '@fullcalendar/interaction';
 import { apiFetch } from '../../../lib/api-client';
 
 interface ArticlePlan {
@@ -80,20 +81,42 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ plans = [], webId }) => {
         }
     };
 
+    const handleEventResize = async (info: EventResizeDoneArg) => {
+        if (!resolvedWebId) {
+            info.revert();
+            return;
+        }
+
+        const newStart = info.event.start;
+        if (!newStart) {
+            info.revert();
+            return;
+        }
+
+        // Only update if start time changed (resizing from start)
+        // If resizing from end, we don't persist it as we only have plannedPublishAt
+        // But we still update local state to reflect the change in UI
+        setEvents((prev) =>
+            prev.map((ev) =>
+                ev.id === info.event.id ? { ...ev, start: newStart.toISOString() } : ev
+            )
+        );
+
+        try {
+            await apiFetch(`/webs/${resolvedWebId}/article-plans/${info.event.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ plannedPublishAt: newStart.toISOString() })
+            });
+        } catch (error) {
+            console.error('Failed to update plan date', error);
+            info.revert();
+        }
+    };
+
     return (
         <div id="kt_app_content_container" className="app-container container-fluid">
             {/*begin::Card*/}
             <div className="card">
-                {/*begin::Card header*/}
-                <div className="card-header">
-                    <h2 className="card-title fw-bold">Calendar</h2>
-                    <div className="card-toolbar">
-                        <button className="btn btn-flex btn-primary" data-kt-calendar="add">
-                            <i className="ki-outline ki-plus fs-2"></i>Add Event
-                        </button>
-                    </div>
-                </div>
-                {/*end::Card header*/}
                 {/*begin::Card body*/}
                 <div className="card-body">
                     {/*begin::Calendar*/}
@@ -182,6 +205,9 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ plans = [], webId }) => {
                             dayMaxEvents={true}
                             dayMaxEventRows={true}
                             moreLinkClick="popover"
+                            eventResizableFromStart={true}
+                            eventDurationEditable={true}
+                            eventResize={handleEventResize}
                             eventDrop={handleEventDrop}
                             eventContent={(arg) => {
                                 const isAutoPublish = arg.event.extendedProps.autoPublishMode === 'auto_publish';
