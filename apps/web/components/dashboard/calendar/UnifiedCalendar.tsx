@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { EventDropArg, EventInput } from '@fullcalendar/core';
+import { EventResizeDoneArg } from '@fullcalendar/interaction';
 import { apiFetch } from '../../../lib/api-client';
 import Swal from 'sweetalert2';
 
@@ -139,6 +140,43 @@ const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({ plans, onUpdate }) =>
         }
     };
 
+    const handleEventResize = async (info: EventResizeDoneArg) => {
+        const webId = info.event.extendedProps.webId;
+        const newStart = info.event.start;
+
+        if (!newStart || !webId) {
+            info.revert();
+            return;
+        }
+
+        // Optimistic update
+        setEvents((prev) =>
+            prev.map((ev) =>
+                ev.id === info.event.id ? { ...ev, start: newStart.toISOString() } : ev
+            )
+        );
+
+        try {
+            await apiFetch(`/webs/${webId}/article-plans/${info.event.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ plannedPublishAt: newStart.toISOString() })
+            });
+            if (onUpdate) onUpdate();
+        } catch (error) {
+            console.error('Failed to update plan date', error);
+            info.revert();
+            Swal.fire({
+                text: "Failed to update event date.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                }
+            });
+        }
+    };
+
     return (
         <div className="card">
             <div className="card-header">
@@ -225,6 +263,9 @@ const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({ plans, onUpdate }) =>
                         droppable={true}
                         dayMaxEvents={true}
                         dayMaxEventRows={true}
+                        eventResizableFromStart={true}
+                        eventDurationEditable={true}
+                        eventResize={handleEventResize}
                         eventDrop={handleEventDrop}
                         eventContent={(arg) => {
                             const isAutoPublish = arg.event.extendedProps.autoPublishMode === 'auto_publish';
