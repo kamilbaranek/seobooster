@@ -55,7 +55,7 @@ const LoginPage = () => {
 
   const handleSocialLogin = (provider: string) => {
     if (provider === 'Google') {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3333/api';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'https://budliki.com/api';
       window.location.href = `${apiBaseUrl}/auth/google`;
       return;
     }
